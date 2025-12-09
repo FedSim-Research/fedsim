@@ -1,0 +1,91 @@
+/* --- Variables & Reset --- */
+:root {
+  --sidebar-width: 500px;
+  --bg-color: #121212; /* Dark background */
+  --text-color: #a0a0a0; /* Muted text */
+  --text-hover: #ffffff; /* White text on hover */
+  --accent-color: #3b82f6; /* Blue accent */
+  --hover-bg: #1e1e1e; /* Slightly lighter bg on hover */
+  --font-family: 'Inter', sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: sans-serif;
+}
+
+body {
+  display: flex;
+  background-color: #f4f4f5; /* Light bg for the main content area */
+}
+
+/* --- Sidebar Container --- */
+.sidebar {
+  width: var(--sidebar-width);
+  height: 100vh;
+  background-color: #121212;
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  padding: 20px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  border-right: 1px solid #2a2a2a;
+}
+
+/* --- Logo Section --- */
+.logo-container {
+  padding: 0 10px 40px 10px;
+}
+
+.logo-text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -1px;
+}
+
+/* --- Navigation List --- */
+.nav-links {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-grow: 1; /* Pushes bottom section down */
+}
+
+/* --- Links Styling --- */
+.sidebar a {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 12px 15px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--text-color);
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+/* Hover State */
+.sidebar a:hover {
+  background-color: var(--hover-bg);
+  color: var(--text-hover);
+  transform: translateX(4px); /* Subtle shift right */
+}
+
+/* Active State */
+.sidebar a.active {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+/* Icons */
+.sidebar i {
+  font-size: 1.1rem;
+  min-width: 20px;
+}
