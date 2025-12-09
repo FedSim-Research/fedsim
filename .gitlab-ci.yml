@@ -1,0 +1,12 @@
+stages:
+  - build-frontend
+
+frontend-build:
+  stage: build-frontend
+  script:
+    - cd code/frontend
+    - npm ci
+    - npm run build
+  rules:
+    - changes:
+        - code/frontend/**/*
