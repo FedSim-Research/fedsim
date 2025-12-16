@@ -1,0 +1,64 @@
+.client-node {
+  width: 100px;
+  height: 100px;
+  background: #0b0b0b; /* Fast Schwarz */
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #ffffff;
+  align-items: center;
+  font-family: 'Inter', system-ui, sans-serif;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  border-top: 4px solid #1e90ff;
+  transition:
+    transform 0.1s,
+    box-shadow 0.1s;
+}
+
+.client-node:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+}
+
+/* Header Styling */
+.client.node-header {
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.client.node-header strong {
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+
+.client-node.badge {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Content Styling */
+.client-node.body {
+  padding: 12px;
+  font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.client-node.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}

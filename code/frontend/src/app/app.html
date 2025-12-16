@@ -1,0 +1,13 @@
+<div class="canvas-wrapper" (dragover)="onDragOver($event)" (drop)="onDrop($event)">
+  <vflow
+    [nodes]="nodes"
+    [edges]="edges"
+    view="auto"
+    [background]="{ type: 'dots' }"
+    [alignmentHelper]="true"
+  >
+    <mini-map />
+  </vflow>
+
+  <app-sidebar />
+</div>

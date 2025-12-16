@@ -1,5 +1,8 @@
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ClientNode } from '../nodes/client-node/client-node';
+import { ServerNode } from '../nodes/server-node/server-node';
+import { SuperServerNode } from '../nodes/super-server-node/super-server-node';
 
 @Component({
   selector: 'app-sidebar',
@@ -58,9 +61,9 @@ export class SidebarComponent {
 
   public onDragStart(
     event: DragEvent,
-    kind: 'superserver' | 'server' | 'client'
+    kind: 'SuperServerNode' | 'ServerNode' | 'ClientNode'
   ): void {
-    if (kind === 'superserver' && this.selectedArchitectures.spyker) {
+    if (kind === 'SuperServerNode' && this.selectedArchitectures.spyker) {
       event.preventDefault();
       return;
     }
@@ -68,7 +71,7 @@ export class SidebarComponent {
 
     const payload = {
       type: kind,
-      config: this.configDraft[kind]
+      config: this.configDraft
     };
 
     // Daten als JSON String anhängen
