@@ -1,64 +1,76 @@
-.client-node {
-  width: 100px;
-  height: 100px;
-  background: #0b0b0b; /* Fast Schwarz */
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
+:host {
+  display: block;
+  width: fit-content;
+  user-select: none;
+}
+
+.node-card {
+  width: 220px;
+  background: rgb(15, 15, 15);
+  border: 1px solid rgba(255, 255, 255, 0.107);
+  border-radius: 12px;
   color: #ffffff;
-  align-items: center;
   font-family: 'Inter', system-ui, sans-serif;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  border-top: 4px solid #1e90ff;
-  transition:
-    transform 0.1s,
-    box-shadow 0.1s;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
-.client-node:hover {
-  border-color: rgba(255, 255, 255, 0.4);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+.node-header {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-/* Header Styling */
-.client.node-header {
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+.node-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #10b981;
+  border-radius: 50%;
+}
+
+.node-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spec-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.client.node-header strong {
-  font-size: 0.85rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 110px;
-}
-
-.client-node.badge {
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.6);
 }
 
-/* Content Styling */
-.client-node.body {
-  padding: 12px;
-  font-size: 0.8rem;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: rgba(255, 255, 255, 0.8);
+.spec-value {
+  font-family: 'Menlo', 'Monaco', monospace;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
-.client-node.row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.node-footer {
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: right;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }

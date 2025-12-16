@@ -1,19 +1,22 @@
-import { Component } from '@angular/core';
+import { Component, Inject } from '@angular/core';
+import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ClientNode } from '../nodes/client-node/client-node';
-import { ServerNode } from '../nodes/server-node/server-node';
-import { SuperServerNode } from '../nodes/super-server-node/super-server-node';
+// Die Node Imports brauchst du hier eigentlich nicht zwingend, 
+// es sei denn du nutzt sie für Typen, aber sie schaden auch nicht.
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
   templateUrl: './sidebar.component.html',
   styleUrls: ['./sidebar.component.css'],
-  imports: [FormsModule],
+  imports: [FormsModule, CommonModule],
 })
 export class SidebarComponent {
   public isOpen = true;
+  public isDarkMode = true;
 
+  // WICHTIG: Name geändert zu 'showSimulationpopup' passend zur HTML
+  public showSimulationpopup = false;
   
   public selectedArchitectures = {
     spyker: true,
@@ -22,7 +25,6 @@ export class SidebarComponent {
 
   public edgesChecked = false;
 
-  // Zentrales Datenmodell für die Inputs
   public configDraft = {
     superserver: {
       name: 'SuperServer',
@@ -47,6 +49,8 @@ export class SidebarComponent {
     }
   };
 
+  constructor(@Inject(DOCUMENT) private document: Document) {}
+
   public toggleSidebar(): void {
     this.isOpen = !this.isOpen;
   }
@@ -59,25 +63,62 @@ export class SidebarComponent {
     this.isOpen = false;
   }
 
+  public toggleTheme(): void {
+    this.isDarkMode = !this.isDarkMode;
+    
+    if (this.isDarkMode) {
+      this.document.body.classList.remove('light-mode');
+    } else {
+      this.document.body.classList.add('light-mode');
+    }
+  }
+
   public onDragStart(
     event: DragEvent,
     kind: 'SuperServerNode' | 'ServerNode' | 'ClientNode'
   ): void {
-    if (kind === 'SuperServerNode' && this.selectedArchitectures.spyker) {
-      event.preventDefault();
-      return;
-    }
+    if (kind === 'SuperServerNode') {
+      if (this.selectedArchitectures.spyker) {
+        event.preventDefault();
+        return;
+      }
 
+      const allGraphNodes = document.querySelectorAll('.vflow-node');
+      const alreadyExists = Array.from(allGraphNodes).some(node => 
+        node.textContent?.includes('SuperServer')
+      );
+      
+      if (alreadyExists) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+    }
 
     const payload = {
       type: kind,
       config: this.configDraft
     };
 
-    // Daten als JSON String anhängen
     if (event.dataTransfer) {
       event.dataTransfer.setData('application/json', JSON.stringify(payload));
       event.dataTransfer.effectAllowed = 'copy';
     }
+  }
+
+  // --- popup Logic ---
+
+  public openSimulationpopup(): void {
+    this.showSimulationpopup = true;
+  }
+
+  public closeSimulationpopup(): void {
+    this.showSimulationpopup = false;
+  }
+
+  public runSimulation(type: 'spyker' | 'hierarchical' | 'both'): void {
+    console.log('Starte Simulation für:', type);
+    // Hier Logik einfügen (z.B. Service call)
+    this.closeSimulationpopup();
   }
 }

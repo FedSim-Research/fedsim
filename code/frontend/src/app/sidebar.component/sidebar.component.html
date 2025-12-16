@@ -14,6 +14,26 @@
       </div>
     </div>
 
+    <button class="icon-btn" (click)="toggleTheme()" [attr.aria-label]="isDarkMode ? 'Switch to Light' : 'Switch to Dark'">
+      @if (isDarkMode) {
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+      } @else {
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      }
+    </button>
+
     <button class="icon-btn" type="button" (click)="closeSidebar()" aria-label="Close sidebar">
       <span class="icon-chevron-left"></span>
     </button>
@@ -77,13 +97,6 @@
           <span>Name</span>
           <input type="text" [(ngModel)]="configDraft.server.name">
         </label>
-        <label class="field">
-          <span>Umgebung</span>
-          <select [(ngModel)]="configDraft.server.environment">
-            <option value="S">Hierarchical</option>
-            <option value="H">Spyker</option>
-          </select>
-        </label>
         <div class="grid">
           <label class="field">
             <span>CPU</span>
@@ -144,18 +157,45 @@
         </div>
       </div>
     </details>
-
-    <div class="block">
-      <label class="check">
-        <input type="checkbox" [(ngModel)]="edgesChecked" />
-        <span>Edges</span>
-      </label>
-    </div>
-
   </div>
 
   <footer class="sidebar__footer">
-    <button class="cta" type="button">Start simulation</button>
+    <button class="cta" type="button" (click)="openSimulationpopup()">Start simulation</button>
     <button class="cta cta--secondary" type="button">Reset graph</button>
   </footer>
 </aside>
+
+@if (showSimulationpopup) {
+<div class="popup-backdrop" (click)="closeSimulationpopup()">
+  <div class="popup-card" (click)="$event.stopPropagation()">
+    
+    <div class="popup-header">
+      <h3>Simulation starten</h3>
+      <button class="icon-btn-small" (click)="closeSimulationpopup()">✕</button>
+    </div>
+
+    <div class="popup-body">
+      <p>Welches Environment wollen Sie berechnen?</p>
+      
+      <div class="popup-actions">
+        <button class="cta-option" (click)="runSimulation('spyker')">
+          <span class="dot spyker-dot"></span>
+          1. Spyker
+        </button>
+        
+        <button class="cta-option" (click)="runSimulation('hierarchical')">
+          <span class="dot hier-dot"></span>
+          2. Hierarchical
+        </button>
+        
+        <button class="cta-option both" (click)="runSimulation('both')">
+          <div class="dots-wrapper">
+            <span class="dot both-dot"></span>
+          </div>
+          3. Spyker & Hierarchical
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+}

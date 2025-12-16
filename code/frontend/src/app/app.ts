@@ -16,6 +16,7 @@ import { SuperServerNode } from './nodes/super-server-node/super-server-node';
 export class App {
   public nodes: Node[] = [];
   public edges: Edge[] = [];
+  private alreadyHasSuperServer = false;
 
   public onDragOver(event: DragEvent) {
     event.preventDefault();
@@ -33,7 +34,7 @@ export class App {
 
     try {
       const payload = JSON.parse(rawData);
-      
+
       // 2. Position bestimmen
       const mousePosition = {
         x: event.clientX,
@@ -41,32 +42,42 @@ export class App {
       };
 
       let nodeType;
-      switch (payload.type.toString()){
+      switch (payload.type.toString()) {
         case 'ClientNode':
-          nodeType=ClientNode;
+          nodeType = ClientNode;
           break;
         case 'ServerNode':
-          nodeType=ServerNode;
+          nodeType = ServerNode;
           break;
         case 'SuperServerNode':
           nodeType = SuperServerNode;
+          if (this.alreadyHasSuperServer) {
+            console.warn('Block: SuperServer already exists (found by text content).');
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          } else {
+            this.alreadyHasSuperServer = true;
+          }
           break;
         default:
-            console.log("yo mister white yo, there's an error")
-        }
-        const newNode: Node = {
-          id: crypto.randomUUID(),
-          point: mousePosition,
-          type: nodeType,
-          data: {
+          console.log("yo mister white yo, there's an error")
+          return;
+      }
+      const newNode: Node = {
+        id: crypto.randomUUID(),
+        point: mousePosition,
+        type: nodeType,
+        data: {
           type: payload.type,
           config: payload.config,
-            },
-          };
-        this.nodes.push(newNode);
-        console.log("added new node:", newNode);
-      } catch {
-        console.log('FUCK YOU');
+        },
+      };
+      this.nodes = [...this.nodes, newNode];
+      console.log("added new node:", newNode);
+    } catch {
+      console.log('FUCK YOU');
     }
-  } 
+  }
+
 }

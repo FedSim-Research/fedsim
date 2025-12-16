@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { CustomNodeComponent, NodeHtmlTemplateDirective } from 'ngx-vflow';
 
 @Component({
@@ -7,6 +7,14 @@ import { CustomNodeComponent, NodeHtmlTemplateDirective } from 'ngx-vflow';
   templateUrl: './client-node.html',
   styleUrl: './client-node.css',
 })
+
 export class ClientNode extends CustomNodeComponent{
-    displayTooltips = false;  
-}
+   override data = signal({ 
+     id: '', 
+     count: 0, 
+     type: '', 
+     computeTimeMs: 0, 
+     pingMs: 0, 
+     packetloss: 0, 
+   });
+ }
