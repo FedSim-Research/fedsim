@@ -1,0 +1,14 @@
+/* Füllt den gesamten Viewport */
+.canvas-wrapper {
+  height: 100vh;
+  width: 100vw;
+  background-color: #1a1a1a;
+  overflow: hidden;
+  position: relative;
+}
+
+.muted {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.75rem;
+  margin-top: 4px;
+}
