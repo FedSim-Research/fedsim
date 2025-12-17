@@ -5,3 +5,4 @@ share/
 include/
 pyvenv.cfg
 final_model.pt
+node_modules
