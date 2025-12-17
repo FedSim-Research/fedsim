@@ -18,6 +18,13 @@ export class App {
   public edges: Edge[] = [];
   private alreadyHasSuperServer = false;
 
+  public handleReset() {
+    this.nodes = [];
+    this.edges = [];
+    this.alreadyHasSuperServer = false;
+    console.log('Graph wurde zurückgesetzt.');
+  }
+
   public onDragOver(event: DragEvent) {
     event.preventDefault();
     if (event.dataTransfer) {
@@ -28,14 +35,12 @@ export class App {
   public onDrop(event: DragEvent) {
     event.preventDefault();
 
-    // 1. JSON-String auslesen
     const rawData = event.dataTransfer?.getData('application/json');
     if (!rawData) return;
 
     try {
       const payload = JSON.parse(rawData);
 
-      // 2. Position bestimmen
       const mousePosition = {
         x: event.clientX,
         y: event.clientY,
@@ -61,7 +66,7 @@ export class App {
           }
           break;
         default:
-          console.log("yo mister white yo, there's an error")
+          console.log("this is the default case")
           return;
       }
       const newNode: Node = {
@@ -76,8 +81,7 @@ export class App {
       this.nodes = [...this.nodes, newNode];
       console.log("added new node:", newNode);
     } catch {
-      console.log('FUCK YOU');
+      console.log('Catched');
     }
   }
-
 }

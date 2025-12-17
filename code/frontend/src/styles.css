@@ -6,7 +6,7 @@
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   --node-bg: rgba(15, 15, 15, 0.95);
 
-  --bg: #18181b;  /* Hintergrundfarbe */
+  --bg: #18181b;  /* Backgroundcolor */
 }
 
 body.light-mode {        
@@ -17,7 +17,7 @@ body.light-mode {
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.08); 
   --node-bg: rgba(235, 25, 25, 0.9);
 
-  --bg: #d4d4d8; /* Hintergrundfarbe */
+  --bg: #d4d4d8; /* Backgroundcolor */
 }
 
 html, body {

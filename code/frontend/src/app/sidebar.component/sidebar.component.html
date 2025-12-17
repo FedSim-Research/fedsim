@@ -1,36 +1,36 @@
 @if (!isOpen) {
-  <button class="sidebar-fab" type="button" (click)="openSidebar()" aria-label="Open sidebar">
-    <span class="fab-icon"></span>
-  </button>
+<button class="sidebar-fab" type="button" (click)="openSidebar()" aria-label="Open sidebar">
+  <span class="fab-icon"></span>
+</button>
 }
 
 <aside class="sidebar" [class.sidebar--closed]="!isOpen">
   <header class="sidebar__header">
     <div class="brand">
-      <div class="brand__mark" aria-hidden="true"></div>
       <div class="brand__text">
         <div class="brand__title">FedSim</div>
         <div class="brand__subtitle">Configurator</div>
       </div>
     </div>
 
-    <button class="icon-btn" (click)="toggleTheme()" [attr.aria-label]="isDarkMode ? 'Switch to Light' : 'Switch to Dark'">
+    <button class="icon-btn" (click)="toggleTheme()"
+      [attr.aria-label]="isDarkMode ? 'Switch to Light' : 'Switch to Dark'">
       @if (isDarkMode) {
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="5"></circle>
-          <line x1="12" y1="1" x2="12" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="23"></line>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-          <line x1="1" y1="12" x2="3" y2="12"></line>
-          <line x1="21" y1="12" x2="23" y2="12"></line>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-        </svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="5"></circle>
+        <line x1="12" y1="1" x2="12" y2="3"></line>
+        <line x1="12" y1="21" x2="12" y2="23"></line>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+        <line x1="1" y1="12" x2="3" y2="12"></line>
+        <line x1="21" y1="12" x2="23" y2="12"></line>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+      </svg>
       } @else {
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </svg>
       }
     </button>
 
@@ -40,53 +40,52 @@
   </header>
 
   <div class="content">
-    
     <div class="block">
-      <div class="block__title">Compare</div>
-      <div class="checkbox-row">
-        <label class="check">
-          <input type="checkbox" [(ngModel)]="selectedArchitectures.spyker" />
-          <span>Spyker</span>
-        </label>
-        <label class="check">
-          <input type="checkbox" [(ngModel)]="selectedArchitectures.hierfl" />
-          <span>Hierarchical</span>
-        </label>
+      <div class="block__title">Architecture Mode</div>
+      <div class="toggle-row">
+        <span class="toggle-label" [class.active]="!selectedArchitectures.spyker" (click)="setArchitecture(false)">Hierarchical</span>
+        <div class="toggle-switch" (click)="toggleArchitecture()">
+          <input type="checkbox" [checked]="selectedArchitectures.spyker" readonly>
+          <span class="slider"></span>
+        </div>
+        <span class="toggle-label" [class.active]="selectedArchitectures.spyker" (click)="setArchitecture(true)">Spyker</span>
       </div>
     </div>
-
+    
     <div class="rightpane__header">
-      <div class="rightpane__subtitle">Konfiguration</div>
+      <div class="rightpane__subtitle">Configuration</div>
     </div>
 
-    <details class="disclosure" [class.disclosure--disabled]="selectedArchitectures.spyker">
-      <summary class="disclosure__summary">
-        <span>Super Server</span>
-      </summary>
-      <div class="disclosure__body">
-        <label class="field">
-          <span>Name</span>
-          <input type="text" [(ngModel)]="configDraft.superserver.name" placeholder="Name">
-        </label>
-        <label class="field">
-          <span>ID</span>
-          <input type="text" [(ngModel)]="configDraft.superserver.id" placeholder="ID">
-        </label>
-        <div class="grid">
+    <div class="tooltip-wrapper" [title]="selectedArchitectures.spyker ? 'Not available in Spyker' : ''">
+      <details class="disclosure" [class.disclosure--disabled]="selectedArchitectures.spyker">
+        <summary class="disclosure__summary">
+          <span>Super Server</span>
+        </summary>
+        <div class="disclosure__body">
           <label class="field">
-            <span>CPU</span>
-            <input type="number" min="1" [(ngModel)]="configDraft.superserver.cpus">
+            <span>Name</span>
+            <input type="text" [(ngModel)]="configDraft.superserver.name" placeholder="Name">
           </label>
           <label class="field">
-            <span>GPU</span>
-            <input type="number" min="0" [(ngModel)]="configDraft.superserver.gpus">
+            <span>ID</span>
+            <input type="text" [(ngModel)]="configDraft.superserver.id" placeholder="ID">
           </label>
+          <div class="grid">
+            <label class="field">
+              <span>CPU</span>
+              <input type="number" min="1" [(ngModel)]="configDraft.superserver.cpus">
+            </label>
+            <label class="field">
+              <span>GPU</span>
+              <input type="number" min="0" [(ngModel)]="configDraft.superserver.gpus">
+            </label>
+          </div>
+          <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'SuperServerNode')">
+            Drag Super Server
+          </div>
         </div>
-        <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'SuperServerNode')">
-          Drag Super Server
-        </div>
-      </div>
-    </details>
+      </details>
+    </div>
 
     <details class="disclosure">
       <summary class="disclosure__summary">
@@ -108,7 +107,7 @@
           </label>
         </div>
         <label class="field">
-          <span>Rechenzeit (ms)</span>
+          <span>Computing time (ms)</span>
           <input type="number" min="0" [(ngModel)]="configDraft.server.computeTimeMs">
         </label>
         <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'ServerNode')">
@@ -128,7 +127,7 @@
         </label>
         <div class="grid">
           <label class="field">
-            <span>Clientanzahl</span>
+            <span>Number of clients</span>
             <input type="number" min="1" [(ngModel)]="configDraft.client.count">
           </label>
           <label class="field">
@@ -137,7 +136,7 @@
           </label>
         </div>
         <label class="field">
-          <span>Clientart</span>
+          <span>Client type</span>
           <select [(ngModel)]="configDraft.client.type">
             <option value="laptop">Laptop</option>
             <option value="workstation">Workingstation</option>
@@ -145,7 +144,7 @@
           </select>
         </label>
         <label class="field">
-          <span>Rechenzeit (ms)</span>
+          <span>Computing time (ms)</span>
           <input type="number" min="0" [(ngModel)]="configDraft.client.computeTimeMs">
         </label>
         <label class="field">
@@ -161,41 +160,17 @@
 
   <footer class="sidebar__footer">
     <button class="cta" type="button" (click)="openSimulationpopup()">Start simulation</button>
-    <button class="cta cta--secondary" type="button">Reset graph</button>
+    <app-reset-button (reset)="onResetRequested()"></app-reset-button>
   </footer>
+
+  @if (toastMessage) {
+    <app-error-popup [message]="toastMessage"></app-error-popup>
+  }
 </aside>
 
 @if (showSimulationpopup) {
-<div class="popup-backdrop" (click)="closeSimulationpopup()">
-  <div class="popup-card" (click)="$event.stopPropagation()">
-    
-    <div class="popup-header">
-      <h3>Simulation starten</h3>
-      <button class="icon-btn-small" (click)="closeSimulationpopup()">✕</button>
-    </div>
-
-    <div class="popup-body">
-      <p>Welches Environment wollen Sie berechnen?</p>
-      
-      <div class="popup-actions">
-        <button class="cta-option" (click)="runSimulation('spyker')">
-          <span class="dot spyker-dot"></span>
-          1. Spyker
-        </button>
-        
-        <button class="cta-option" (click)="runSimulation('hierarchical')">
-          <span class="dot hier-dot"></span>
-          2. Hierarchical
-        </button>
-        
-        <button class="cta-option both" (click)="runSimulation('both')">
-          <div class="dots-wrapper">
-            <span class="dot both-dot"></span>
-          </div>
-          3. Spyker & Hierarchical
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
+  <app-start-popup 
+    (close)="closeSimulationpopup()" 
+    (run)="runSimulation($event)">
+  </app-start-popup>
 }

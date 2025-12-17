@@ -1,9 +1,8 @@
 import { Component, signal } from '@angular/core';
-import { CustomNodeComponent, NodeHtmlTemplateDirective } from 'ngx-vflow';
+import { CustomNodeComponent } from 'ngx-vflow';
 
 @Component({
   selector: 'app-client-node',
-  imports: [NodeHtmlTemplateDirective],
   templateUrl: './client-node.html',
   styleUrl: './client-node.css',
 })

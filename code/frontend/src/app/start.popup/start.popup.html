@@ -1,0 +1,32 @@
+<div class="popup-backdrop" (click)="onClose()">
+  <div class="popup-card" (click)="$event.stopPropagation()">
+
+    <div class="popup-header">
+      <h3>Start simulation</h3>
+      <button class="icon-btn-small" (click)="onClose()">✕</button>
+    </div>
+
+    <div class="popup-body">
+      <p>Which environment do you want to calculate?</p>
+
+      <div class="popup-actions">
+        <button class="cta-option" (click)="onRun('spyker')">
+          <span class="dot spyker-dot"></span>
+          1. Spyker
+        </button>
+
+        <button class="cta-option" (click)="onRun('hierarchical')">
+          <span class="dot hier-dot"></span>
+          2. Hierarchical
+        </button>
+
+        <button class="cta-option both" (click)="onRun('both')">
+          <div class="dots-wrapper">
+            <span class="dot both-dot"></span>
+          </div>
+          3. Spyker & Hierarchical
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
