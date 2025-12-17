@@ -1,7 +1,15 @@
+# Linux venv
 bin/
 lib/
 lib64
 share/
 include/
+
+# Windows venv
+Scripts/
+Include/
+Lib/
+
 pyvenv.cfg
+
 final_model.pt
