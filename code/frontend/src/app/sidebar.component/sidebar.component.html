@@ -162,11 +162,9 @@
     <button class="cta" type="button" (click)="openSimulationpopup()">Start simulation</button>
     <app-reset-button (reset)="onResetRequested()"></app-reset-button>
   </footer>
-
-  @if (toastMessage) {
-    <app-error-popup [message]="toastMessage"></app-error-popup>
-  }
 </aside>
+
+<p-toast position="top-right" />
 
 @if (showSimulationpopup) {
   <app-start-popup 

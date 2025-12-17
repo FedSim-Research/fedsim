@@ -1,22 +1,23 @@
 import { Component, Inject, Output, EventEmitter } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ErrorPopup } from '../error.popup/error.popup'; 
-import { StartPopup } from '../start.popup/start.popup'; 
-import { ResetButton } from '../reset.button/reset.button'; 
+import { StartPopup } from '../start.popup/start.popup';
+import { ResetButton } from '../reset.button/reset.button';
+import { ToastModule } from 'primeng/toast';
+import { MessageService } from 'primeng/api';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
   templateUrl: './sidebar.component.html',
   styleUrls: ['./sidebar.component.css'],
-  imports: [FormsModule, CommonModule, ErrorPopup, StartPopup, ResetButton],
+  imports: [FormsModule, CommonModule, StartPopup, ResetButton, ToastModule],
+  providers: [MessageService],
 })
 export class SidebarComponent {
   public isOpen = true;
   public isDarkMode = true;
   public showSimulationpopup = false;
-  public toastMessage: string | null = null;
 
   @Output() resetGraph = new EventEmitter<void>();
 
@@ -31,11 +32,17 @@ export class SidebarComponent {
     client: { id: 'CL-01', count: 50, type: 'mobile', computeTimeMs: 120, pingMs: 40, packetloss: 0.02 }
   };
 
-  constructor(@Inject(DOCUMENT) private document: Document) {}
+  constructor(
+    @Inject(DOCUMENT) private document: Document,
+    private messageService: MessageService
+  ) {}
 
-  private showToast(message: string) {
-    this.toastMessage = message;
-    setTimeout(() => { this.toastMessage = null; }, 2000);
+  private showErrorToast(message: string) {
+    this.messageService.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: message,
+    });
   }
 
   public onResetRequested(): void {
@@ -75,7 +82,7 @@ export class SidebarComponent {
       if (alreadyExists) {
         event.preventDefault();
         event.stopPropagation();
-        this.showToast('Only one Super Server can exist in the environment Hierarchical.');
+        this.showErrorToast('Only one Super Server can exist in the environment Hierarchical.');
         return;
       }
     }
