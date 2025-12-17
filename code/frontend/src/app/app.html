@@ -9,5 +9,9 @@
     <mini-map />
   </vflow>
 
-  <app-sidebar (resetGraph)="handleReset()"></app-sidebar>
+  <app-sidebar 
+  (resetGraph)="handleReset()"
+  (undoRequested)="undo()"
+  (redoRequested)="redo()">
+  </app-sidebar>
 </div>

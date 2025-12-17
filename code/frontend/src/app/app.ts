@@ -18,13 +18,54 @@ export class App {
   public edges: Edge[] = [];
   private alreadyHasSuperServer = false;
 
+  private history: Node[][] = []; 
+  private historyIndex = 0;
+
+  constructor() {
+    this.saveHistory();
+  }
+
+  private saveHistory() {
+    if (this.historyIndex < this.history.length - 1) {
+      this.history = this.history.slice(0, this.historyIndex + 1);
+    }
+    
+    this.history.push([...this.nodes]);
+    this.historyIndex++;
+    
+    if (this.history.length > 20) {
+      this.history.shift();
+      this.historyIndex--;
+    }
+  }
+
+  public undo() {
+    if (this.historyIndex > 0) {
+      this.historyIndex--;
+      this.nodes = [...this.history[this.historyIndex]];
+      this.updateSuperServerStatus();
+    }
+  }
+
+  public redo() {
+    if (this.historyIndex < this.history.length - 1) {
+      this.historyIndex++;
+      this.nodes = [...this.history[this.historyIndex]];
+      this.updateSuperServerStatus();
+    }
+  }
+
+  private updateSuperServerStatus() {
+    this.alreadyHasSuperServer = this.nodes.some(n => (n as any).data?.type === 'SuperServerNode');
+  }
+
   public handleReset() {
     this.nodes = [];
     this.edges = [];
     this.alreadyHasSuperServer = false;
-    console.log('Graph wurde zurückgesetzt.');
+    this.saveHistory();
   }
-
+  
   public onDragOver(event: DragEvent) {
     event.preventDefault();
     if (event.dataTransfer) {
@@ -79,9 +120,10 @@ export class App {
         },
       };
       this.nodes = [...this.nodes, newNode];
+      this.saveHistory();
       console.log("added new node:", newNode);
-    } catch {
-      console.log('Catched');
+    } catch (e) {
+      console.log('Catched', e);
     }
   }
 }

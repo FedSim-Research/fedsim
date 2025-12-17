@@ -49,6 +49,17 @@ export class SidebarComponent {
     this.resetGraph.emit();
   }
 
+  @Output() undoRequested = new EventEmitter<void>();
+  @Output() redoRequested = new EventEmitter<void>();
+  
+  public redo(): void {
+    this.redoRequested.emit();
+  }
+
+  public undo(): void {
+    this.undoRequested.emit();
+  }
+
   public toggleArchitecture(): void {
     this.selectedArchitectures.spyker = !this.selectedArchitectures.spyker;
     this.selectedArchitectures.hierfl = !this.selectedArchitectures.spyker;

@@ -13,10 +13,20 @@
       </div>
     </div>
 
-    <button class="icon-btn" (click)="toggleTheme()"
-      [attr.aria-label]="isDarkMode ? 'Switch to Light' : 'Switch to Dark'">
+    <button
+      class="icon-btn"
+      (click)="toggleTheme()"
+      [attr.aria-label]="isDarkMode ? 'Switch to Light' : 'Switch to Dark'"
+    >
       @if (isDarkMode) {
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+      >
         <circle cx="12" cy="12" r="5"></circle>
         <line x1="12" y1="1" x2="12" y2="3"></line>
         <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -28,7 +38,14 @@
         <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
       </svg>
       } @else {
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+      >
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
       </svg>
       }
@@ -43,20 +60,33 @@
     <div class="block">
       <div class="block__title">Architecture Mode</div>
       <div class="toggle-row">
-        <span class="toggle-label" [class.active]="!selectedArchitectures.spyker" (click)="setArchitecture(false)">Hierarchical</span>
+        <span
+          class="toggle-label"
+          [class.active]="!selectedArchitectures.spyker"
+          (click)="setArchitecture(false)"
+          >Hierarchical</span
+        >
         <div class="toggle-switch" (click)="toggleArchitecture()">
-          <input type="checkbox" [checked]="selectedArchitectures.spyker" readonly>
+          <input type="checkbox" [checked]="selectedArchitectures.spyker" readonly />
           <span class="slider"></span>
         </div>
-        <span class="toggle-label" [class.active]="selectedArchitectures.spyker" (click)="setArchitecture(true)">Spyker</span>
+        <span
+          class="toggle-label"
+          [class.active]="selectedArchitectures.spyker"
+          (click)="setArchitecture(true)"
+          >Spyker</span
+        >
       </div>
     </div>
-    
+
     <div class="rightpane__header">
       <div class="rightpane__subtitle">Configuration</div>
     </div>
 
-    <div class="tooltip-wrapper" [title]="selectedArchitectures.spyker ? 'Not available in Spyker' : ''">
+    <div
+      class="tooltip-wrapper"
+      [title]="selectedArchitectures.spyker ? 'Not available in Spyker' : ''"
+    >
       <details class="disclosure" [class.disclosure--disabled]="selectedArchitectures.spyker">
         <summary class="disclosure__summary">
           <span>Super Server</span>
@@ -64,20 +94,20 @@
         <div class="disclosure__body">
           <label class="field">
             <span>Name</span>
-            <input type="text" [(ngModel)]="configDraft.superserver.name" placeholder="Name">
+            <input type="text" [(ngModel)]="configDraft.superserver.name" placeholder="Name" />
           </label>
           <label class="field">
             <span>ID</span>
-            <input type="text" [(ngModel)]="configDraft.superserver.id" placeholder="ID">
+            <input type="text" [(ngModel)]="configDraft.superserver.id" placeholder="ID" />
           </label>
           <div class="grid">
             <label class="field">
               <span>CPU</span>
-              <input type="number" min="1" [(ngModel)]="configDraft.superserver.cpus">
+              <input type="number" min="1" [(ngModel)]="configDraft.superserver.cpus" />
             </label>
             <label class="field">
               <span>GPU</span>
-              <input type="number" min="0" [(ngModel)]="configDraft.superserver.gpus">
+              <input type="number" min="0" [(ngModel)]="configDraft.superserver.gpus" />
             </label>
           </div>
           <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'SuperServerNode')">
@@ -94,21 +124,21 @@
       <div class="disclosure__body">
         <label class="field">
           <span>Name</span>
-          <input type="text" [(ngModel)]="configDraft.server.name">
+          <input type="text" [(ngModel)]="configDraft.server.name" />
         </label>
         <div class="grid">
           <label class="field">
             <span>CPU</span>
-            <input type="number" min="1" [(ngModel)]="configDraft.server.cpus">
+            <input type="number" min="1" [(ngModel)]="configDraft.server.cpus" />
           </label>
           <label class="field">
             <span>GPU</span>
-            <input type="number" min="0" [(ngModel)]="configDraft.server.gpus">
+            <input type="number" min="0" [(ngModel)]="configDraft.server.gpus" />
           </label>
         </div>
         <label class="field">
           <span>Computing time (ms)</span>
-          <input type="number" min="0" [(ngModel)]="configDraft.server.computeTimeMs">
+          <input type="number" min="0" [(ngModel)]="configDraft.server.computeTimeMs" />
         </label>
         <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'ServerNode')">
           Drag Server Node
@@ -123,16 +153,16 @@
       <div class="disclosure__body">
         <label class="field">
           <span>ID</span>
-          <input type="text" [(ngModel)]="configDraft.client.id">
+          <input type="text" [(ngModel)]="configDraft.client.id" />
         </label>
         <div class="grid">
           <label class="field">
             <span>Number of clients</span>
-            <input type="number" min="1" [(ngModel)]="configDraft.client.count">
+            <input type="number" min="1" [(ngModel)]="configDraft.client.count" />
           </label>
           <label class="field">
             <span>Ping (ms)</span>
-            <input type="number" min="0" [(ngModel)]="configDraft.client.pingMs">
+            <input type="number" min="0" [(ngModel)]="configDraft.client.pingMs" />
           </label>
         </div>
         <label class="field">
@@ -145,11 +175,17 @@
         </label>
         <label class="field">
           <span>Computing time (ms)</span>
-          <input type="number" min="0" [(ngModel)]="configDraft.client.computeTimeMs">
+          <input type="number" min="0" [(ngModel)]="configDraft.client.computeTimeMs" />
         </label>
         <label class="field">
           <span>Packetloss</span>
-          <input type="number" step="0.001" min="0" max="1" [(ngModel)]="configDraft.client.packetloss">
+          <input
+            type="number"
+            step="0.001"
+            min="0"
+            max="1"
+            [(ngModel)]="configDraft.client.packetloss"
+          />
         </label>
         <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'ClientNode')">
           Drag Client Node
@@ -159,6 +195,10 @@
   </div>
 
   <footer class="sidebar__footer">
+    <div class="footer__info footer__info--expand">
+      <button class="cta" cta--secondary type="button" (click)="undo()">Undo</button>
+      <button class="cta" cta--secondary type="button" (click)="redo()">Redo</button>
+    </div>
     <button class="cta" type="button" (click)="openSimulationpopup()">Start simulation</button>
     <app-reset-button (reset)="onResetRequested()"></app-reset-button>
   </footer>
@@ -167,8 +207,5 @@
 <p-toast position="top-right" />
 
 @if (showSimulationpopup) {
-  <app-start-popup 
-    (close)="closeSimulationpopup()" 
-    (run)="runSimulation($event)">
-  </app-start-popup>
+<app-start-popup (close)="closeSimulationpopup()" (run)="runSimulation($event)"> </app-start-popup>
 }

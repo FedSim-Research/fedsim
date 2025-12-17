@@ -351,6 +351,18 @@
   gap: 10px;
   background: var(--bg);
   z-index: 2;
+  width:100%;
+  padding: 10px;
+}
+
+.footer__info--expand {
+  flex: 1;
+  display: flex;
+}
+
+.footer__info--expand .cta{
+  width: 50%;
+  text-align: center;
 }
 
 .cta {
