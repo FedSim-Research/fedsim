@@ -20,6 +20,7 @@ export class SidebarComponent {
   public showSimulationpopup = false;
 
   @Output() resetGraph = new EventEmitter<void>();
+  @Output() modeChange = new EventEmitter<'spyker' | 'hierfl'>();
 
   public selectedArchitectures = {
     spyker: false,
@@ -63,11 +64,13 @@ export class SidebarComponent {
   public toggleArchitecture(): void {
     this.selectedArchitectures.spyker = !this.selectedArchitectures.spyker;
     this.selectedArchitectures.hierfl = !this.selectedArchitectures.spyker;
+    this.modeChange.emit(this.selectedArchitectures.spyker ? 'spyker' : 'hierfl');
   }
 
   public setArchitecture(isSpyker: boolean): void {
     this.selectedArchitectures.spyker = isSpyker;
     this.selectedArchitectures.hierfl = !isSpyker;
+    this.modeChange.emit(isSpyker ? 'spyker' : 'hierfl');
   }
 
   public toggleSidebar(): void { this.isOpen = !this.isOpen; }

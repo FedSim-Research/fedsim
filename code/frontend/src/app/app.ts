@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Vflow, Node, Edge, CustomNodeComponent } from 'ngx-vflow';
+import { Vflow, Node, Edge } from 'ngx-vflow';
 import { SidebarComponent } from './sidebar.component/sidebar.component';
 import { ClientNode } from './nodes/client-node/client-node';
 import { ServerNode } from './nodes/server-node/server-node';
@@ -14,43 +14,62 @@ import { SuperServerNode } from './nodes/super-server-node/super-server-node';
   imports: [Vflow, SidebarComponent, CommonModule],
 })
 export class App {
+  public activeMode: 'spyker' | 'hierfl' = 'hierfl';
   public nodes: Node[] = [];
   public edges: Edge[] = [];
   private alreadyHasSuperServer = false;
 
-  private history: Node[][] = []; 
-  private historyIndex = 0;
+  private graphsByMode: Record<'spyker' | 'hierfl', { nodes: Node[]; edges: Edge[] }> = {
+    spyker: { nodes: [], edges: [] },
+    hierfl: { nodes: [], edges: [] },
+  };
+
+  private historyByMode: Record<'spyker' | 'hierfl', Node[][]> = {
+    spyker: [],
+    hierfl: [],
+  };
+  private historyIndexByMode: Record<'spyker' | 'hierfl', number> = {
+    spyker: 0,
+    hierfl: 0,
+  };
 
   constructor() {
     this.saveHistory();
   }
 
   private saveHistory() {
-    if (this.historyIndex < this.history.length - 1) {
-      this.history = this.history.slice(0, this.historyIndex + 1);
+    const history = this.historyByMode[this.activeMode];
+    const index = this.historyIndexByMode[this.activeMode];
+
+    if (index < history.length - 1) {
+      this.historyByMode[this.activeMode] = history.slice(0, index + 1);
     }
     
-    this.history.push([...this.nodes]);
-    this.historyIndex++;
+    this.historyByMode[this.activeMode].push([...this.nodes]);
+    this.historyIndexByMode[this.activeMode] += 1;
     
-    if (this.history.length > 20) {
-      this.history.shift();
-      this.historyIndex--;
+    if (this.historyByMode[this.activeMode].length > 20) {
+      this.historyByMode[this.activeMode].shift();
+      this.historyIndexByMode[this.activeMode] -= 1;
     }
   }
 
   public undo() {
-    if (this.historyIndex > 0) {
-      this.historyIndex--;
-      this.nodes = [...this.history[this.historyIndex]];
+    if (this.historyIndexByMode[this.activeMode] > 0) {
+      this.historyIndexByMode[this.activeMode] -= 1;
+      const history = this.historyByMode[this.activeMode];
+      this.nodes = [...history[this.historyIndexByMode[this.activeMode]]];
+      this.graphsByMode[this.activeMode].nodes = this.nodes;
       this.updateSuperServerStatus();
     }
   }
 
   public redo() {
-    if (this.historyIndex < this.history.length - 1) {
-      this.historyIndex++;
-      this.nodes = [...this.history[this.historyIndex]];
+    const history = this.historyByMode[this.activeMode];
+    if (this.historyIndexByMode[this.activeMode] < history.length - 1) {
+      this.historyIndexByMode[this.activeMode] += 1;
+      this.nodes = [...history[this.historyIndexByMode[this.activeMode]]];
+      this.graphsByMode[this.activeMode].nodes = this.nodes;
       this.updateSuperServerStatus();
     }
   }
@@ -63,6 +82,7 @@ export class App {
     this.nodes = [];
     this.edges = [];
     this.alreadyHasSuperServer = false;
+    this.graphsByMode[this.activeMode] = { nodes: [], edges: [] };
     this.saveHistory();
   }
   
@@ -120,10 +140,31 @@ export class App {
         },
       };
       this.nodes = [...this.nodes, newNode];
+      this.graphsByMode[this.activeMode].nodes = this.nodes;
       this.saveHistory();
       console.log("added new node:", newNode);
     } catch (e) {
       console.log('Catched', e);
     }
+  }
+
+  public onModeChange(mode: 'spyker' | 'hierfl'): void {
+    if (this.activeMode === mode) return;
+
+    this.graphsByMode[this.activeMode] = {
+      nodes: this.nodes,
+      edges: this.edges,
+    };
+
+    this.activeMode = mode;
+    this.nodes = this.graphsByMode[mode].nodes;
+    this.edges = this.graphsByMode[mode].edges;
+
+    if (this.historyByMode[mode].length === 0) {
+      this.historyByMode[mode] = [ [...this.nodes] ];
+      this.historyIndexByMode[mode] = 0;
+    }
+
+    this.updateSuperServerStatus();
   }
 }
