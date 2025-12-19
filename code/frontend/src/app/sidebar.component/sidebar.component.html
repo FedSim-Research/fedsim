@@ -59,23 +59,23 @@
   <div class="content">
     <div class="block">
       <div class="block__title">Architecture Mode</div>
-      <div class="toggle-row">
-        <span
-          class="toggle-label"
+      <div class="mode-tabs">
+        <button
+          type="button"
+          class="mode-tab"
           [class.active]="!selectedArchitectures.spyker"
           (click)="setArchitecture(false)"
-          >Hierarchical</span
         >
-        <div class="toggle-switch" (click)="toggleArchitecture()">
-          <input type="checkbox" [checked]="selectedArchitectures.spyker" readonly />
-          <span class="slider"></span>
-        </div>
-        <span
-          class="toggle-label"
+          Hierarchical
+        </button>
+        <button
+          type="button"
+          class="mode-tab"
           [class.active]="selectedArchitectures.spyker"
           (click)="setArchitecture(true)"
-          >Spyker</span
         >
+          Spyker
+        </button>
       </div>
     </div>
 
