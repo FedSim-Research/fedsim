@@ -4,15 +4,50 @@
   user-select: none;
 }
 
+.node-wrapper {
+  position: relative;
+  display: inline-block;
+  overflow: visible;
+}
+
 .node-card {
   width: 220px;
   background: rgb(15, 15, 15);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.107);
   border-radius: 12px;
   color: #ffffff;
   font-family: 'Inter', system-ui, sans-serif;
   overflow: hidden;
   transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.delete-button {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #ef4444;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  transform: translateY(-4px);
+}
+
+.delete-button--visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.delete-button:hover {
+  color: #f87171;
 }
 
 .node-header {

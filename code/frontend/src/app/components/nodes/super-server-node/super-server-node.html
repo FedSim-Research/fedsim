@@ -1,8 +1,23 @@
-<div class="node-card">
-  <div class="node-header">
+<div class="node-wrapper">
+  <button
+    class="delete-button"
+    type="button"
+    [class.delete-button--visible]="showDelete()"
+    (click)="onDelete($event)"
+    aria-label="Knoten loeschen"
+  >
+    <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+      <path
+        d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h2v9H7V9z"
+        fill="currentColor"
+      />
+    </svg>
+  </button>
+  <div class="node-card" (click)="onNodeClick($event)">
+    <div class="node-header">
     <div class="node-title">
       <span class="status-dot"></span>
-      <span>Server</span>
+      <span>SuperServer</span>
     </div>
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;">
       <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
@@ -13,7 +28,11 @@
   </div>
 
   <div class="node-body">
-        
+    <div class="spec-row">
+      <span>ID</span>
+      <span class="spec-value">SupServ-01</span>
+    </div>
+    
     <div class="spec-row">
       <span>CPU</span>
       <span class="spec-value">8</span>
@@ -23,15 +42,10 @@
       <span>GPU</span>
       <span class="spec-value">1</span>
     </div>
+  </div>
 
-    <div class="spec-row">
-      <span>Compute time</span>
-      <span class="spec-value">100</span>
+    <div class="node-footer">
+      Spyker Environment
     </div>
   </div>
-
-  <div class="node-footer">
-    Spyker Environment
-  </div>
-
-  </div>
+</div>

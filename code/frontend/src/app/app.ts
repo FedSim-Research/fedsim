@@ -1,10 +1,12 @@
-import { Component } from '@angular/core';
+import { Component, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Vflow, Node, Edge } from 'ngx-vflow';
-import { SidebarComponent } from './sidebar.component/sidebar.component';
-import { ClientNode } from './nodes/client-node/client-node';
-import { ServerNode } from './nodes/server-node/server-node';
-import { SuperServerNode } from './nodes/super-server-node/super-server-node';
+import { SidebarComponent } from './components/sidebar.component/sidebar.component';
+import { ClientNode } from './components/nodes/client-node/client-node';
+import { ServerNode } from './components/nodes/server-node/server-node';
+import { SuperServerNode } from './components/nodes/super-server-node/super-server-node';
+import { NodeDeleteUiService } from './services/node-delete-ui.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-root',
@@ -33,8 +35,14 @@ export class App {
     hierfl: 0,
   };
 
-  constructor() {
+  constructor(
+    private nodeDeleteUi: NodeDeleteUiService,
+    private destroyRef: DestroyRef
+  ) {
     this.saveHistory();
+    this.nodeDeleteUi.deleteRequests$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((nodeId) => this.deleteNodeById(nodeId));
   }
 
   private saveHistory() {
@@ -76,6 +84,15 @@ export class App {
 
   private updateSuperServerStatus() {
     this.alreadyHasSuperServer = this.nodes.some(n => (n as any).data?.type === 'SuperServerNode');
+  }
+
+  private deleteNodeById(nodeId: string): void {
+    if (!this.nodes.some(node => node.id === nodeId)) return;
+    this.nodes = this.nodes.filter(node => node.id !== nodeId);
+    this.edges = this.edges.filter(edge => edge.source !== nodeId && edge.target !== nodeId);
+    this.graphsByMode[this.activeMode] = { nodes: this.nodes, edges: this.edges };
+    this.updateSuperServerStatus();
+    this.saveHistory();
   }
 
   public handleReset() {
