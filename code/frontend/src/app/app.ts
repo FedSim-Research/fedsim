@@ -1,6 +1,6 @@
-import { Component, DestroyRef, ViewChild } from '@angular/core';
+import { Component, DestroyRef, HostListener, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Vflow, VflowComponent, Node, Edge } from 'ngx-vflow';
+import { Vflow, VflowComponent, Node, Edge, NodePositionChange } from 'ngx-vflow';
 import { SidebarComponent } from './components/sidebar.component/sidebar.component';
 import { ClientNode } from './components/nodes/client-node/client-node';
 import { ServerNode } from './components/nodes/server-node/server-node';
@@ -22,6 +22,7 @@ export class App {
   public nodes: Node[] = [];
   public edges: Edge[] = [];
   private alreadyHasSuperServer = false;
+  private pendingNodePositions = new Map<string, { x: number; y: number }>();
 
   private graphsByMode: Record<'spyker' | 'hierfl', { nodes: Node[]; edges: Edge[] }> = {
     spyker: { nodes: [], edges: [] },
@@ -86,6 +87,26 @@ export class App {
 
   private updateSuperServerStatus() {
     this.alreadyHasSuperServer = this.nodes.some(n => (n as any).data?.type === 'SuperServerNode');
+  }
+
+  public onNodePositionChange(changes: NodePositionChange[]): void {
+    if (!changes?.length) return;
+    for (const change of changes) {
+      this.pendingNodePositions.set(change.id, change.point);
+    }
+  }
+
+  @HostListener('window:mouseup')
+  @HostListener('window:touchend')
+  public flushNodePositionChanges(): void {
+    if (!this.pendingNodePositions.size) return;
+    const changesById = new Map(this.pendingNodePositions);
+    this.pendingNodePositions.clear();
+    this.nodes = this.nodes.map(node => {
+      const point = changesById.get(node.id);
+      return point ? { ...node, point } : node;
+    });
+    this.graphsByMode[this.activeMode].nodes = this.nodes;
   }
 
   private deleteNodeById(nodeId: string): void {
