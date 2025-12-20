@@ -250,8 +250,9 @@ export class App implements AfterViewInit {
     if (!this.selectedEdgeIds.size) return;
     event.preventDefault();
     const ids = new Set(this.selectedEdgeIds);
-    this.edges = this.edges.filter(e => !ids.has(e.id));
+    this.edges = this.normalizeEdges(this.edges.filter(e => !ids.has(e.id)));
     this.graphsByMode[this.activeMode].edges = this.edges;
+    this.saveHistory();
     this.selectedEdgeIds.clear();
   }
 
@@ -283,8 +284,11 @@ export class App implements AfterViewInit {
     if (!valid) return false;
 
     // Clients are limited to a single edge total (in or out)
-    if ((sourceType === 'ClientNode' || targetType === 'ClientNode') && this.edges.some(e => e.source === connection.source || e.target === connection.source || e.source === connection.target || e.target === connection.target)) {
-      return false;
+    if (sourceType === 'ClientNode' || targetType === 'ClientNode') {
+      const clientId = sourceType === 'ClientNode' ? connection.source : connection.target;
+      if (this.edges.some(e => e.source === clientId || e.target === clientId)) {
+        return false;
+      }
     }
 
     return true;
