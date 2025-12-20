@@ -90,7 +90,8 @@ export class App implements AfterViewInit {
       const history = this.historyByMode[this.activeMode];
       this.nodes = [...history[this.historyIndexByMode[this.activeMode]]];
       this.graphsByMode[this.activeMode].nodes = this.nodes;
-      this.edges = [...this.graphsByMode[this.activeMode].edges];
+      this.edges = this.normalizeEdges([...this.graphsByMode[this.activeMode].edges]);
+      this.graphsByMode[this.activeMode].edges = this.edges;
       this.updateSuperServerStatus();
     }
   }
@@ -101,13 +102,19 @@ export class App implements AfterViewInit {
       this.historyIndexByMode[this.activeMode] += 1;
       this.nodes = [...history[this.historyIndexByMode[this.activeMode]]];
       this.graphsByMode[this.activeMode].nodes = this.nodes;
-      this.edges = [...this.graphsByMode[this.activeMode].edges];
+      this.edges = this.normalizeEdges([...this.graphsByMode[this.activeMode].edges]);
+      this.graphsByMode[this.activeMode].edges = this.edges;
       this.updateSuperServerStatus();
     }
   }
 
   private updateSuperServerStatus() {
     this.alreadyHasSuperServer = this.nodes.some(n => (n as any).data?.type === 'SuperServerNode');
+  }
+
+  private normalizeEdges(edges: Edge[]): Edge[] {
+    // Keep edges anchored to their declared handles instead of auto-floating
+    return edges.map(edge => ({ ...edge, floating: false }));
   }
 
   public onNodePositionChange(changes: NodePositionChange[]): void {
@@ -225,7 +232,8 @@ export class App implements AfterViewInit {
 
     this.activeMode = mode;
     this.nodes = this.graphsByMode[mode].nodes;
-    this.edges = this.graphsByMode[mode].edges;
+    this.edges = this.normalizeEdges(this.graphsByMode[mode].edges);
+    this.graphsByMode[mode].edges = this.edges;
     this.selectedEdgeIds.clear();
 
     if (this.historyByMode[mode].length === 0) {
@@ -257,13 +265,25 @@ export class App implements AfterViewInit {
     if (!sourceType || !targetType) return false;
 
     const isHier = this.activeMode === 'hierfl';
-    const valid = isHier
-      ? (sourceType === 'SuperServerNode' && targetType === 'ServerNode') || (sourceType === 'ServerNode' && targetType === 'ClientNode')
-      : (sourceType === 'ServerNode' && targetType === 'ServerNode') || (sourceType === 'ServerNode' && targetType === 'ClientNode');
+    const pair = `${sourceType}->${targetType}`;
+    const validPairs = isHier
+      ? new Set([
+          'SuperServerNode->ServerNode',
+          'ServerNode->SuperServerNode',
+          'ServerNode->ClientNode',
+          'ClientNode->ServerNode',
+        ])
+      : new Set([
+          'ServerNode->ServerNode',
+          'ServerNode->ClientNode',
+          'ClientNode->ServerNode',
+        ]);
+    const valid = validPairs.has(pair);
 
     if (!valid) return false;
 
-    if (targetType === 'ClientNode' && this.edges.some(e => e.target === connection.target)) {
+    // Clients are limited to a single edge total (in or out)
+    if ((sourceType === 'ClientNode' || targetType === 'ClientNode') && this.edges.some(e => e.source === connection.source || e.target === connection.source || e.source === connection.target || e.target === connection.target)) {
       return false;
     }
 
@@ -280,7 +300,7 @@ export class App implements AfterViewInit {
       sourceHandle: connection.sourceHandle,
       targetHandle: connection.targetHandle,
       reconnectable: true,
-      floating: true,
+      floating: false,
     };
 
     this.edges = [...this.edges, newEdge];
