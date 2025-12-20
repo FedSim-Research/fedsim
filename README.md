@@ -1,48 +1,65 @@
 # RP_FedSim
 
+# Python venv setup and running simulations
+Currently, the flower simulation (explicitly ray) only supports Linux. To run simulations on a Windows machine, use WSL2 and follow this guide using the Linux commands.
 
+In order to use a virtual environment setup with python (strongly recommended), the following procedure is necessary:
 
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
+Starting from the project root directory, firstly a new venv is generated.
 ```
-cd existing_repo
-git remote add origin https://gitlab-vs.informatik.uni-stuttgart.de/schramml/rp_fedsim.git
-git branch -M main
-git push -uf origin main
+python3 -m venv .
 ```
 
-## Integrate with your tools
+Now, the python environment can be activated using the command:
+- Linux: `source <path to project-root>/bin/activate`
+- Powershell: `<path to project-root>/Scripts/Activate.ps1`
 
-- [ ] [Set up project integrations](https://gitlab-vs.informatik.uni-stuttgart.de/schramml/rp_fedsim/-/settings/integrations)
 
-## Collaborate with your team
+The setup can be checked using the command `which pip` for Linux and `gcm pip` for Powershell. Confirm that the path to pip corresponds to:
+- Linux: `<path to project-root>/bin/pip`
+- Powershell: `<path to project-root>/Scripts/pip`
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+For the next step, flower has to be installed by pip. By using the `-e` flag it is ensured that changes made to the custom flower implementation in this project are instantly reflected when using the `flwr` command.
+```
+cd ./code/framework/flower/framework/
+pip install -e .
+pip install -e ".[simulation]"
+```
 
-## Test and Deploy
+Beware, the download size of all necessary dependencies is roughly 8GB.
+To confirm this step has succeeded, the following path checks can be performed:
 
-Use the built-in continuous integration in GitLab.
+Linux:
+- `which flwr` should point to `<path to project-root>/bin/flwr`
+- `which flower-simulation` should point to `<path to project-root>/bin/flower-simulation`
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+Powershell:
+- `gcm flwr` should point to `<path to project-root>/Scripts/flwr`
+- `gcm flower-simulation` should point to `<path to project-root>/Scripts/flower-simulation`
 
-***
+In order to be REALLY sure that the custom implementation of the flower framework is used, the following code can be temporarily injected into the startup file located at:
+
+ `<path to project-root>/code/framework/flower/framework/py/flwr/__init__.py`
+
+In order to work properly, the following code has to be inserted at the very top of the file. (even above all imports!)
+ ```
+print("\n" + "="*53)
+print(">>> SUCCESS: You are using your CUSTOM LOCAL FLWR <<<")
+print("="*53 + "\n")
+ ```
+
+In order to work properly, the above mentioned code has to be inserted at the very top of the file. (even above all imports!)
+
+Finally, to run a simulation and make see the work of this code injection, use the following commands:
+
+Starting from project root:
+```
+flwr run ./code/framework/impl/
+```
+
+An output file, called `final_model.pt` will be created, which unsurprisingly contains the final model after the simulation has ended and the model has been trained. This file is located wherever the above mentioned `flwr` run is started.
+
+---
 
 # Editing this README
 
