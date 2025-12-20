@@ -118,11 +118,13 @@ export class App {
 
     try {
       const payload = JSON.parse(rawData);
+      const target = event.currentTarget as HTMLElement;
+      const rect = target.getBoundingClientRect();
 
       const mousePosition = {
-        x: event.clientX,
-        y: event.clientY,
-      };
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
 
       let nodeType;
       switch (payload.type.toString()) {
