@@ -1,16 +1,29 @@
 import { Component, computed, inject } from '@angular/core';
-import { CustomNodeComponent } from 'ngx-vflow';
+import { CustomNodeComponent, HandleComponent } from 'ngx-vflow';
 import { NodeDeleteUiService } from '../../../services/node-delete-ui.service';
 
 @Component({
   selector: 'app-server-node',
-  imports: [],
+  standalone: true,
+  imports: [HandleComponent],
   templateUrl: './server-node.html',
   styleUrl: './server-node.css',
 })
 export class ServerNode extends CustomNodeComponent{
   private nodeDeleteUi = inject(NodeDeleteUiService);
   public showDelete = computed(() => this.nodeDeleteUi.activeId() === this.node().id);
+
+  public server = computed(() => {
+    const config = ((this.node().data as any)?.config) ?? {};
+    const environment = ((this.node().data as any)?.environment) ?? (config.environment ?? 'spyker');
+    return {
+      name: config.name ?? '',
+      cpus: config.cpus ?? 0,
+      gpus: config.gpus ?? 0,
+      computeTimeMs: config.computeTimeMs ?? 0,
+      environment,
+    };
+  });
 
   public onNodeClick(event: MouseEvent): void {
     if (event.button !== 0) return;

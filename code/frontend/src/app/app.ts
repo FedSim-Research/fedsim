@@ -38,6 +38,43 @@ export class App {
     hierfl: 0,
   };
 
+  private rebuildEdges(): void {
+    const edges: Edge[] = [];
+    const nodes = this.nodes;
+    const mode = this.activeMode;
+
+    const supers = nodes.filter(n => (n as any).data?.type === 'SuperServerNode');
+    const servers = nodes.filter(n => (n as any).data?.type === 'ServerNode');
+    const clients = nodes.filter(n => (n as any).data?.type === 'ClientNode');
+
+    const addEdge = (source: string, target: string) => {
+      // Use floating edges so they attach to the node center even without explicit handles.
+      edges.push({ id: `${source}->${target}`, source, target, floating: true });
+    };
+
+    if (mode === 'hierfl') {
+      if (supers.length && servers.length) {
+        const superId = supers[0].id;
+        servers.forEach(server => addEdge(superId, server.id));
+      }
+      servers.forEach(server => {
+        clients.forEach(client => addEdge(server.id, client.id));
+      });
+    } else {
+      for (let i = 0; i < servers.length; i++) {
+        for (let j = i + 1; j < servers.length; j++) {
+          addEdge(servers[i].id, servers[j].id);
+        }
+      }
+      servers.forEach(server => {
+        clients.forEach(client => addEdge(server.id, client.id));
+      });
+    }
+
+    this.edges = edges;
+    this.graphsByMode[this.activeMode].edges = edges;
+  }
+
   constructor(
     private nodeDeleteUi: NodeDeleteUiService,
     private destroyRef: DestroyRef
@@ -71,6 +108,7 @@ export class App {
       const history = this.historyByMode[this.activeMode];
       this.nodes = [...history[this.historyIndexByMode[this.activeMode]]];
       this.graphsByMode[this.activeMode].nodes = this.nodes;
+      this.rebuildEdges();
       this.updateSuperServerStatus();
     }
   }
@@ -81,6 +119,7 @@ export class App {
       this.historyIndexByMode[this.activeMode] += 1;
       this.nodes = [...history[this.historyIndexByMode[this.activeMode]]];
       this.graphsByMode[this.activeMode].nodes = this.nodes;
+      this.rebuildEdges();
       this.updateSuperServerStatus();
     }
   }
@@ -112,8 +151,8 @@ export class App {
   private deleteNodeById(nodeId: string): void {
     if (!this.nodes.some(node => node.id === nodeId)) return;
     this.nodes = this.nodes.filter(node => node.id !== nodeId);
-    this.edges = this.edges.filter(edge => edge.source !== nodeId && edge.target !== nodeId);
-    this.graphsByMode[this.activeMode] = { nodes: this.nodes, edges: this.edges };
+    this.rebuildEdges();
+    this.graphsByMode[this.activeMode].nodes = this.nodes;
     this.updateSuperServerStatus();
     this.saveHistory();
   }
@@ -180,10 +219,12 @@ export class App {
         data: {
           type: payload.type,
           config: payload.config,
+          environment: this.activeMode,
         },
       };
       this.nodes = [...this.nodes, newNode];
       this.graphsByMode[this.activeMode].nodes = this.nodes;
+      this.rebuildEdges();
       this.saveHistory();
       console.log("added new node:", newNode);
     } catch (e) {
@@ -201,7 +242,7 @@ export class App {
 
     this.activeMode = mode;
     this.nodes = this.graphsByMode[mode].nodes;
-    this.edges = this.graphsByMode[mode].edges;
+    this.rebuildEdges();
 
     if (this.historyByMode[mode].length === 0) {
       this.historyByMode[mode] = [ [...this.nodes] ];

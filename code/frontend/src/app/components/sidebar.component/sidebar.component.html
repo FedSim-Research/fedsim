@@ -87,8 +87,12 @@
       class="tooltip-wrapper"
       [title]="selectedArchitectures.spyker ? 'Not available in Spyker' : ''"
     >
-      <details class="disclosure" [class.disclosure--disabled]="selectedArchitectures.spyker">
-        <summary class="disclosure__summary">
+      <details
+        #supDetails
+        class="disclosure"
+        [class.disclosure--disabled]="selectedArchitectures.spyker"
+      >
+        <summary class="disclosure__summary" (click)="onSuperServerSummaryClick($event)">
           <span>Super Server</span>
         </summary>
         <div class="disclosure__body">

@@ -1,4 +1,4 @@
-import { Component, Inject, Output, EventEmitter } from '@angular/core';
+import { Component, Inject, Output, EventEmitter, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StartPopup } from '../start.popup/start.popup';
@@ -18,6 +18,7 @@ export class SidebarComponent {
   public isOpen = true;
   public isDarkMode = true;
   public showSimulationpopup = false;
+  @ViewChild('supDetails') private supDetails?: ElementRef<HTMLDetailsElement>;
 
   @Output() resetGraph = new EventEmitter<void>();
   @Output() modeChange = new EventEmitter<'spyker' | 'hierfl'>();
@@ -28,7 +29,7 @@ export class SidebarComponent {
   };
 
   public configDraft = {
-    superserver: { name: 'SuperServer', id: 'SS-01', cpus: 8, gpus: 1 },
+    superserver: { name: 'Super Server', id: 'SS-01', cpus: 8, gpus: 1 },
     server: { name: 'Server Node', environment: 'Spyker', cpus: 4, gpus: 0, computeTimeMs: 50 },
     client: { id: 'CL-01', count: 50, type: 'mobile', computeTimeMs: 120, pingMs: 40, packetloss: 0.02 }
   };
@@ -65,12 +66,18 @@ export class SidebarComponent {
     this.selectedArchitectures.spyker = !this.selectedArchitectures.spyker;
     this.selectedArchitectures.hierfl = !this.selectedArchitectures.spyker;
     this.modeChange.emit(this.selectedArchitectures.spyker ? 'spyker' : 'hierfl');
+    if (this.selectedArchitectures.spyker) {
+      this.closeSuperServerDisclosure();
+    }
   }
 
   public setArchitecture(isSpyker: boolean): void {
     this.selectedArchitectures.spyker = isSpyker;
     this.selectedArchitectures.hierfl = !isSpyker;
     this.modeChange.emit(isSpyker ? 'spyker' : 'hierfl');
+    if (isSpyker) {
+      this.closeSuperServerDisclosure();
+    }
   }
 
   public toggleSidebar(): void { this.isOpen = !this.isOpen; }
@@ -87,20 +94,29 @@ export class SidebarComponent {
     if (kind === 'SuperServerNode') {
       if (this.selectedArchitectures.spyker) {
         event.preventDefault();
+        event.stopPropagation();
+        this.showErrorToast('No super server is allowed to exist in the Spyker Environment');
         return;
       }
       const allGraphNodes = document.querySelectorAll('.vflow-node');
-      const alreadyExists = Array.from(allGraphNodes).some(node => 
-        node.textContent?.includes('SuperServer')
-      );
+      const alreadyExists = Array.from(allGraphNodes).some(node => {
+        const text = node.textContent?.toLowerCase().replace(/\s+/g, '') ?? '';
+        return text.includes('superserver');
+      });
       if (alreadyExists) {
         event.preventDefault();
         event.stopPropagation();
-        this.showErrorToast('Only one Super Server can exist in the environment Hierarchical.');
+        this.showErrorToast('Only one Super Server can exist in the Environment Hierarchical.');
         return;
       }
     }
-    const payload = { type: kind, config: this.configDraft };
+    const configByKind = {
+      SuperServerNode: { ...this.configDraft.superserver },
+      ServerNode: { ...this.configDraft.server },
+      ClientNode: { ...this.configDraft.client },
+    } as const;
+
+    const payload = { type: kind, config: configByKind[kind] };
     if (event.dataTransfer) {
       event.dataTransfer.setData('application/json', JSON.stringify(payload));
       event.dataTransfer.effectAllowed = 'copy';
@@ -109,6 +125,17 @@ export class SidebarComponent {
 
   public openSimulationpopup(): void { this.showSimulationpopup = true; }
   public closeSimulationpopup(): void { this.showSimulationpopup = false; }
+  public onSuperServerSummaryClick(event: Event): void {
+    if (this.selectedArchitectures.spyker) {
+      event.preventDefault();
+      this.closeSuperServerDisclosure();
+      this.showErrorToast('No super server is allowed to exist in the Spyker Environment');
+    }
+  }
+
+  private closeSuperServerDisclosure(): void {
+    this.supDetails?.nativeElement.removeAttribute('open');
+  }
   
   public runSimulation(type: 'spyker' | 'hierarchical' | 'both'): void { 
     console.log('Starte Simulation für:', type); 
