@@ -1,6 +1,6 @@
-import { Component, DestroyRef } from '@angular/core';
+import { Component, DestroyRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Vflow, Node, Edge } from 'ngx-vflow';
+import { Vflow, VflowComponent, Node, Edge } from 'ngx-vflow';
 import { SidebarComponent } from './components/sidebar.component/sidebar.component';
 import { ClientNode } from './components/nodes/client-node/client-node';
 import { ServerNode } from './components/nodes/server-node/server-node';
@@ -16,6 +16,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
   imports: [Vflow, SidebarComponent, CommonModule],
 })
 export class App {
+  @ViewChild(VflowComponent) private flow?: VflowComponent;
+
   public activeMode: 'spyker' | 'hierfl' = 'hierfl';
   public nodes: Node[] = [];
   public edges: Edge[] = [];
@@ -118,13 +120,14 @@ export class App {
 
     try {
       const payload = JSON.parse(rawData);
-      const target = event.currentTarget as HTMLElement;
-      const rect = target.getBoundingClientRect();
-
-      const mousePosition = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    };
+      const flowPoint = this.flow?.documentPointToFlowPoint({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      const mousePosition = flowPoint ?? {
+        x: event.clientX,
+        y: event.clientY,
+      };
 
       let nodeType;
       switch (payload.type.toString()) {
