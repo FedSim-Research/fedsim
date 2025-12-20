@@ -1,6 +1,6 @@
-import { Component, DestroyRef, HostListener, ViewChild } from '@angular/core';
+import { Component, DestroyRef, HostListener, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Vflow, VflowComponent, Node, Edge, NodePositionChange } from 'ngx-vflow';
+import { Vflow, VflowComponent, Node, Edge, NodePositionChange, Connection, ɵConnectionModel as ConnectionModel } from 'ngx-vflow';
 import { SidebarComponent } from './components/sidebar.component/sidebar.component';
 import { ClientNode } from './components/nodes/client-node/client-node';
 import { ServerNode } from './components/nodes/server-node/server-node';
@@ -15,20 +15,23 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
   styleUrls: ['./app.css'],
   imports: [Vflow, SidebarComponent, CommonModule],
 })
-export class App {
+export class App implements AfterViewInit {
   @ViewChild(VflowComponent) private flow?: VflowComponent;
 
   public activeMode: 'spyker' | 'hierfl' = 'hierfl';
   public nodes: Node[] = [];
   public edges: Edge[] = [];
+  public connectionModel = new ConnectionModel({
+    mode: 'loose',
+    validator: (connection) => this.canConnect(connection),
+  });
+
   private alreadyHasSuperServer = false;
   private pendingNodePositions = new Map<string, { x: number; y: number }>();
-
   private graphsByMode: Record<'spyker' | 'hierfl', { nodes: Node[]; edges: Edge[] }> = {
     spyker: { nodes: [], edges: [] },
     hierfl: { nodes: [], edges: [] },
   };
-
   private historyByMode: Record<'spyker' | 'hierfl', Node[][]> = {
     spyker: [],
     hierfl: [],
@@ -37,43 +40,7 @@ export class App {
     spyker: 0,
     hierfl: 0,
   };
-
-  private rebuildEdges(): void {
-    const edges: Edge[] = [];
-    const nodes = this.nodes;
-    const mode = this.activeMode;
-
-    const supers = nodes.filter(n => (n as any).data?.type === 'SuperServerNode');
-    const servers = nodes.filter(n => (n as any).data?.type === 'ServerNode');
-    const clients = nodes.filter(n => (n as any).data?.type === 'ClientNode');
-
-    const addEdge = (source: string, target: string) => {
-      // Use floating edges so they attach to the node center even without explicit handles.
-      edges.push({ id: `${source}->${target}`, source, target, floating: true });
-    };
-
-    if (mode === 'hierfl') {
-      if (supers.length && servers.length) {
-        const superId = supers[0].id;
-        servers.forEach(server => addEdge(superId, server.id));
-      }
-      servers.forEach(server => {
-        clients.forEach(client => addEdge(server.id, client.id));
-      });
-    } else {
-      for (let i = 0; i < servers.length; i++) {
-        for (let j = i + 1; j < servers.length; j++) {
-          addEdge(servers[i].id, servers[j].id);
-        }
-      }
-      servers.forEach(server => {
-        clients.forEach(client => addEdge(server.id, client.id));
-      });
-    }
-
-    this.edges = edges;
-    this.graphsByMode[this.activeMode].edges = edges;
-  }
+  private selectedEdgeIds = new Set<string>();
 
   constructor(
     private nodeDeleteUi: NodeDeleteUiService,
@@ -85,6 +52,21 @@ export class App {
       .subscribe((nodeId) => this.deleteNodeById(nodeId));
   }
 
+  public ngAfterViewInit(): void {
+    this.flow?.edgesChange$?.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(changes => {
+      for (const change of changes) {
+        if ((change as any).type === 'select') {
+          const selected = (change as any).selected as boolean;
+          if (selected) {
+            this.selectedEdgeIds.add((change as any).id);
+          } else {
+            this.selectedEdgeIds.delete((change as any).id);
+          }
+        }
+      }
+    });
+  }
+
   private saveHistory() {
     const history = this.historyByMode[this.activeMode];
     const index = this.historyIndexByMode[this.activeMode];
@@ -92,10 +74,10 @@ export class App {
     if (index < history.length - 1) {
       this.historyByMode[this.activeMode] = history.slice(0, index + 1);
     }
-    
+
     this.historyByMode[this.activeMode].push([...this.nodes]);
     this.historyIndexByMode[this.activeMode] += 1;
-    
+
     if (this.historyByMode[this.activeMode].length > 20) {
       this.historyByMode[this.activeMode].shift();
       this.historyIndexByMode[this.activeMode] -= 1;
@@ -108,7 +90,7 @@ export class App {
       const history = this.historyByMode[this.activeMode];
       this.nodes = [...history[this.historyIndexByMode[this.activeMode]]];
       this.graphsByMode[this.activeMode].nodes = this.nodes;
-      this.rebuildEdges();
+      this.edges = [...this.graphsByMode[this.activeMode].edges];
       this.updateSuperServerStatus();
     }
   }
@@ -119,7 +101,7 @@ export class App {
       this.historyIndexByMode[this.activeMode] += 1;
       this.nodes = [...history[this.historyIndexByMode[this.activeMode]]];
       this.graphsByMode[this.activeMode].nodes = this.nodes;
-      this.rebuildEdges();
+      this.edges = [...this.graphsByMode[this.activeMode].edges];
       this.updateSuperServerStatus();
     }
   }
@@ -151,8 +133,9 @@ export class App {
   private deleteNodeById(nodeId: string): void {
     if (!this.nodes.some(node => node.id === nodeId)) return;
     this.nodes = this.nodes.filter(node => node.id !== nodeId);
-    this.rebuildEdges();
+    this.edges = this.edges.filter(edge => edge.source !== nodeId && edge.target !== nodeId);
     this.graphsByMode[this.activeMode].nodes = this.nodes;
+    this.graphsByMode[this.activeMode].edges = this.edges;
     this.updateSuperServerStatus();
     this.saveHistory();
   }
@@ -164,7 +147,7 @@ export class App {
     this.graphsByMode[this.activeMode] = { nodes: [], edges: [] };
     this.saveHistory();
   }
-  
+
   public onDragOver(event: DragEvent) {
     event.preventDefault();
     if (event.dataTransfer) {
@@ -209,9 +192,9 @@ export class App {
           }
           break;
         default:
-          console.log("this is the default case")
           return;
       }
+
       const newNode: Node = {
         id: crypto.randomUUID(),
         point: mousePosition,
@@ -222,11 +205,11 @@ export class App {
           environment: this.activeMode,
         },
       };
+
       this.nodes = [...this.nodes, newNode];
       this.graphsByMode[this.activeMode].nodes = this.nodes;
-      this.rebuildEdges();
+      this.graphsByMode[this.activeMode].edges = this.edges;
       this.saveHistory();
-      console.log("added new node:", newNode);
     } catch (e) {
       console.log('Catched', e);
     }
@@ -242,13 +225,65 @@ export class App {
 
     this.activeMode = mode;
     this.nodes = this.graphsByMode[mode].nodes;
-    this.rebuildEdges();
+    this.edges = this.graphsByMode[mode].edges;
+    this.selectedEdgeIds.clear();
 
     if (this.historyByMode[mode].length === 0) {
-      this.historyByMode[mode] = [ [...this.nodes] ];
+      this.historyByMode[mode] = [[...this.nodes]];
       this.historyIndexByMode[mode] = 0;
     }
 
     this.updateSuperServerStatus();
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  public onKeyDown(event: KeyboardEvent): void {
+    if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+    if (!this.selectedEdgeIds.size) return;
+    event.preventDefault();
+    const ids = new Set(this.selectedEdgeIds);
+    this.edges = this.edges.filter(e => !ids.has(e.id));
+    this.graphsByMode[this.activeMode].edges = this.edges;
+    this.selectedEdgeIds.clear();
+  }
+
+  private canConnect(connection: Connection): boolean {
+    const sourceNode = this.nodes.find(n => n.id === connection.source);
+    const targetNode = this.nodes.find(n => n.id === connection.target);
+    if (!sourceNode || !targetNode) return false;
+
+    const sourceType = (sourceNode as any).data?.type as string | undefined;
+    const targetType = (targetNode as any).data?.type as string | undefined;
+    if (!sourceType || !targetType) return false;
+
+    const isHier = this.activeMode === 'hierfl';
+    const valid = isHier
+      ? (sourceType === 'SuperServerNode' && targetType === 'ServerNode') || (sourceType === 'ServerNode' && targetType === 'ClientNode')
+      : (sourceType === 'ServerNode' && targetType === 'ServerNode') || (sourceType === 'ServerNode' && targetType === 'ClientNode');
+
+    if (!valid) return false;
+
+    if (targetType === 'ClientNode' && this.edges.some(e => e.target === connection.target)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  public handleConnect(connection: Connection): void {
+    if (!this.canConnect(connection)) return;
+
+    const newEdge: Edge = {
+      id: crypto.randomUUID(),
+      source: connection.source,
+      target: connection.target,
+      sourceHandle: connection.sourceHandle,
+      targetHandle: connection.targetHandle,
+      reconnectable: true,
+      floating: true,
+    };
+
+    this.edges = [...this.edges, newEdge];
+    this.graphsByMode[this.activeMode].edges = this.edges;
   }
 }
