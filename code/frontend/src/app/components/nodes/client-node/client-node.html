@@ -1,7 +1,7 @@
-<div class="node-wrapper">
+<div class="node-wrapper" [attr.data-id]="node().id">
   <handle type="target" position="top" id="client-in" />
   <handle type="source" position="top" id="client-out" />
-  <div class="node-card" (click)="onNodeClick($event)">
+  <div class="node-card" (click)="onNodeClick($event)" [class.node-selected]="isSelected()">
     <div class="node-header">
       <div class="node-title">
         <span class="status-dot"></span>

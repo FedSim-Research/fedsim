@@ -12,6 +12,7 @@ import { NodeDeleteUiService } from '../../../services/node-delete-ui.service';
 export class SuperServerNode extends CustomNodeComponent {
   private nodeDeleteUi = inject(NodeDeleteUiService);
   public showDelete = computed(() => this.nodeDeleteUi.activeId() === this.node().id);
+  public isSelected = computed(() => Boolean((this.node().data as any)?.selected));
 
   public superserver = computed(() => {
     const config = ((this.node().data as any)?.config) ?? {};
@@ -27,6 +28,11 @@ export class SuperServerNode extends CustomNodeComponent {
 
   public onNodeClick(event: MouseEvent): void {
     if (event.button !== 0) return;
+    if (event.ctrlKey || event.metaKey) {
+      event.stopPropagation();
+      window.dispatchEvent(new CustomEvent('node-ctrl-click', { detail: { id: this.node().id } }));
+      return;
+    }
     event.stopPropagation();
     this.nodeDeleteUi.showFor(this.node().id);
   }

@@ -14,13 +14,21 @@ export class ClientNode extends CustomNodeComponent{
    private nodeDeleteUi = inject(NodeDeleteUiService);
    public showDelete = computed(() => this.nodeDeleteUi.activeId() === this.node().id);
 
+  public isSelected = computed(() => Boolean((this.node().data as any)?.selected));
+
    public client = computed(() => {
      const config = ((this.node().data as any)?.config) ?? {};
     const environment = ((this.node().data as any)?.environment) ?? (config.environment ?? 'spyker');
+
+     const rawType = config.type ?? '';
+     const type = typeof rawType === 'string' && rawType.length
+       ? rawType.charAt(0).toUpperCase() + rawType.slice(1)
+       : rawType;
+
      return {
        id: config.id ?? '',
        count: config.count ?? 0,
-       type: config.type ?? '',
+       type,
        computeTimeMs: config.computeTimeMs ?? 0,
        pingMs: config.pingMs ?? 0,
        packetloss: config.packetloss ?? 0,
@@ -30,6 +38,11 @@ export class ClientNode extends CustomNodeComponent{
 
    public onNodeClick(event: MouseEvent): void {
      if (event.button !== 0) return;
+     if (event.ctrlKey || event.metaKey) {
+       event.stopPropagation();
+       window.dispatchEvent(new CustomEvent('node-ctrl-click', { detail: { id: this.node().id } }));
+       return;
+     }
      event.stopPropagation();
      this.nodeDeleteUi.showFor(this.node().id);
    }

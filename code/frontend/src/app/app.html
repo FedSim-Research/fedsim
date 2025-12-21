@@ -1,4 +1,4 @@
-<div class="canvas-wrapper" (dragover)="onDragOver($event)" (drop)="onDrop($event)">
+<div class="canvas-wrapper" (dragover)="onDragOver($event)" (drop)="onDrop($event)" (mousedown)="onCanvasMouseDown($event)">
   <vflow
     [nodes]="nodes"
     [edges]="edges"
@@ -11,8 +11,16 @@
     [alignmentHelper]="true"
     (onNodesChange.position)="onNodePositionChange($event)"
   >
-    <mini-map />
   </vflow>
+
+  <div
+    *ngIf="selectionBox.visible"
+    class="selection-box"
+    [style.left.px]="selectionBox.left"
+    [style.top.px]="selectionBox.top"
+    [style.width.px]="selectionBox.width"
+    [style.height.px]="selectionBox.height"
+  ></div>
 
   <app-sidebar
     (resetGraph)="handleReset()"

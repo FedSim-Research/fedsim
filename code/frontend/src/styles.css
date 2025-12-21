@@ -32,3 +32,25 @@ html, body {
 .vflow-node > foreignObject {
   overflow: visible;
 }
+
+
+body.light-mode .edge {
+  stroke: #000;
+}
+
+body.light-mode .edge_selected {
+  stroke: #0f4c75;
+}
+
+body:not(.light-mode) g[alignmentHelper] line {
+  stroke: #fff;
+}
+
+body.light-mode g[alignmentHelper] line {
+  stroke: #1b262c;
+}
+
+.node-selected {
+  outline: 4px solid #007BFF;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+}

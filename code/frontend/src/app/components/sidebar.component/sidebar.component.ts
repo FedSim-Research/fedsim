@@ -5,14 +5,16 @@ import { StartPopup } from '../start.popup/start.popup';
 import { ResetButton } from '../reset.button/reset.button';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ConfirmationService } from 'primeng/api';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
   templateUrl: './sidebar.component.html',
   styleUrls: ['./sidebar.component.css'],
-  imports: [FormsModule, CommonModule, StartPopup, ResetButton, ToastModule],
-  providers: [MessageService],
+  imports: [FormsModule, CommonModule, StartPopup, ResetButton, ToastModule, ConfirmDialogModule],
+  providers: [MessageService, ConfirmationService],
 })
 export class SidebarComponent {
   public isOpen = true;
@@ -36,7 +38,8 @@ export class SidebarComponent {
 
   constructor(
     @Inject(DOCUMENT) private document: Document,
-    private messageService: MessageService
+    private messageService: MessageService,
+    private confirmationService: ConfirmationService
   ) {}
 
   private showErrorToast(message: string) {
@@ -48,7 +51,21 @@ export class SidebarComponent {
   }
 
   public onResetRequested(): void {
-    this.resetGraph.emit();
+    this.confirmationService.confirm({
+      header: 'Reset graph?',
+      message: 'Are you sure you want to delete all nodes and edges?',
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: 'Yes, delete',
+      rejectLabel: 'Cancel',
+      rejectButtonStyleClass: 'p-button-text p-button-sm',
+      acceptButtonStyleClass: 'p-button-danger p-button-sm',
+      defaultFocus: 'accept',
+      closable: true,
+      closeOnEscape: true,
+      accept: () => {
+        this.resetGraph.emit();
+      },
+    });
   }
 
   @Output() undoRequested = new EventEmitter<void>();

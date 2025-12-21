@@ -1,9 +1,9 @@
-<div class="node-wrapper">
-  <handle type="target" position="left" id="server-in" />
-  <handle type="target" position="top" id="server-in-top" />
-  <handle type="source" position="right" id="server-out" />
+<div class="node-wrapper" [attr.data-id]="node().id">
+  <handle *ngIf="environment() === 'spyker'" type="target" position="left" id="server-in" />
+  <handle *ngIf="environment() === 'hierfl'" type="target" position="top" id="server-in-top" />
+  <handle *ngIf="environment() === 'spyker'" type="source" position="right" id="server-out" />
   <handle type="source" position="bottom" id="server-out-bottom" />
-  <div class="node-card" (click)="onNodeClick($event)">
+  <div class="node-card" (click)="onNodeClick($event)" [class.node-selected]="isSelected()">
     <div class="node-header">
       <div class="node-title">
         <span class="status-dot"></span>
