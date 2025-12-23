@@ -1,12 +1,15 @@
-import { Component, DestroyRef, HostListener, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, DestroyRef, inject, HostListener, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Vflow, VflowComponent, Node, Edge, NodePositionChange, Connection, ɵConnectionModel as ConnectionModel } from 'ngx-vflow';
 import { SidebarComponent } from './components/sidebar.component/sidebar.component';
 import { ClientNode } from './components/nodes/client-node/client-node';
 import { ServerNode } from './components/nodes/server-node/server-node';
 import { SuperServerNode } from './components/nodes/super-server-node/super-server-node';
-import { NodeDeleteUiService } from './services/node-delete-ui.service';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { GraphServiceSpyker } from './services/subservices/graph-service-spyker';
+import { GraphHistoryServiceSpyker } from './services/subservices/graph-history-service-spyker';
+import { GraphServiceHierach } from './services/subservices/graph-service-hierach';
+import { GraphHistoryServiceHierach } from './services/subservices/graph-history-service-hierach';
+
 
 @Component({
   selector: 'app-root',
@@ -15,45 +18,58 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
   styleUrls: ['./app.css'],
   imports: [Vflow, SidebarComponent, CommonModule],
 })
-export class App implements AfterViewInit {
+export class App implements AfterViewInit{
   @ViewChild(VflowComponent) private flow?: VflowComponent;
-
-  public activeMode: 'spyker' | 'hierfl' = 'hierfl';
+  protected graphServiceSpyker = inject(GraphServiceSpyker);
+  protected graphHistorySpyker = inject(GraphHistoryServiceSpyker);
+  protected graphServiceHierach = inject(GraphServiceHierach);
+  protected graphHistoryHierach = inject(GraphHistoryServiceHierach);
   public nodes: Node[] = [];
   public edges: Edge[] = [];
+  public activeMode: ('spyker' | 'hierfl') = 'hierfl';
+  private pendingNodePositions = new Map<string, { x: number; y: number }>();
+  private selectedNodeIds = new Set<string>();
+  private selectedEdgeIds = new Set<string>();
+  private copyBuffer: Node[] = [];
+  public selectionBox = { visible: false, left: 0, top: 0, width: 0, height: 0 };
+  private dragOrigin: { x: number; y: number } | null = null;
   public connectionModel = new ConnectionModel({
     mode: 'loose',
     validator: (connection) => this.canConnect(connection),
   });
 
-  private alreadyHasSuperServer = false;
-  private pendingNodePositions = new Map<string, { x: number; y: number }>();
-  private selectedNodeIds = new Set<string>();
-  private copyBuffer: Node[] = [];
-  public selectionBox = { visible: false, left: 0, top: 0, width: 0, height: 0 };
-  private dragOrigin: { x: number; y: number } | null = null;
-  private graphsByMode: Record<'spyker' | 'hierfl', { nodes: Node[]; edges: Edge[] }> = {
-    spyker: { nodes: [], edges: [] },
-    hierfl: { nodes: [], edges: [] },
-  };
-  private historyByMode: Record<'spyker' | 'hierfl', { nodes: Node[]; edges: Edge[] }[]> = {
-    spyker: [],
-    hierfl: [],
-  };
-  private historyIndexByMode: Record<'spyker' | 'hierfl', number> = {
-    spyker: 0,
-    hierfl: 0,
-  };
-  private selectedEdgeIds = new Set<string>();
 
-  constructor(
-    private nodeDeleteUi: NodeDeleteUiService,
-    private destroyRef: DestroyRef
-  ) {
-    this.saveHistory();
-    this.nodeDeleteUi.deleteRequests$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((nodeId) => this.deleteNodeById(nodeId));
+  public ngAfterViewInit(): void {
+    this.flow?.edgesChange$?.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(changes => {
+      for (const change of changes) {
+        if ((change as any).type === 'select') {
+          const selected = (change as any).selected as boolean;
+          if (selected) {
+            this.selectedEdgeIds.add((change as any).id);
+          } else {
+            this.selectedEdgeIds.delete((change as any).id);
+          }
+        }
+      }
+    });
+
+    const clearSelectionOnClick = (event: MouseEvent) => {
+      if (event.ctrlKey || event.metaKey) return;
+      if (event.button !== 0 && event.button !== 2) return;
+      if (!this.selectedNodeIds.size) return;
+      this.clearNodeSelection();
+    };
+
+    window.addEventListener('mousedown', clearSelectionOnClick, true);
+    this.destroyRef.onDestroy(() => {
+      window.removeEventListener('mousedown', clearSelectionOnClick, true);
+    });
+
+    window.addEventListener('node-ctrl-click', (event: Event) => {
+      const id = (event as CustomEvent)?.detail?.id as string | undefined;
+      if (!id) return;
+      this.toggleNodeSelection(id);
+    });
   }
 
   public ngAfterViewInit(): void {
@@ -194,11 +210,11 @@ export class App implements AfterViewInit {
   public handleReset() {
     this.nodes = [];
     this.edges = [];
-    this.alreadyHasSuperServer = false;
-    this.selectedNodeIds.clear();
-    this.copyBuffer = [];
-    this.graphsByMode[this.activeMode] = { nodes: [], edges: [] };
-    this.saveHistory();
+    if (this.activeMode=='hierfl'){
+      this.graphServiceHierach.resetGraph();
+    } else if (this.activeMode=='spyker') {
+      this.graphServiceSpyker.resetGraph();
+    }
   }
 
   public onDragOver(event: DragEvent) {
@@ -210,10 +226,8 @@ export class App implements AfterViewInit {
 
   public onDrop(event: DragEvent) {
     event.preventDefault();
-
     const rawData = event.dataTransfer?.getData('application/json');
     if (!rawData) return;
-
     try {
       const payload = JSON.parse(rawData);
       const isFromJson = payload?.origin === 'json' || payload?.fromJson === true;
@@ -236,16 +250,9 @@ export class App implements AfterViewInit {
           break;
         case 'SuperServerNode':
           nodeType = SuperServerNode;
-          if (this.alreadyHasSuperServer) {
-            console.warn('Block: SuperServer already exists (found by text content).');
-            event.preventDefault();
-            event.stopPropagation();
-            return;
-          } else {
-            this.alreadyHasSuperServer = true;
-          }
           break;
         default:
+          console.log('this is the default case');
           return;
       }
 
@@ -263,45 +270,64 @@ export class App implements AfterViewInit {
       };
 
       this.nodes = [...this.nodes, newNode];
-      this.graphsByMode[this.activeMode].nodes = this.nodes;
-      this.graphsByMode[this.activeMode].edges = this.edges;
-      this.autoConnectSpykerServers(newNode, isFromJson);
-      this.saveHistory();
-      this.applySelection(new Set(this.selectedNodeIds));
+      if (this.activeMode=="hierfl"){
+        console.log("Hierach and added node")
+        this.graphServiceHierach.addNode(newNode);
+        this.graphHistoryHierach.saveState({nodes: this.nodes, edges: this.edges});
+      } else {
+        this.graphServiceSpyker.addNode(newNode);
+        this.graphHistorySpyker.saveState({nodes: this.nodes, edges: this.edges});
+      }
+      console.log('added new node:', newNode);
     } catch (e) {
       console.log('Catched', e);
     }
   }
 
-  public onModeChange(mode: 'spyker' | 'hierfl'): void {
+public onModeChange(mode: 'spyker' | 'hierfl'): void {
     if (this.activeMode === mode) return;
-
-    this.flushNodePositionChanges(false);
-
-    this.graphsByMode[this.activeMode] = {
-      nodes: this.nodes,
-      edges: this.edges,
-    };
-
     this.activeMode = mode;
-    this.nodes = this.graphsByMode[mode].nodes;
-    this.edges = this.normalizeEdges(this.graphsByMode[mode].edges);
-    this.graphsByMode[mode].edges = this.edges;
-    this.selectedEdgeIds.clear();
-    this.clearNodeSelection();
-
-    if (this.historyByMode[mode].length === 0) {
-      const nodeSnapshot = this.nodes.map(n => ({
-        ...n,
-        point: n.point ? { ...n.point } : n.point,
-        data: { ...(n as any).data },
-      }));
-      const edgeSnapshot = this.edges.map(e => ({ ...e }));
-      this.historyByMode[mode] = [{ nodes: nodeSnapshot, edges: edgeSnapshot }];
-      this.historyIndexByMode[mode] = 0;
+    if (this.activeMode == 'spyker'){
+      console.log("changed mode to spyker");
+      this.nodes = this.graphServiceSpyker.nodes();
+      this.edges = this.graphServiceSpyker.edges();
     }
+    if (this.activeMode == 'hierfl'){
+      console.log("changed mode to hierarch")
+      this.nodes = this.graphServiceHierach.nodes();
+      this.edges = this.graphServiceHierach.edges();
+    }
+  }
 
-    this.updateSuperServerStatus();
+  public undo(){
+    if (this.activeMode == 'spyker'){
+      this.graphHistorySpyker.undo();
+      this.nodes = this.graphHistorySpyker.getNodes();
+      this.edges = this.graphHistorySpyker.getEdges();
+    }
+    if (this.activeMode == 'hierfl'){
+      this.graphHistoryHierach.undo();
+      this.nodes = this.graphHistoryHierach.getNodes();
+      this.edges = this.graphHistoryHierach.getEdges();
+    }
+  }
+
+  public redo(){
+    if (this.activeMode == 'spyker'){
+      this.graphHistorySpyker.redo();
+      this.nodes = this.graphHistorySpyker.getNodes();
+      this.edges = this.graphHistorySpyker.getEdges();
+    }
+    if (this.activeMode == 'hierfl'){
+      this.graphHistoryHierach.redo();
+      this.nodes = this.graphHistoryHierach.getNodes();
+      this.edges = this.graphHistoryHierach.getEdges();
+    }
+  }
+
+  public exportcurrentGraph() { 
+    let currentNodes = this.nodes.toString;
+    let graph: JSON = JSON.parse()
   }
 
   @HostListener('window:keydown', ['$event'])
