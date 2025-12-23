@@ -1,0 +1,46 @@
+{
+  "architecture": "hierfl",
+  "nodes": [
+    {
+      "id": "n1",
+      "data": {
+        "type": "SuperServerNode",
+        "config": {
+          "id": "root-1",
+          "name": "RootServer",
+          "cpus": 8,
+          "gpus": 1
+        }
+      }
+    },
+    {
+      "id": "n2",
+      "data": {
+        "type": "ServerNode",
+        "config": {
+          "name": "EdgeEU",
+          "cpus": 4,
+          "gpus": 0
+        }
+      }
+    },
+    {
+      "id": "n3",
+      "data": {
+        "type": "ClientNode",
+        "config": {
+          "id": "clients-eu",
+          "count": 50,
+          "type": "mobile",
+          "computeTimeMs": 120,
+          "pingMs": 30,
+          "packetloss": 0.01
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "source": "n1", "target": "n2" },
+    { "source": "n2", "target": "n3" }
+  ]
+}

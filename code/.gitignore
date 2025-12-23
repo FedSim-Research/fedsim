@@ -39,3 +39,12 @@ Thumbs.db
 
 # Project specific
 code/config.json
+
+# Database (SQLite)
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables
+*.env
+*.env.*
