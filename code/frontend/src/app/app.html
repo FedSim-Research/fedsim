@@ -1,32 +1,43 @@
-<div class="canvas-wrapper" (dragover)="onDragOver($event)" (drop)="onDrop($event)" (mousedown)="onCanvasMouseDown($event)">
+<div
+  class="canvas-wrapper"
+  appShortcuts
+  #shortcuts="appShortcuts"
+  #canvasWrapper
+  (dragover)="onDragOver($event)"
+  (drop)="onDrop($event)">
   <vflow
-    [nodes]="nodes"
-    [edges]="edges"
-    [connection]="connectionModel"
+    [class.shift-selection-mode]="shortcuts.shiftDown"
+    [nodes]="nodes()"
+    [edges]="edges()"
     [entitiesSelectable]="true"
     [elevateEdgesOnSelect]="true"
-    (onConnect)="handleConnect($event)"
+    [connection]="connectionModel"
+    (connect)="handleConnect($event)"
+    (onNodesChange.position)="handleNodePositionChange($event)"
     view="auto"
     [background]="{ type: 'dots', backgroundColor: 'transparent' }" 
-    [alignmentHelper]="true"
-    (onNodesChange.position)="onNodePositionChange($event)"
-  >
-  </vflow>
-
-  <div
-    *ngIf="selectionBox.visible"
-    class="selection-box"
-    [style.left.px]="selectionBox.left"
-    [style.top.px]="selectionBox.top"
-    [style.width.px]="selectionBox.width"
-    [style.height.px]="selectionBox.height"
-  ></div>
-
+    [alignmentHelper]="true">
+    </vflow>
+  <ngx-selecto
+    [className]="'selecto-selection'"
+    [dragContainer]="canvasWrapper"
+    [rootContainer]="canvasWrapper"
+    [boundContainer]="canvasWrapper"
+    [selectableTargets]="['.canvas-wrapper [data-id]']"
+    [selectByClick]="false"
+    [selectFromInside]="false"
+    [continueSelect]="false"
+    [preventDefault]="false"
+    [keyContainer]="keyContainer"
+    [hitRate]="50"
+    (dragStart)="shortcuts.onSelectoDragStart($event)"
+    (select)="shortcuts.onSelectoSelect($event)"
+    (selectEnd)="shortcuts.onSelectoSelectEnd($event)">
+  </ngx-selecto>
   <app-sidebar
     (resetGraph)="handleReset()"
     (undoRequested)="undo()"
     (redoRequested)="redo()"
-    (modeChange)="onModeChange($event)"
-  >
+    (modeChange)="changeMode($event)">
   </app-sidebar>
 </div>

@@ -2,6 +2,8 @@ import { Component, computed, inject } from '@angular/core';
 import { NgIf } from '@angular/common';
 import { CustomNodeComponent, HandleComponent } from 'ngx-vflow';
 import { NodeDeleteUiService } from '../../../services/node-delete-ui.service';
+import { GraphServiceSpyker } from '../../../services/subservices/graph-service-spyker';
+import { GraphServiceHierach } from '../../../services/subservices/graph-service-hierach';
 
 @Component({
   selector: 'app-server-node',
@@ -10,7 +12,9 @@ import { NodeDeleteUiService } from '../../../services/node-delete-ui.service';
   templateUrl: './server-node.html',
   styleUrl: './server-node.css',
 })
-export class ServerNode extends CustomNodeComponent{
+export class ServerNode extends CustomNodeComponent {
+  protected graphServiceSpyker = inject(GraphServiceSpyker);
+  protected graphServiceHierach = inject(GraphServiceHierach);
   private nodeDeleteUi = inject(NodeDeleteUiService);
   public showDelete = computed(() => this.nodeDeleteUi.activeId() === this.node().id);
   public isSelected = computed(() => Boolean((this.node().data as any)?.selected));
@@ -42,6 +46,12 @@ export class ServerNode extends CustomNodeComponent{
 
   public onDelete(event: MouseEvent): void {
     event.stopPropagation();
-    this.nodeDeleteUi.requestDelete(this.node().id);
+    if (this.graphServiceSpyker.nodes().some(node => node.id === this.node().id)) {
+      this.graphServiceSpyker.removeNodeById(this.node().id);
+      console.log("Removed server node from spyker");
+    } else {
+      this.graphServiceHierach.removeNodeById(this.node().id);
+      console.log("Removed server node from hierfl");
+    }
   }
 }

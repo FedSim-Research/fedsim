@@ -1,13 +1,18 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { GraphService } from '../graph-service';
 import { Edge, Node } from 'ngx-vflow';
 import { SuperServerNode } from '../../components/nodes/super-server-node/super-server-node';
+import { GraphHistoryServiceHierach } from './graph-history-service-hierach';
 
 @Injectable({
   providedIn: 'root',
 })
-export class GraphServiceHierach extends GraphService{
+export class GraphServiceHierach extends GraphService<GraphHistoryServiceHierach>{
   private hasSuperServer = false;  
+
+  constructor(graphHistory: GraphHistoryServiceHierach){
+    super(graphHistory);
+  }
 
   public override addNode(newNode: Node): void {
     if (newNode.type==SuperServerNode){
@@ -19,5 +24,6 @@ export class GraphServiceHierach extends GraphService{
       this.hasSuperServer = true;
     }
     this.nodes.update((nodes) => [...nodes, newNode]);
+    this.graphHistory.saveState({nodes: this.nodes(), edges: this.edges()});
   } 
 }
