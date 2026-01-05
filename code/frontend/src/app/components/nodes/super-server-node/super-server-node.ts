@@ -1,15 +1,19 @@
 import { Component, computed, inject } from '@angular/core';
 import { CustomNodeComponent, HandleComponent } from 'ngx-vflow';
 import { NodeDeleteUiService } from '../../../services/node-delete-ui.service';
+import { GraphServiceSpyker } from '../../../services/subservices/graph-service-spyker';
+import { GraphServiceHierach } from '../../../services/subservices/graph-service-hierach';
 
 @Component({
   selector: 'app-super-server-node',
-  standalone: true, 
+  standalone: true,
   imports: [HandleComponent],
   templateUrl: './super-server-node.html',
   styleUrl: './super-server-node.css',
 })
 export class SuperServerNode extends CustomNodeComponent {
+  protected graphServiceSpyker = inject(GraphServiceSpyker);
+  protected graphServiceHierach = inject(GraphServiceHierach);
   private nodeDeleteUi = inject(NodeDeleteUiService);
   public showDelete = computed(() => this.nodeDeleteUi.activeId() === this.node().id);
   public isSelected = computed(() => Boolean((this.node().data as any)?.selected));
@@ -39,6 +43,12 @@ export class SuperServerNode extends CustomNodeComponent {
 
   public onDelete(event: MouseEvent): void {
     event.stopPropagation();
-    this.nodeDeleteUi.requestDelete(this.node().id);
+    if (this.graphServiceSpyker.nodes().some(node => node.id === this.node().id)) {
+      this.graphServiceSpyker.removeNodeById(this.node().id);
+      console.log("Removed superserver node from spyker");
+    } else {
+      this.graphServiceHierach.removeNodeById(this.node().id);
+      console.log("Removed superserver node from hierfl");
+    }
   }
 }

@@ -1,0 +1,280 @@
+import { Directive, HostListener, inject, ElementRef} from '@angular/core';
+import { GraphServiceHierach } from '../services/subservices/graph-service-hierach';
+import { GraphServiceSpyker } from '../services/subservices/graph-service-spyker';
+import { Node } from 'ngx-vflow';
+import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'selecto';
+
+
+@Directive({
+  selector: '[appShortcuts]',
+  standalone: true,
+  exportAs: 'appShortcuts',
+})
+export class Shortcuts{
+  protected graphServiceSpyker = inject(GraphServiceSpyker);
+  protected graphServiceHierach = inject(GraphServiceHierach);
+  protected elRef = inject(ElementRef) as ElementRef<HTMLElement>;
+  private clipboard: Node[] = [];
+  public selectedNodeIds: Set<string> = new Set();
+  public selectedEdgeIds: Set<string> = new Set();
+  public shiftDown = false;
+  private selecting = false;
+  private lastSelectElements: Array<HTMLElement | SVGElement> = [];
+
+  @HostListener('window:keydown', ['$event'])
+  public onKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Shift') {
+      this.shiftDown = true;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.clearNodeSelection();
+      return;
+    }
+    if (event.ctrlKey || event.metaKey) {
+      if (event.key.toLowerCase() === 'c') {
+        event.preventDefault();
+        this.copySelectedNodes();
+        return;
+      }
+      if (event.key.toLowerCase() === 'v') {
+        event.preventDefault();
+        this.pasteCopiedNodes();
+        return;
+      }
+    }
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      if (!this.selectedEdgeIds.size && !this.selectedNodeIds.size) return;
+      event.preventDefault();
+      const edgeIds = Array.from(this.selectedEdgeIds);
+      for (const edgeId of edgeIds) {
+        if (this.graphServiceSpyker.edges().some((e) => e.id === edgeId)) {
+          this.graphServiceSpyker.removeEdgeById(edgeId);
+        } else if (this.graphServiceHierach.edges().some((e) => e.id === edgeId)) {
+          this.graphServiceHierach.removeEdgeById(edgeId);
+        }
+      }
+      this.selectedEdgeIds.clear();
+      const nodeIds = Array.from(this.selectedNodeIds);
+      for (const nodeId of nodeIds) {
+        if (this.graphServiceSpyker.nodes().some((node) => node.id === nodeId)) {
+          this.graphServiceSpyker.removeNodeById(nodeId);
+        } else if (this.graphServiceHierach.nodes().some((node) => node.id === nodeId)) {
+          this.graphServiceHierach.removeNodeById(nodeId);
+        }
+      }
+      this.selectedNodeIds.clear();
+    }
+  }
+
+  @HostListener('document:keyup', ['$event'])
+  public onKeyUp(event: KeyboardEvent) {
+    if (event.key === 'Shift') {
+      this.shiftDown = false;
+      if (this.selecting) {
+        this.applySelectionFromElements(this.lastSelectElements);
+        this.resetBoxSelectionState();
+      }
+    }
+  }
+
+  @HostListener('document:pointerdown', ['$event'])
+  public onPointerDown(event: PointerEvent) {
+    if (!this.shiftDown || event.button !== 0) return;
+  }
+
+  @HostListener('document:pointermove', ['$event'])
+  public onPointerMove(event: PointerEvent) {
+    if (!this.shiftDown || event.buttons !== 1) return;
+  }
+
+  @HostListener('document:pointerup', ['$event'])
+  public onPointerUp(event: PointerEvent) {
+    if (this.shiftDown && event.button === 0) {
+    }
+  }
+
+  public onSelectoDragStart(event: SelectoDragStart) {
+    const input = event.inputEvent as PointerEvent | MouseEvent | TouchEvent | undefined;
+    
+    const targetEl = (input && 'target' in input) ? (input as any).target as Element | null : null;
+    if (targetEl && targetEl.closest('app-sidebar')) {
+      event.stop();
+      return;
+    }
+
+    if (!this.shiftDown) {
+      event.stop();
+      return;
+    }
+    this.selecting = true;
+    this.lastSelectElements = [];
+  }
+
+  public onSelectoSelect(event: OnSelect) {
+    if (!this.shiftDown) return;
+    this.lastSelectElements = event.selected;
+  }
+
+  public onSelectoSelectEnd(event: OnSelectEnd) {
+    this.lastSelectElements = event.selected;
+    this.applySelectionFromElements(event.selected);
+    this.resetBoxSelectionState();
+  }
+
+  @HostListener('window:node-ctrl-click', ['$event'])
+  public onNodeCtrlClick(event: Event): void {
+    const custom = event as CustomEvent<any>;
+    const id = custom?.detail?.id as string | undefined;
+    if (!id) return;
+    const selected = new Set(this.selectedNodeIds);
+    if (selected.has(id)) selected.delete(id);
+    else selected.add(id);
+    this.applySelection(selected);
+  }
+
+  private applySelection(selected: Set<string>) {
+    this.selectedNodeIds = new Set(selected);
+    const selectedEdges = this.collectSelectedEdges(selected);
+    this.selectedEdgeIds = selectedEdges;
+    const spykerNodes = this.graphServiceSpyker.nodes().map((n) => {
+      const data = ((n as any).data as any) || {};
+      const selectedFlag = selected.has(n.id);
+      return { ...n, data: { ...data, selected: selectedFlag } } as Node;
+    });
+    this.graphServiceSpyker.nodes.set(spykerNodes);
+
+    const hierNodes = this.graphServiceHierach.nodes().map((n) => {
+      const data = ((n as any).data as any) || {};
+      const selectedFlag = selected.has(n.id);
+      return { ...n, data: { ...data, selected: selectedFlag } } as Node;
+    });
+    this.graphServiceHierach.nodes.set(hierNodes);
+
+    const spykerEdges = this.graphServiceSpyker.edges().map((e) => {
+      const data = ((e as any).data as any) || {};
+      const selectedFlag = selectedEdges.has(e.id);
+      return { ...e, data: { ...data, selected: selectedFlag } } as any;
+    });
+    this.graphServiceSpyker.edges.set(spykerEdges);
+
+    const hierEdges = this.graphServiceHierach.edges().map((e) => {
+      const data = ((e as any).data as any) || {};
+      const selectedFlag = selectedEdges.has(e.id);
+      return { ...e, data: { ...data, selected: selectedFlag } } as any;
+    });
+    this.graphServiceHierach.edges.set(hierEdges);
+  }
+
+  private applySelectionFromElements(elements: Array<HTMLElement | SVGElement>) {
+    const nodeIds = this.extractNodeIds(elements);
+    if (!nodeIds.size) {
+      this.clearNodeSelection();
+      return;
+    }
+    this.applySelection(nodeIds);
+  }
+
+  private extractNodeIds(elements: Array<HTMLElement | SVGElement>): Set<string> {
+    const ids = new Set<string>();
+    elements.forEach((el) => {
+      const id = this.findNodeId(el as Element);
+      if (id) ids.add(id);
+    });
+    return ids;
+  }
+
+  private findNodeId(element: Element | null): string | null {
+    let current: Element | null = element;
+    while (current) {
+      const dataset = (current as HTMLElement).dataset;
+      const candidate = dataset?.['id'] || dataset?.['nodeId'] || current.getAttribute('data-id') || current.getAttribute('data-node-id');
+      if (candidate) return candidate;
+      current = current.parentElement;
+    }
+    return null;
+  }
+
+  private resetBoxSelectionState() {
+    this.selecting = false;
+    this.lastSelectElements = [];
+  }
+
+  private collectSelectedEdges(selectedNodes: Set<string>): Set<string> {
+    const ids = new Set<string>();
+
+    const addEdges = (edges: any[]) => {
+      edges.forEach((e) => {
+        if (selectedNodes.has(e.source) && selectedNodes.has(e.target)) {
+          ids.add(e.id);
+        }
+      });
+    };
+
+    addEdges(this.graphServiceSpyker.edges());
+    addEdges(this.graphServiceHierach.edges());
+
+    return ids;
+  }
+
+  private clearNodeSelection() {
+    this.selectedNodeIds.clear();
+    this.selectedEdgeIds.clear();
+    const spykerCleared = this.graphServiceSpyker.nodes().map((n) => {
+      const data = ((n as any).data as any) || {};
+      if (data.selected) return { ...n, data: { ...data, selected: false } } as Node;
+      return n;
+    });
+    this.graphServiceSpyker.nodes.set(spykerCleared);
+
+    const hierCleared = this.graphServiceHierach.nodes().map((n) => {
+      const data = ((n as any).data as any) || {};
+      if (data.selected) return { ...n, data: { ...data, selected: false } } as Node;
+      return n;
+    });
+    this.graphServiceHierach.nodes.set(hierCleared);
+  }
+
+  public copySelectedNodes() {
+    const ids = Array.from(this.selectedNodeIds);
+    const copied: any[] = [];
+    for (const id of ids) {
+      const n1 = this.graphServiceSpyker.nodes().find((n) => n.id === id);
+      const n2 = this.graphServiceHierach.nodes().find((n) => n.id === id);
+      const src = n1 ?? n2;
+      if (src) {
+        const { id, ...rest } = src;
+        copied.push(JSON.parse(JSON.stringify(rest)));
+      }
+    }
+    this.clipboard = copied;
+  }
+
+  public pasteCopiedNodes() {
+    if (!this.clipboard.length) {
+      return;
+    }
+    let targetService: GraphServiceSpyker | GraphServiceHierach = this.graphServiceSpyker;
+    if (this.selectedNodeIds.size) {
+      const first = Array.from(this.selectedNodeIds)[0];
+      if (this.graphServiceHierach.nodes().some((n) => n.id === first)) {
+        targetService = this.graphServiceHierach as unknown as GraphServiceSpyker;
+      }
+    }
+    this.selectedNodeIds.clear();
+    const newIds: string[] = [];
+    for (const node of this.clipboard) {
+      const newId = crypto.randomUUID();
+      const newNode: Node = {
+        ...JSON.parse(JSON.stringify(node)),
+        id: newId,
+        point: { x: (node.point?.x ?? 0) + 50, y: (node.point?.y ?? 0) + 50},
+      };
+      targetService.addNode(newNode);
+      newIds.push(newId);
+    }
+    for (const id of newIds) {
+      this.selectedNodeIds.add(id);
+    }
+  }
+}

@@ -1,6 +1,5 @@
 import { Injectable, WritableSignal, signal } from '@angular/core';
 import { Node, Edge } from 'ngx-vflow';
-import { GraphService } from './graph-service';
 
 export interface State{
   nodes: Node[];
@@ -21,6 +20,10 @@ export abstract class GraphHistoryService {
 
   public getEdges() {
     return this.state().edges;
+  }
+
+  public getState() {
+    return this.state();
   }
 
   public undo() {
@@ -45,8 +48,8 @@ export abstract class GraphHistoryService {
     let newState = stack[stack.length-1];
     this.state.set(newState);
     stack.pop();
-    this.undoStack.update((redoStack) => stack);
-    this.redoStack.update((undoStack) => [...undoStack, oldState]);
+    this.redoStack.update(() => stack);
+    this.undoStack.update((undoStack) => [...undoStack, oldState]);
   }
 
   public saveState(newState: State) {
