@@ -11,7 +11,7 @@ export class GraphServiceHierach extends GraphService<GraphHistoryServiceHierach
   private hasSuperServer = false;  
 
   constructor(graphHistory: GraphHistoryServiceHierach){
-    super(graphHistory);
+    super(graphHistory, 'hierfl');
   }
 
   public override addNode(newNode: Node): void {
@@ -24,6 +24,7 @@ export class GraphServiceHierach extends GraphService<GraphHistoryServiceHierach
       this.hasSuperServer = true;
     }
     this.nodes.update((nodes) => [...nodes, newNode]);
+    this.persistCreateNode(newNode);
     this.graphHistory.saveState({nodes: this.nodes(), edges: this.edges()});
   } 
 }

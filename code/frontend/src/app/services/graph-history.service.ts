@@ -57,4 +57,10 @@ export abstract class GraphHistoryService {
     this.undoStack.update((undoStack) => [...undoStack, oldState])
     this.state.set(newState);
   }
+
+  public resetHistory(newState: State) {
+    this.state.set(newState);
+    this.undoStack.set([]);
+    this.redoStack.set([]);
+  }
 }

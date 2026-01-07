@@ -1,119 +1,208 @@
 import json
-import hashlib
-from sqlalchemy import select
+import uuid
+from sqlalchemy import select, delete
+from sqlalchemy.orm import selectinload
 from backend.db.database import SessionLocal
-from backend.db.models import Graph
-from backend.schemas.graph import GraphCreate
-
-def normalize_graph(graph: GraphCreate) -> dict:
-    """
-    Converts a frontend graph into a deterministic from by sorting and normalizing
-    """
-
-    sorted_nodes = sort_nodes(graph.nodes)
-    normalized_nodes, id_map = assign_node_ids(sorted_nodes)
-    normalized_edges = normalize_edges(graph.edges, id_map)
-
-    return {
-        "architecture": graph.architecture,
-        "nodes": normalized_nodes,
-        "edges": normalized_edges,
-    }
+from backend.db.models import Graph, Node, Edge
+from backend.schemas.graph import (
+    GraphCreate,
+    NodeCreate,
+    NodeUpdate,
+    EdgeCreate,
+)
 
 
-def sort_nodes(nodes):
-    """
-    Sort nodes deterministically based on semantic content,
-    NOT frontend-generated IDs.
-    """
-    return sorted(
-        nodes,
-        key=lambda n: (
-            n.data.type,
-            sorted(n.data.config.items()),
-        ),
-    )
-
-def assign_node_ids(nodes):
-    """
-    Assign deterministic internal IDs (N1, N2, ...) to nodes
-    and build a mapping from frontend IDs to internal IDs.
-    """
-
-    id_map = {}
-    normalized_nodes = []
-
-    for idx, node in enumerate(nodes, start=1):
-        internal_id = f"N{idx}"
-
-        id_map[node.id] = internal_id
-
-        normalized_nodes.append(
-            {
-                "id": internal_id,
-                "type": node.data.type,
-                "config": node.data.config,
-            }
-        )
-
-    return normalized_nodes, id_map
-
-def normalize_edges(edges, id_map):
-    """
-    Remap edges to internal node IDs and sort them deterministically.
-    """
-
-    normalized_edges = []
-
-    for edge in edges:
-        normalized_edges.append(
-            {
-                "source": id_map[edge.source],
-                "target": id_map[edge.target],
-            }
-        )
-
-    return sorted(
-        normalized_edges,
-        key=lambda e: (e["source"], e["target"]),
-    )
-
-def hash_graph(normalized_graph: dict) -> str:
-    """
-    hashes the provided graph into a hex digest
-    """
-    canonical_json = json.dumps(
-        normalized_graph,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
-
-def save_graph(normalized_graph: dict, graph_hash: str) -> Graph:
-    """
-    Returns existing graph if hash exists, otherwise persists a new one.
-    """
-
+def create_graph(payload: GraphCreate) -> Graph:
     session = SessionLocal()
     try:
-        stmt = select(Graph).where(Graph.graph_hash == graph_hash)
-        existing = session.execute(stmt).scalar_one_or_none()
-
-        if existing:
-            return existing
-
         graph = Graph(
-            architecture=normalized_graph["architecture"],
-            graph_hash=graph_hash,
-            nodes_json=json.dumps(normalized_graph["nodes"]),
-            edges_json=json.dumps(normalized_graph["edges"]),
+            name=payload.name,
+            architecture=payload.architecture,
+            metadata_json=json.dumps(payload.metadata) if payload.metadata is not None else None,
         )
-
         session.add(graph)
         session.commit()
         session.refresh(graph)
-
         return graph
+    finally:
+        session.close()
 
+
+def delete_graph(graph_id: int) -> bool:
+    session = SessionLocal()
+    try:
+        stmt = select(Graph).where(Graph.id == graph_id)
+        graph = session.execute(stmt).scalar_one_or_none()
+        if graph is None:
+            return False
+
+        session.delete(graph)
+        session.commit()
+        return True
+    finally:
+        session.close()
+
+def list_graphs() -> list[Graph]:
+    session = SessionLocal()
+    try:
+        stmt = select(Graph).order_by(Graph.id.desc())
+        return list(session.execute(stmt).scalars().all())
+    finally:
+        session.close()
+
+
+def get_graph(graph_id: int) -> Graph | None:
+    session = SessionLocal()
+    try:
+        stmt = (
+            select(Graph)
+            .where(Graph.id == graph_id)
+            .options(
+                selectinload(Graph.nodes),
+                selectinload(Graph.edges),
+            )
+        )
+        return session.execute(stmt).scalar_one_or_none()
+    finally:
+        session.close()
+
+
+def create_node(graph_id: int, payload: NodeCreate) -> Node:
+    session = SessionLocal()
+    try:
+        stmt = select(Graph).where(Graph.id == graph_id)
+        graph = session.execute(stmt).scalar_one_or_none()
+        if graph is None:
+            raise ValueError("graph_not_found")
+
+        external_id = payload.external_id or str(uuid.uuid4())
+        node = Node(
+            graph_id=graph_id,
+            external_id=external_id,
+            type=payload.type,
+            config_json=json.dumps(payload.config),
+            position_json=json.dumps(payload.position.model_dump()),
+        )
+        session.add(node)
+        session.commit()
+        session.refresh(node)
+        return node
+    finally:
+        session.close()
+
+
+def update_node(node_id: int, payload: NodeUpdate) -> Node | None:
+    session = SessionLocal()
+    try:
+        stmt = select(Node).where(Node.id == node_id)
+        node = session.execute(stmt).scalar_one_or_none()
+        if node is None:
+            return None
+
+        if payload.type is not None:
+            node.type = payload.type
+        if payload.config is not None:
+            node.config_json = json.dumps(payload.config)
+        if payload.position is not None:
+            node.position_json = json.dumps(payload.position.model_dump())
+
+        session.commit()
+        session.refresh(node)
+        return node
+    finally:
+        session.close()
+
+
+def create_edge(graph_id: int, payload: EdgeCreate) -> Edge:
+    session = SessionLocal()
+    try:
+        graph_stmt = select(Graph).where(Graph.id == graph_id)
+        graph = session.execute(graph_stmt).scalar_one_or_none()
+        if graph is None:
+            raise ValueError("graph_not_found")
+
+        source_node_id = payload.source_node_id
+        target_node_id = payload.target_node_id
+        if payload.source_external_id or payload.target_external_id:
+            if not payload.source_external_id or not payload.target_external_id:
+                raise ValueError("edge_payload_incomplete")
+            node_stmt = select(Node).where(
+                Node.graph_id == graph_id,
+                Node.external_id.in_([payload.source_external_id, payload.target_external_id]),
+            )
+            nodes = list(session.execute(node_stmt).scalars().all())
+            if len(nodes) != 2:
+                raise ValueError("node_not_found")
+            source_node_id = next(
+                node.id for node in nodes if node.external_id == payload.source_external_id
+            )
+            target_node_id = next(
+                node.id for node in nodes if node.external_id == payload.target_external_id
+            )
+
+        if source_node_id is None or target_node_id is None:
+            raise ValueError("edge_payload_incomplete")
+
+        node_stmt = select(Node).where(Node.id.in_([source_node_id, target_node_id]))
+        nodes = list(session.execute(node_stmt).scalars().all())
+        if len(nodes) != 2:
+            raise ValueError("node_not_found")
+
+        node_graph_ids = {node.graph_id for node in nodes}
+        if node_graph_ids != {graph_id}:
+            raise ValueError("node_graph_mismatch")
+
+        existing_stmt = select(Edge).where(
+            Edge.graph_id == graph_id,
+            Edge.source_node_id == source_node_id,
+            Edge.target_node_id == target_node_id,
+        )
+        if session.execute(existing_stmt).scalar_one_or_none() is not None:
+            raise ValueError("edge_exists")
+
+        edge = Edge(
+            graph_id=graph_id,
+            source_node_id=source_node_id,
+            target_node_id=target_node_id,
+        )
+        session.add(edge)
+        session.commit()
+        session.refresh(edge)
+        return edge
+    finally:
+        session.close()
+
+
+def delete_node(node_id: int) -> bool:
+    session = SessionLocal()
+    try:
+        stmt = select(Node).where(Node.id == node_id)
+        node = session.execute(stmt).scalar_one_or_none()
+        if node is None:
+            return False
+
+        session.execute(
+            delete(Edge).where(
+                (Edge.source_node_id == node_id) | (Edge.target_node_id == node_id)
+            )
+        )
+        session.delete(node)
+        session.commit()
+        return True
+    finally:
+        session.close()
+
+
+def delete_edge(edge_id: int) -> bool:
+    session = SessionLocal()
+    try:
+        stmt = select(Edge).where(Edge.id == edge_id)
+        edge = session.execute(stmt).scalar_one_or_none()
+        if edge is None:
+            return False
+
+        session.delete(edge)
+        session.commit()
+        return True
     finally:
         session.close()

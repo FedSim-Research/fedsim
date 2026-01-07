@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { GraphService } from '../graph-service';
 import { GraphHistoryServiceSpyker } from './graph-history-service-spyker';
-import { Node, Edge } from 'ngx-vflow';
+import { Node } from 'ngx-vflow';
 import { ServerNode } from '../../components/nodes/server-node/server-node';
 
 @Injectable({
@@ -9,11 +9,12 @@ import { ServerNode } from '../../components/nodes/server-node/server-node';
 })
 export class GraphServiceSpyker extends GraphService<GraphHistoryServiceSpyker> {
   constructor(graphHistory: GraphHistoryServiceSpyker) {
-    super(graphHistory);
+    super(graphHistory, 'spyker');
   }
 
   public override addNode(newNode: Node) {
     this.nodes.update((nodes) => [...nodes, newNode]);
+    this.persistCreateNode(newNode);
 
     if (newNode.type !== ServerNode) {
       this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });

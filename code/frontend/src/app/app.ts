@@ -1,4 +1,4 @@
-import { Component, inject, ViewChild, computed, signal } from '@angular/core';
+import { Component, inject, ViewChild, computed, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Vflow, VflowComponent, Node, Edge, NodePositionChange, Connection, ɵConnectionModel as ConnectionModel } from 'ngx-vflow';
 import { NgxSelectoModule } from 'ngx-selecto';
@@ -9,6 +9,7 @@ import { ServerNode } from './components/nodes/server-node/server-node';
 import { SuperServerNode } from './components/nodes/super-server-node/super-server-node';
 import { GraphServiceSpyker } from './services/subservices/graph-service-spyker';
 import { GraphServiceHierach } from './services/subservices/graph-service-hierach';
+import { GraphPersistenceService } from './services/graph-persistence.service';
 
 export type modes = 'spyker' | 'hierfl';
 
@@ -19,12 +20,13 @@ export type modes = 'spyker' | 'hierfl';
   styleUrls: ['./app.css'],
   imports: [Vflow, SidebarComponent, CommonModule, Shortcuts, NgxSelectoModule],
 })
-export class App{
+export class App implements OnInit{
   @ViewChild(VflowComponent) private flow?: VflowComponent;
   @ViewChild(Shortcuts) private shortcuts?: Shortcuts;
   public keyContainer = window;
   protected graphServiceSpyker = inject(GraphServiceSpyker);
   protected graphServiceHierach = inject(GraphServiceHierach);
+  private graphPersistence = inject(GraphPersistenceService);
   public activeMode = signal<modes>('hierfl');
   public activeGraph = computed(() => {
     if (this.activeMode() === 'spyker') {
@@ -47,6 +49,10 @@ export class App{
     validator: (connection) => this.canConnect(connection),
   });
 
+  public ngOnInit(): void {
+    void this.graphPersistence.initializeGraph(this.graphServiceSpyker, 'spyker');
+    void this.graphPersistence.initializeGraph(this.graphServiceHierach, 'hierfl');
+  }
 
   public handleReset() {
     if (this.activeMode()=='hierfl'){
