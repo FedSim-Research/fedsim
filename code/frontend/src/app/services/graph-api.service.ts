@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface Position {
   x: number;
@@ -65,7 +66,7 @@ export interface EdgeCreate {
 @Injectable({ providedIn: 'root' })
 export class GraphApiService {
   private http = inject(HttpClient);
-  private baseUrl = (window as any).FEDSIM_API_BASE_URL ?? 'http://localhost:8000';
+  private baseUrl = (window as any).FEDSIM_API_BASE_URL ?? environment.apiBaseUrl;
 
   private url(path: string): string {
     const trimmed = this.baseUrl.replace(/\/+$/, '');
