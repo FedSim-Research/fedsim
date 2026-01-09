@@ -1,4 +1,5 @@
 import heapq
+import ray
 from typing import List
 from simulation.event import Event
 
@@ -36,13 +37,23 @@ class SimulationOrchestrator:
     def run_until(self, target_time: float):
         self._check_precons_run_until(target_time)
 
+        pending_refs = []
+
         while self._event_heap:
             next_event = self._event_heap[0]
             if next_event.trigger_time > target_time:
                 self.global_virtual_time = target_time
                 break
 
-            self.step()
+            pending_refs.append(self.step())
+
+            # PERFORMANCE TWEAK:
+            # Garbage collect refs or check for errors periodically
+            if len(pending_refs) > 100:
+                # This ensures if an actor crashed, we crash the simulation NOW,
+                # not 1 hour later.
+                ray.get(pending_refs)
+                pending_refs = []
 
     def _check_precons_add_event(self, delay, actor_ref, method_name):
         if delay < 0:
