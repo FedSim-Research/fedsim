@@ -148,17 +148,22 @@ export class App implements OnInit{
 
 
   public handleConnect(connection: Connection): void {
-  const newEdge: Edge = {
-    id: crypto.randomUUID(),
-    source: connection.source,
-    target: connection.target,
-    reconnectable: true,
-    floating: false,
-  };
+    const resolved = this.activeMode() === 'hierfl'
+      ? this.normalizeHierConnection(connection)
+      : connection;
+    const newEdge: Edge = {
+      id: crypto.randomUUID(),
+      source: resolved.source,
+      target: resolved.target,
+      sourceHandle: resolved.sourceHandle,
+      targetHandle: resolved.targetHandle,
+      reconnectable: true,
+      floating: false,
+    };
 
-  this.activeGraph().addEdge(newEdge);
-  console.log('added new edge', newEdge);
-}
+    this.activeGraph().addEdge(newEdge);
+    console.log('added new edge', newEdge);
+  }
   public handleNodePositionChange(posChanges: NodePositionChange[]){
     if (!posChanges?.length) return;
     this._lastPosChanges = posChanges;
@@ -205,6 +210,8 @@ export class App implements OnInit{
 
     if (!valid) return false;
 
+    const resolved = isHier ? this.normalizeHierConnection(connection) : connection;
+
     if (sourceType === 'ClientNode' || targetType === 'ClientNode') {
       const clientId = sourceType === 'ClientNode' ? connection.source : connection.target;
       if (this.edges().some(e => e.source === clientId || e.target === clientId)) {
@@ -215,7 +222,7 @@ export class App implements OnInit{
     const involvesSuperAndServer =
       (sourceType === 'SuperServerNode' && targetType === 'ServerNode') ||
       (sourceType === 'ServerNode' && targetType === 'SuperServerNode');
-    if (isHier && involvesSuperAndServer && this.edges().some(e => e.source === connection.source && e.target === connection.target)) {
+    if (isHier && involvesSuperAndServer && this.edges().some(e => e.source === resolved.source && e.target === resolved.target)) {
       return false;
     }
 
@@ -227,4 +234,47 @@ export class App implements OnInit{
     return true;
   }
 
+  private normalizeHierConnection(connection: Connection): Connection {
+    const sourceNode = this.nodes().find(n => n.id === connection.source);
+    const targetNode = this.nodes().find(n => n.id === connection.target);
+    if (!sourceNode || !targetNode) return connection;
+    const sourceType = (sourceNode as any).data?.type as string | undefined;
+    const targetType = (targetNode as any).data?.type as string | undefined;
+    if (!sourceType || !targetType) return connection;
+
+    if (sourceType === 'ServerNode' && targetType === 'SuperServerNode') {
+      return {
+        source: connection.target,
+        target: connection.source,
+        sourceHandle: 'superserver-out',
+        targetHandle: 'server-in-top',
+      };
+    }
+    if (sourceType === 'SuperServerNode' && targetType === 'ServerNode') {
+      return {
+        source: connection.source,
+        target: connection.target,
+        sourceHandle: 'superserver-out',
+        targetHandle: 'server-in-top',
+      };
+    }
+    if (sourceType === 'ClientNode' && targetType === 'ServerNode') {
+      return {
+        source: connection.target,
+        target: connection.source,
+        sourceHandle: 'server-out-bottom',
+        targetHandle: 'client-in',
+      };
+    }
+    if (sourceType === 'ServerNode' && targetType === 'ClientNode') {
+      return {
+        source: connection.source,
+        target: connection.target,
+        sourceHandle: 'server-out-bottom',
+        targetHandle: 'client-in',
+      };
+    }
+
+    return connection;
+  }
 }
