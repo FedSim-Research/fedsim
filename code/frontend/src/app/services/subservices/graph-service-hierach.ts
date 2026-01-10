@@ -27,4 +27,12 @@ export class GraphServiceHierach extends GraphService<GraphHistoryServiceHierach
     this.persistCreateNode(newNode);
     this.graphHistory.saveState({nodes: this.nodes(), edges: this.edges()});
   } 
+
+  public override removeNodeById(nodeId: String): void {
+    const node = this.nodes().find((n) => n.id === nodeId);
+    if (node?.type === SuperServerNode) {
+      this.hasSuperServer = false;
+    }
+    super.removeNodeById(nodeId);
+  }
 }
