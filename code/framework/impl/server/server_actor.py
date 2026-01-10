@@ -111,6 +111,6 @@ class BaseAsyncServer(ABC):
     @abstractmethod
     def on_server_message(self, data: Any):
         """
-        Handle a message from another Server (Edge->Super or Peer->Peer).
+        Handle a message from another Server (Edge<->Super or Peer->Peer).
         """
         pass
