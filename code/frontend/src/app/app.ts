@@ -106,7 +106,7 @@ export class App implements OnInit{
         data: {
           type: payload.type,
           config: payload.config,
-          environment: this.activeMode,
+          environment: this.activeMode(),
           fromJson: isFromJson,
           selected: false,
         },

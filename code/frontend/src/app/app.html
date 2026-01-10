@@ -14,6 +14,7 @@
     [connection]="connectionModel"
     (connect)="handleConnect($event)"
     (onNodesChange.position)="handleNodePositionChange($event)"
+    (onEdgesChange.select)="shortcuts.onEdgeSelectionChange($event)"
     view="auto"
     [background]="{ type: 'dots', backgroundColor: 'transparent' }" 
     [alignmentHelper]="true">

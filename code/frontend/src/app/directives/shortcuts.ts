@@ -277,4 +277,17 @@ export class Shortcuts{
       this.selectedNodeIds.add(id);
     }
   }
+
+  public onEdgeSelectionChange(changes: Array<{ id: string; selected: boolean }>): void {
+    const next = new Set(this.selectedEdgeIds);
+    for (const change of changes) {
+      if (!change?.id) continue;
+      if (change.selected) {
+        next.add(change.id);
+      } else {
+        next.delete(change.id);
+      }
+    }
+    this.selectedEdgeIds = next;
+  }
 }
