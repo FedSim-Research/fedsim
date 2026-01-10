@@ -11,7 +11,7 @@ def estimate_training_time(
     ) / client_spec.performance_metrics.compute_factor
     noise = random.gauss(0, client_spec.performance_metrics.performance_stddev)
 
-    return max(0.000001, time_avg + noise)
+    return max(1e-6, time_avg + noise)
 
 
 def estimate_aggregation_time(
@@ -22,4 +22,4 @@ def estimate_aggregation_time(
     ) / server_spec.performance_metrics.compute_factor
     noise = random.gauss(time_avg, server_spec.performance_metrics.performance_stddev)
 
-    return max(0.000001, time_avg + noise)
+    return max(1e-6, time_avg + noise)
