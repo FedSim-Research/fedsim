@@ -2,7 +2,6 @@ import numpy as np
 from typing import List, Dict, Any
 from abc import ABC, abstractmethod
 
-# We assume these exist from your previous work
 from simulation.context import get_global_context
 
 
