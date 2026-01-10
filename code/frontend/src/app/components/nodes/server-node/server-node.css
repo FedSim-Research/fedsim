@@ -43,6 +43,12 @@
   transform: translateY(0);
 }
 
+.node-card:hover .delete-button {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 .delete-button:hover {
   color: #f87171;
 }
