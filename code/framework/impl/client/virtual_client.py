@@ -2,6 +2,8 @@ import flwr
 from flwr.common import (
     FitIns,
     FitRes,
+    GetParametersIns,
+    GetParametersRes,
     EvaluateIns,
     EvaluateRes,
     parameters_to_ndarrays,
@@ -17,7 +19,7 @@ class VirtualClient(flwr.client.Client):
         self.client_id = client_id
         self.inner_client = inner_client
 
-    def get_parameters(self, ins):
+    def get_parameters(self, ins: GetParametersIns) -> GetParametersRes:
         return self.inner_client.get_parameters(ins)
 
     def fit(self, ins: FitIns) -> FitRes:
