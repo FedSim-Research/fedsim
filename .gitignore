@@ -13,3 +13,4 @@ Lib/
 pyvenv.cfg
 
 final_model.pt
+final_model_hierarchical.pth
