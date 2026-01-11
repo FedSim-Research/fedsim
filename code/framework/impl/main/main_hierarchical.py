@@ -234,7 +234,7 @@ def evaluate_model(filename: str):
     Loads a saved model checkpoint and evaluates it against the CIFAR-10 test set.
     """
     print(f"Starting evaluation for model: {filename}")
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
 
     model = Net()
     model.to(device)

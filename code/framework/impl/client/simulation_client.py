@@ -22,7 +22,7 @@ class SimulationFlowerClient(flwr.client.Client):
     def __init__(self, partition_id: int, num_partitions: int):
         self.partition_id = partition_id
         self.num_partitions = num_partitions
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cpu")
 
         # 1. Initialize Model
         self.net = Net().to(self.device)
