@@ -5,6 +5,3 @@ from dataclasses import dataclass
 class Performance:
     compute_factor: float
     performance_stddev: float
-
-
-performance_dict = dict[str, Performance]
