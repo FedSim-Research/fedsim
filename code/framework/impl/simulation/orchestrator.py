@@ -24,11 +24,11 @@ class SimulationOrchestrator:
         self.global_virtual_time = max(self.global_virtual_time, event.trigger_time)
         actor_ref, method_name, payload = event.callback
         print(
-            "executing event:",
+            "[Orchestrator] Executing event:",
             payload["event_type"],
             "at time",
             self.global_virtual_time,
-            "for actor",
+            "for",
             actor_ref,
         )
         return getattr(actor_ref, method_name).remote(payload)
