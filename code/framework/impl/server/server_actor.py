@@ -21,6 +21,8 @@ class BaseAsyncServer(ABC):
         # We store parameters as a list of numpy arrays (standard Flower format)
         self.global_model_weights: List[np.ndarray] = []
 
+        self._generated_events = []
+
         # Context Access
         self.context = get_global_context()
 
@@ -67,6 +69,10 @@ class BaseAsyncServer(ABC):
                 f"[Warning] [Server {self.server_id}] Unknown event type: {event_type}"
             )
 
+        events_to_return = self._generated_events.copy()
+        self._generated_events.clear()
+        return events_to_return
+
     def _schedule_event(
         self, delay: float, target_actor, event_type: str, data: Any = None
     ):
@@ -80,12 +86,17 @@ class BaseAsyncServer(ABC):
 
         payload = {"event_type": event_type, "trigger_time": trigger_time, "data": data}
 
-        self.orchestrator_ref.add_event.remote(
-            delay=delay,
-            actor_ref=target_actor,
-            method_name="handle_event",
-            payload=payload,
-        )
+        self._generated_events.append((delay, target_actor, "handle_event", payload))
+
+    def get_global_model(self) -> List[np.ndarray]:
+        """Return the current global model weights."""
+        return self.global_model_weights
+
+    def _get_and_clear_events(self):
+        """Helper to flush the event buffer."""
+        events = self._generated_events.copy()
+        self._generated_events.clear()
+        return events
 
     # =========================================================
     # ABSTRACT METHODS ("Hooks" for Hierarchical and Spyker)

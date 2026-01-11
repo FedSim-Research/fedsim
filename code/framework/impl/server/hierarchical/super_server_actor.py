@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Tuple
 
 from server.server_actor import BaseAsyncServer
 from simulation.network_model import estimate_transmission_time
+from simulation.context import SimulationContext, set_global_context
 
 SERVER_MESSAGE = "SERVER_MESSAGE"
 
@@ -14,14 +15,16 @@ class SuperServer(BaseAsyncServer):
         self,
         server_id: str,
         initial_parameters: List[np.ndarray],
-        edge_server_refs: Dict[str, ray.ObjectRef],
         required_updates: int,
         training_config: Dict[str, Any],
+        context: SimulationContext,
     ):
+        set_global_context(context)
+
         super().__init__(server_id)
 
         self.initial_parameters = initial_parameters
-        self.edge_server_refs = edge_server_refs
+        self.edge_server_refs = {}
         self.required_updates = required_updates
         self.training_config = training_config
 
@@ -30,12 +33,21 @@ class SuperServer(BaseAsyncServer):
 
         self.global_model_weights = self.initial_parameters
 
+    def set_edge_servers(self, edge_server_refs: Dict[str, ray.ObjectRef]):
+        """
+        Late-binding of Edge Servers to avoid circular dependency.
+        """
+        self.edge_server_refs = edge_server_refs
+        print(f"[SuperServer] Registered {len(edge_server_refs)} edge servers.")
+
     def start_simulation(self):
         """
         Kickstart the simulation by sending the Initial Model (Age 0)
         to all Edge Servers.
         """
         self._broadcast_global_model()
+
+        return self._get_and_clear_events()
 
     def on_client_update(self, _):
         raise NotImplementedError(
@@ -45,13 +57,13 @@ class SuperServer(BaseAsyncServer):
     def on_server_message(self, data: Dict[str, Any]):
         """
         Receive partial global models from Edge Servers.
-        Payload: { "edge_id": str, "weights": List[np.ndarray], "num_samples": int }
+        Payload: { "edge_server_id": str, "weights": List[np.ndarray], "num_samples": int }
         """
-        edge_id = data["edge_id"]
+        edge_server_id = data["edge_server_id"]
         weights = data["weights"]
         num_samples = data["num_samples"]
 
-        self.updates_buffer[edge_id] = (weights, num_samples)
+        self.updates_buffer[edge_server_id] = (weights, num_samples)
 
         if len(self.updates_buffer) >= self.required_updates:
             # --- FedAvg Logic ---
@@ -80,8 +92,8 @@ class SuperServer(BaseAsyncServer):
 
         super_spec = self.context.get_server_spec(self.server_id)
 
-        for edge_id, edge_ref in self.edge_server_refs.items():
-            edge_spec = self.context.get_server_spec(edge_id)
+        for edge_server_id, edge_server_ref in self.edge_server_refs.items():
+            edge_spec = self.context.get_server_spec(edge_server_id)
 
             total_bytes = sum(w.nbytes for w in self.global_model_weights)
             model_size_mb = total_bytes / (1024 * 1024)
@@ -93,7 +105,7 @@ class SuperServer(BaseAsyncServer):
 
             self._schedule_event(
                 delay=latency,
-                target_actor=edge_ref,
+                target_actor=edge_server_ref,
                 event_type=SERVER_MESSAGE,
                 data={
                     "type": "MODEL_SYNC",
