@@ -4,6 +4,7 @@ from typing import List
 from simulation.event import Event
 
 
+@ray.remote
 class SimulationOrchestrator:
     def __init__(self):
         self._event_heap: List[Event] = []
@@ -13,16 +14,7 @@ class SimulationOrchestrator:
     def add_event(self, delay: float, actor_ref, method_name: str, payload):
         self._check_precons_add_event(delay, actor_ref, method_name)
 
-        trigger_time = self.global_virtual_time + delay
-        self._sequence_counter += 1
-
-        event = Event(
-            trigger_time=trigger_time,
-            sequence_id=self._sequence_counter,
-            callback=(actor_ref, method_name, payload),
-        )
-
-        heapq.heappush(self._event_heap, event)
+        self._add_event_internal(delay, actor_ref, method_name, payload)
 
     def step(self):
         if not self._event_heap:
@@ -31,13 +23,18 @@ class SimulationOrchestrator:
         event = heapq.heappop(self._event_heap)
         self.global_virtual_time = max(self.global_virtual_time, event.trigger_time)
         actor_ref, method_name, payload = event.callback
-
+        print(
+            "executing event:",
+            payload["event_type"],
+            "at time",
+            self.global_virtual_time,
+            "for actor",
+            actor_ref,
+        )
         return getattr(actor_ref, method_name).remote(payload)
 
     def run_until(self, target_time: float):
         self._check_precons_run_until(target_time)
-
-        pending_refs = []
 
         while self._event_heap:
             next_event = self._event_heap[0]
@@ -45,15 +42,32 @@ class SimulationOrchestrator:
                 self.global_virtual_time = target_time
                 break
 
-            pending_refs.append(self.step())
+            # Execute the event
+            future_result = self.step()
 
-            # PERFORMANCE TWEAK:
-            # Garbage collect refs or check for errors periodically
-            if len(pending_refs) > 100:
-                # This ensures if an actor crashed, we crash the simulation NOW,
-                # not 1 hour later.
-                ray.get(pending_refs)
-                pending_refs = []
+            # --- DEBUGGING: WAIT FOR RESULT ---
+            # If the actor crashed, this line will raise the Exception here and now.
+            # Comment this out later for maximum performance.
+            if future_result is not None:
+                new_events_data = ray.get(future_result)
+
+                # 3. Process new events (if any returned)
+                if new_events_data:
+                    for delay, target, method, payload in new_events_data:
+                        # Reuse the logic of add_event locally
+                        self._add_event_internal(delay, target, method, payload)
+            # ----------------------------------
+
+    def _add_event_internal(self, delay, actor_ref, method_name, payload):
+        """Helper to add event without being an Actor method"""
+        trigger_time = self.global_virtual_time + delay
+        self._sequence_counter += 1
+        event = Event(
+            trigger_time=trigger_time,
+            sequence_id=self._sequence_counter,
+            callback=(actor_ref, method_name, payload),
+        )
+        heapq.heappush(self._event_heap, event)
 
     def _check_precons_add_event(self, delay, actor_ref, method_name):
         if delay < 0:
