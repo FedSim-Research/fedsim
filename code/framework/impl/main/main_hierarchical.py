@@ -20,7 +20,7 @@ from server.hierarchical.super_server_actor import SuperServer
 from server.hierarchical.edge_server_actor import EdgeServer
 from client.simulation_client import SimulationFlowerClient
 
-RUNTIME_LIMIT = 100000.0
+RUNTIME_LIMIT = 5000.0
 SUPER_ID = "super_server"
 EDGE_IDS = ["edge_1", "edge_2"]
 TOTAL_CLIENTS = 4
