@@ -1,4 +1,4 @@
-import { Component, inject, ViewChild, computed, signal, OnInit } from '@angular/core';
+import { Component, inject, ViewChild, computed, signal, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Vflow, VflowComponent, Node, Edge, NodePositionChange, Connection, ɵConnectionModel as ConnectionModel } from 'ngx-vflow';
 import { NgxSelectoModule } from 'ngx-selecto';
@@ -10,6 +10,7 @@ import { SuperServerNode } from './components/nodes/super-server-node/super-serv
 import { GraphServiceSpyker } from './services/subservices/graph-service-spyker';
 import { GraphServiceHierach } from './services/subservices/graph-service-hierach';
 import { GraphPersistenceService } from './services/graph-persistence.service';
+import { GraphApiService } from './services/graph-api.service';
 
 export type modes = 'spyker' | 'hierfl';
 
@@ -21,12 +22,14 @@ export type modes = 'spyker' | 'hierfl';
   imports: [Vflow, SidebarComponent, CommonModule, Shortcuts, NgxSelectoModule],
 })
 export class App implements OnInit{
-  @ViewChild(VflowComponent) private flow?: VflowComponent;
+  @ViewChild(VflowComponent) public flow?: VflowComponent;
   @ViewChild(Shortcuts) private shortcuts?: Shortcuts;
   public keyContainer = window;
   protected graphServiceSpyker = inject(GraphServiceSpyker);
   protected graphServiceHierach = inject(GraphServiceHierach);
   private graphPersistence = inject(GraphPersistenceService);
+  private graphApi = inject(GraphApiService);
+  private cdr = inject(ChangeDetectorRef);
   public activeMode = signal<modes>('hierfl');
   public activeGraph = computed(() => {
     if (this.activeMode() === 'spyker') {
@@ -138,14 +141,10 @@ export class App implements OnInit{
     this.activeGraph().edges.set(this.activeGraph().getGraphHistory().getState().edges);
   }
 
-  public exportGraph() { 
-    // TODO, wait for backend
+  public reloadUI(){
+    this.activeGraph().nodes.set(this.activeGraph().nodes());
+    this.activeGraph().edges.set(this.activeGraph().edges());
   }
-
-  public importGraph() {
-    // TODO, wait for backend
-  }
-
 
   public handleConnect(connection: Connection): void {
     const resolved = this.activeMode() === 'hierfl'
@@ -276,5 +275,79 @@ export class App implements OnInit{
     }
 
     return connection;
+  }
+
+  public async handleGraphSelected(event: { graphId: number; architecture: 'spyker' | 'hierfl' }): Promise<void> {
+    try {
+      // Switch to the selected architecture mode
+      this.activeMode.set(event.architecture);
+
+      // Get the graph data from the API
+      const graphDetail = await this.graphApi.getGraph(event.graphId);
+
+      // Get the appropriate graph service
+      const targetService = event.architecture === 'spyker' 
+        ? this.graphServiceSpyker 
+        : this.graphServiceHierach;
+
+      // Set the graph ID in the service
+      targetService.setGraphId(event.graphId);
+
+      // Convert backend nodes to frontend nodes
+      const NODE_TYPE_MAP = {
+        ClientNode: ClientNode,
+        ServerNode: ServerNode,
+        SuperServerNode: SuperServerNode,
+      } as const;
+
+      const nodes: Node[] = [];
+      const externalByBackendId = new Map<number, string>();
+
+      for (const node of graphDetail.nodes) {
+        const nodeType = NODE_TYPE_MAP[node.type as keyof typeof NODE_TYPE_MAP];
+        if (!nodeType) {
+          continue;
+        }
+        externalByBackendId.set(node.node_id, node.external_id);
+        nodes.push({
+          id: node.external_id,
+          point: node.position,
+          type: nodeType,
+          data: {
+            type: node.type,
+            config: node.config,
+            environment: event.architecture,
+            fromJson: true,
+            selected: false,
+            backendId: node.node_id,
+          },
+        });
+      }
+
+      // Convert backend edges to frontend edges
+      const edges: Edge[] = [];
+      for (const edge of graphDetail.edges) {
+        const source = externalByBackendId.get(edge.source_node_id);
+        const target = externalByBackendId.get(edge.target_node_id);
+        if (!source || !target) {
+          continue;
+        }
+        edges.push({
+          id: `${edge.edge_id}`,
+          source,
+          target,
+          reconnectable: true,
+          floating: false,
+          data: {
+            backendId: edge.edge_id,
+          },
+        });
+      }
+
+      // Load the graph into the active service
+      targetService.setGraphState(nodes, edges, true);
+    } catch (error) {
+      console.error('Failed to load graph:', error);
+    }
   }
 }

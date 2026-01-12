@@ -1,0 +1,81 @@
+<p-dialog
+  [(visible)]="visible"
+  [modal]="true"
+  [closable]="true"
+  [draggable]="false"
+  [resizable]="false"
+  header="Load Graph from Database"
+  [style]="{ width: '500px', maxWidth: '90vw' }"
+  (onHide)="onClose()"
+>
+  <div class="dialog-body">
+    @if (isLoading) {
+    <div class="loading-container">
+      <p-progressSpinner 
+        styleClass="custom-spinner"
+        strokeWidth="4"
+        animationDuration="1s"
+      />
+      <p>Loading graphs...</p>
+    </div>
+    } @else if (graphs.length === 0) {
+    <div class="empty-state">
+      <p>No graphs found in the database</p>
+    </div>
+    } @else {
+    <p-listbox
+      [options]="graphs"
+      [(ngModel)]="selectedGraph"
+      optionLabel="name"
+      [filter]="false"
+      [style]="{ width: '100%' }"
+      [listStyle]="{ 'max-height': '400px' }"
+    >
+      <ng-template let-graph pTemplate="item">
+        <div class="graph-item">
+          <div class="graph-item__header">
+            <strong class="graph-item__name">{{ graph.name || 'Untitled Graph' }}</strong>
+            <span class="graph-item__architecture">{{ graph.architecture }}</span>
+          </div>
+          <div class="graph-item__meta">
+            <span>ID: {{ graph.graph_id }}</span>
+          </div>
+        </div>
+      </ng-template>
+    </p-listbox>
+    }
+  </div>
+
+  <ng-template pTemplate="footer">
+    <div class="dialog-footer">
+      <p-button
+        label="Cancel"
+        severity="secondary"
+        (onClick)="onClose()"
+        [text]="true"
+      />
+      <p-button
+        label="Import"
+        severity="secondary"
+        (onClick)="onImport()"
+        [disabled]="isLoading"
+        icon="pi pi-upload"
+      />
+      <p-button
+        label="Export"
+        severity="secondary"
+        (onClick)="onExport()"
+        [disabled]="isLoading"
+        icon="pi pi-download"
+      />
+      <p-button
+        label="Load Selected Graph"
+        severity="primary"
+        (onClick)="onLoadGraph()"
+        [disabled]="!selectedGraph || isLoading"
+      />
+    </div>
+  </ng-template>
+</p-dialog>
+
+<p-toast position="top-right" />

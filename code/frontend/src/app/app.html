@@ -1,6 +1,7 @@
 <div
   class="canvas-wrapper"
   appShortcuts
+  [activeService]="activeGraph()"
   #shortcuts="appShortcuts"
   #canvasWrapper
   (dragover)="onDragOver($event)"
@@ -36,9 +37,11 @@
     (selectEnd)="shortcuts.onSelectoSelectEnd($event)">
   </ngx-selecto>
   <app-sidebar
+    [shortcuts]="shortcuts"
     (resetGraph)="handleReset()"
     (undoRequested)="undo()"
     (redoRequested)="redo()"
-    (modeChange)="changeMode($event)">
+    (modeChange)="changeMode($event)"
+    (graphSelected)="handleGraphSelected($event)">
   </app-sidebar>
 </div>

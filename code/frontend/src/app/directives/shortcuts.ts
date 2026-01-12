@@ -1,7 +1,11 @@
-import { Directive, HostListener, inject, ElementRef} from '@angular/core';
+import { Directive, HostListener, inject, ElementRef, input, ChangeDetectorRef} from '@angular/core';
 import { GraphServiceHierach } from '../services/subservices/graph-service-hierach';
 import { GraphServiceSpyker } from '../services/subservices/graph-service-spyker';
 import { Node } from 'ngx-vflow';
+import { ClientNode } from '../components/nodes/client-node/client-node';
+import { ServerNode } from '../components/nodes/server-node/server-node';
+import { SuperServerNode } from '../components/nodes/super-server-node/super-server-node';
+import { MessageService } from 'primeng/api';
 import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'selecto';
 
 
@@ -13,7 +17,9 @@ import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'sel
 export class Shortcuts{
   protected graphServiceSpyker = inject(GraphServiceSpyker);
   protected graphServiceHierach = inject(GraphServiceHierach);
+  protected messageService = inject(MessageService);
   protected elRef = inject(ElementRef) as ElementRef<HTMLElement>;
+  public activeService = input.required<GraphServiceSpyker | GraphServiceHierach>();
   private clipboard: Node[] = [];
   public selectedNodeIds: Set<string> = new Set();
   public selectedEdgeIds: Set<string> = new Set();
@@ -251,31 +257,25 @@ export class Shortcuts{
   }
 
   public pasteCopiedNodes() {
-    if (!this.clipboard.length) {
-      return;
-    }
-    let targetService: GraphServiceSpyker | GraphServiceHierach = this.graphServiceSpyker;
-    if (this.selectedNodeIds.size) {
-      const first = Array.from(this.selectedNodeIds)[0];
-      if (this.graphServiceHierach.nodes().some((n) => n.id === first)) {
-        targetService = this.graphServiceHierach as unknown as GraphServiceSpyker;
-      }
-    }
-    this.selectedNodeIds.clear();
-    const newIds: string[] = [];
-    for (const node of this.clipboard) {
+    if (!this.clipboard.length) return;
+    const NODE_TYPE_MAP = {
+      ClientNode, ServerNode, SuperServerNode
+    } as const;
+
+    const newNodeIds = this.clipboard.map((node) => {
       const newId = crypto.randomUUID();
+      const typeString = ((node as any).data as any)?.type;
       const newNode: Node = {
         ...JSON.parse(JSON.stringify(node)),
         id: newId,
-        point: { x: (node.point?.x ?? 0) + 50, y: (node.point?.y ?? 0) + 50},
+        type: typeString ? NODE_TYPE_MAP[typeString as keyof typeof NODE_TYPE_MAP] : undefined,
+        point: { x: (node.point?.x ?? 0) + 50, y: (node.point?.y ?? 0) + 50 },
       };
-      targetService.addNode(newNode);
-      newIds.push(newId);
-    }
-    for (const id of newIds) {
-      this.selectedNodeIds.add(id);
-    }
+      this.activeService().addNode(newNode);
+      return newId;
+    });
+
+    this.applySelection(new Set(newNodeIds));
   }
 
   public onEdgeSelectionChange(changes: Array<{ id: string; selected: boolean }>): void {
@@ -289,5 +289,74 @@ export class Shortcuts{
       }
     }
     this.selectedEdgeIds = next;
+  }
+
+  public exportGraph() {
+    const serializedNodes = this.activeService().nodes().map((node) => {
+      const { type, ...rest } = node as any;
+      return rest;
+    });
+    const serializedEdges = this.activeService().edges().map((edge) => ({
+      ...edge
+    }));
+    const data = {
+      nodes: serializedNodes,
+      edges: serializedEdges,
+      nodeCount: serializedNodes.length,
+      edgeCount: serializedEdges.length
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const filename = `graph-${this.activeService().loadGraphIdFromStorage}.json`;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  public async importGraph(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json,application/json';
+      input.onchange = async (event: Event) => {
+        const file = (event.target as HTMLInputElement).files?.[0];
+        if (!file) {
+          reject(new Error('No file selected'));
+          return;
+        }
+        try {
+          const text = await file.text();
+          const data = JSON.parse(text);
+          if (!data.nodes || !Array.isArray(data.nodes)) {
+            throw new Error('No nodes!');
+          }
+          const NODE_TYPE_MAP = {
+            ClientNode, ServerNode, SuperServerNode
+          } as const;
+          this.activeService().resetGraph();
+          for (const nodeData of data.nodes) {
+            const typeString = nodeData.data?.type;
+            const node: Node = {
+              ...nodeData,
+              id: nodeData.id,
+              type: typeString ? NODE_TYPE_MAP[typeString as keyof typeof NODE_TYPE_MAP] : undefined,
+            };
+            this.activeService().addNode(node);
+          }
+          if (data.edges && Array.isArray(data.edges)) {
+            for (const edgeData of data.edges) {
+              this.activeService().addEdge(edgeData);
+            }
+          }
+          resolve();
+        } catch (error) {
+          console.log("import error:", error)
+          reject(error);
+        }
+      };
+      input.click();
+    });
   }
 }

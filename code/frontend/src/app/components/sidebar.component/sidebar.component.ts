@@ -1,29 +1,34 @@
-import { Component, Inject, Output, EventEmitter, ViewChild, ElementRef } from '@angular/core';
+import { Component, Inject, Output, EventEmitter, ViewChild, ElementRef, Input } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StartPopup } from '../start.popup/start.popup';
 import { ResetButton } from '../reset.button/reset.button';
+import { ViewGraphsDialog } from '../view-graphs.component/view-graphs.component';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
+import { Shortcuts } from '../../directives/shortcuts';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
   templateUrl: './sidebar.component.html',
   styleUrls: ['./sidebar.component.css'],
-  imports: [FormsModule, CommonModule, StartPopup, ResetButton, ToastModule, ConfirmDialogModule],
+  imports: [FormsModule, CommonModule, StartPopup, ResetButton, ViewGraphsDialog, ToastModule, ConfirmDialogModule],
   providers: [MessageService, ConfirmationService],
 })
 export class SidebarComponent {
   public isOpen = true;
   public isDarkMode = true;
   public showSimulationpopup = false;
+  public showViewGraphsDialog = false;
   @ViewChild('supDetails') private supDetails?: ElementRef<HTMLDetailsElement>;
 
+  @Input() shortcuts?: Shortcuts;
   @Output() resetGraph = new EventEmitter<void>();
   @Output() modeChange = new EventEmitter<'spyker' | 'hierfl'>();
+  @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
 
   public selectedArchitectures = {
     spyker: false,
@@ -149,13 +154,25 @@ export class SidebarComponent {
       this.showErrorToast('No super server is allowed to exist in the Spyker Environment');
     }
   }
-
   private closeSuperServerDisclosure(): void {
     this.supDetails?.nativeElement.removeAttribute('open');
+  }
+
+  public openViewGraphsDialog(): void {
+    this.showViewGraphsDialog = true;
+  }
+
+  public closeViewGraphsDialog(): void {
+    this.showViewGraphsDialog = false;
+  }
+
+  public onGraphSelected(event: { graphId: number; architecture: 'spyker' | 'hierfl' }): void {
+    this.graphSelected.emit(event);
+    this.closeViewGraphsDialog();
   }
   
   public runSimulation(type: 'spyker' | 'hierarchical' | 'both'): void { 
     console.log('Starte Simulation für:', type); 
-    this.closeSimulationpopup(); 
+    this.closeSimulationpopup();
   }
 }

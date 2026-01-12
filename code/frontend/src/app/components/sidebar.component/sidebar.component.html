@@ -13,6 +13,13 @@
       </div>
     </div>
 
+    <button class="icon-btn" (click)="openViewGraphsDialog()" aria-label="View saved graphs">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block; margin: auto;">
+        <path d="M12 2.69l1.45.41.41 1.45 1.45.41 1.18-.99 1.28 1.28-.99 1.18.41 1.45 1.45.41.41 1.45-1.45.41-.41 1.45-1.45.41.99 1.18-1.28 1.28-1.18-.99-1.45.41-.41 1.45-1.45.41-.41-1.45-1.45-.41-1.18.99-1.28-1.28.99-1.18-.41-1.45-1.45-.41-.41-1.45 1.45-.41.41-1.45 1.45-.41-.99-1.18 1.28-1.28 1.18.99 1.45-.41.41-1.45z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+    </button>
+
     <button class="icon-btn" (click)="toggleTheme()"
       [attr.aria-label]="isDarkMode ? 'Switch to Light' : 'Switch to Dark'">
       @if (isDarkMode) {
@@ -170,6 +177,9 @@
   </footer>
 </aside>
 
+@if (showViewGraphsDialog) {
+<app-view-graphs-dialog [isDarkMode]="isDarkMode" [shortcuts]="shortcuts" (graphSelected)="onGraphSelected($event)" (close)="closeViewGraphsDialog()"></app-view-graphs-dialog>
+}
 <p-toast position="top-right" />
 <p-confirmDialog styleClass="reset-confirm" />
 
