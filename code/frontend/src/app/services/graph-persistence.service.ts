@@ -18,13 +18,23 @@ type Architecture = 'spyker' | 'hierfl';
 export class GraphPersistenceService {
   private api = inject(GraphApiService);
 
-  public async initializeGraph(service: GraphService<any>, architecture: Architecture): Promise<void> {
+  public async initializeGraph(
+    service: GraphService<any>,
+    architecture: Architecture,
+    createIfMissing: boolean = true
+  ): Promise<void> {
     const storedId = service.loadGraphIdFromStorage();
     if (storedId !== null) {
       const loaded = await this.tryLoadGraph(service, architecture, storedId);
       if (loaded) {
         return;
       }
+    }
+
+    if (!createIfMissing) {
+      service.setGraphId(null);
+      service.setGraphState([], [], true);
+      return;
     }
 
     const created = await this.api.createGraph({

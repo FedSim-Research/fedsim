@@ -53,8 +53,8 @@ export class App implements OnInit{
   });
 
   public ngOnInit(): void {
-    void this.graphPersistence.initializeGraph(this.graphServiceSpyker, 'spyker');
-    void this.graphPersistence.initializeGraph(this.graphServiceHierach, 'hierfl');
+    void this.graphPersistence.initializeGraph(this.graphServiceSpyker, 'spyker', false);
+    void this.graphPersistence.initializeGraph(this.graphServiceHierach, 'hierfl', false);
   }
 
   public handleReset() {

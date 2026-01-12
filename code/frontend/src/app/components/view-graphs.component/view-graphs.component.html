@@ -1,13 +1,43 @@
 <p-dialog
   [(visible)]="visible"
   [modal]="true"
-  [closable]="true"
+  [closable]="hasGraphsForMode(selectedMode)"
   [draggable]="false"
   [resizable]="false"
+  [closeOnEscape]="hasGraphsForMode(selectedMode)"
+  [dismissableMask]="hasGraphsForMode(selectedMode)"
   header="Load Graph from Database"
   [style]="{ width: '500px', maxWidth: '90vw' }"
   (onHide)="onClose()"
 >
+  <div class="dialog-current">
+    <div class="dialog-current__row">
+      <span>Hierfl:</span>
+      <strong>{{ currentGraphLabel('hierfl') }}</strong>
+    </div>
+    <div class="dialog-current__row">
+      <span>Spyker:</span>
+      <strong>{{ currentGraphLabel('spyker') }}</strong>
+    </div>
+  </div>
+  <div class="dialog-tabs">
+    <button
+      class="dialog-tab"
+      type="button"
+      [class.dialog-tab--active]="selectedMode === 'hierfl'"
+      (click)="setMode('hierfl')"
+    >
+      Hierfl
+    </button>
+    <button
+      class="dialog-tab"
+      type="button"
+      [class.dialog-tab--active]="selectedMode === 'spyker'"
+      (click)="setMode('spyker')"
+    >
+      Spyker
+    </button>
+  </div>
   <div class="dialog-body">
     @if (isLoading) {
     <div class="loading-container">
@@ -18,13 +48,26 @@
       />
       <p>Loading graphs...</p>
     </div>
-    } @else if (graphs.length === 0) {
+    } @else if (!hasGraphsForMode(selectedMode)) {
     <div class="empty-state">
-      <p>No graphs found in the database</p>
+      <p>No {{ selectedMode }} graphs found</p>
+      <div class="empty-state__create">
+        <input
+          type="text"
+          [(ngModel)]="createName"
+          placeholder="Graph name"
+        />
+        <p-button
+          label="Create {{ selectedMode }} Graph"
+          severity="primary"
+          (onClick)="createEmptyGraph()"
+          [disabled]="isLoading"
+        />
+      </div>
     </div>
     } @else {
     <p-listbox
-      [options]="graphs"
+      [options]="graphsForMode(selectedMode)"
       [(ngModel)]="selectedGraph"
       optionLabel="name"
       [filter]="false"
@@ -95,6 +138,13 @@
         (onClick)="onExport()"
         [disabled]="isLoading"
         icon="pi pi-download"
+      />
+      <p-button
+        label="New"
+        severity="secondary"
+        (onClick)="createEmptyGraph()"
+        [disabled]="isLoading"
+        icon="pi pi-plus"
       />
       <p-button
         label="Load"

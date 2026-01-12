@@ -1,4 +1,4 @@
-import { Component, inject, Output, EventEmitter, OnInit, Input } from '@angular/core';
+import { Component, inject, Output, EventEmitter, OnInit, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { GraphApiService, GraphResponse } from '../../services/graph-api.service';
@@ -18,24 +18,35 @@ import { Shortcuts } from '../../directives/shortcuts';
   imports: [CommonModule, FormsModule, ToastModule, DialogModule, ButtonModule, ListboxModule, ProgressSpinnerModule],
   providers: [MessageService],
 })
-export class ViewGraphsDialog implements OnInit {
+export class ViewGraphsDialog implements OnInit, OnChanges {
   private graphApiService = inject(GraphApiService);
   private messageService = inject(MessageService);
 
   @Input() isDarkMode = true;
   @Input() shortcuts?: Shortcuts;
+  @Input() activeMode: 'spyker' | 'hierfl' = 'hierfl';
   public graphs: GraphResponse[] = [];
   public isLoading = true;
   public selectedGraph: GraphResponse | null = null;
   public visible = true;
   public editingGraphId: number | null = null;
   public editingName = '';
+  public createName = 'New Graph';
+  public selectedMode: 'spyker' | 'hierfl' = 'hierfl';
 
   @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
   @Output() close = new EventEmitter<void>();
+  @Output() modeRequested = new EventEmitter<'spyker' | 'hierfl'>();
 
   public ngOnInit(): void {
+    this.selectedMode = this.activeMode;
     this.loadGraphs();
+  }
+
+  public ngOnChanges(changes: SimpleChanges): void {
+    if (changes['activeMode']?.currentValue) {
+      this.selectedMode = changes['activeMode'].currentValue;
+    }
   }
 
   private async loadGraphs(): Promise<void> {
@@ -61,6 +72,14 @@ export class ViewGraphsDialog implements OnInit {
       });
       return;
     }
+    if (this.selectedGraph.architecture !== this.selectedMode) {
+      this.messageService.add({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: `Select a ${this.selectedMode} graph to load`,
+      });
+      return;
+    }
 
     this.graphSelected.emit({
       graphId: this.selectedGraph.graph_id,
@@ -70,6 +89,9 @@ export class ViewGraphsDialog implements OnInit {
   }
 
   public onClose(): void {
+    if (!this.hasGraphsForMode(this.selectedMode)) {
+      return;
+    }
     this.visible = false;
     this.close.emit();
   }
@@ -94,6 +116,49 @@ export class ViewGraphsDialog implements OnInit {
         console.log("Error importing:", error);
       }
     }
+  }
+
+  public graphsForMode(mode: 'spyker' | 'hierfl'): GraphResponse[] {
+    return this.graphs.filter((graph) => graph.architecture === mode);
+  }
+
+  public hasGraphsForMode(mode: 'spyker' | 'hierfl'): boolean {
+    return this.graphsForMode(mode).length > 0;
+  }
+
+  public currentGraphLabel(mode: 'spyker' | 'hierfl'): string {
+    const stored = localStorage.getItem(`fedsim.graphId.${mode}`);
+    const id = stored ? Number(stored) : null;
+    if (!id || !Number.isFinite(id)) return 'None';
+    const graph = this.graphs.find((item) => item.graph_id === id);
+    if (!graph) return 'None';
+    return graph.name ? `${graph.name}` : `Graph ${id}`;
+  }
+
+  public async createEmptyGraph(): Promise<void> {
+    const name = this.createName.trim() || 'New Graph';
+    try {
+      const created = await this.graphApiService.createGraph({
+        name,
+        architecture: this.selectedMode,
+        metadata: null,
+      });
+      this.graphs = [created, ...this.graphs];
+      this.selectedGraph = created;
+      this.editingGraphId = created.graph_id;
+      this.editingName = created.name ?? '';
+    } catch {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to create graph',
+      });
+    }
+  }
+
+  public setMode(mode: 'spyker' | 'hierfl'): void {
+    this.selectedMode = mode;
+    this.modeRequested.emit(mode);
   }
 
   public startRename(graph: GraphResponse, event?: Event): void {

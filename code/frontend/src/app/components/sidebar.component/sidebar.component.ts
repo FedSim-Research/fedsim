@@ -1,4 +1,4 @@
-import { Component, Inject, Output, EventEmitter, ViewChild, ElementRef, Input } from '@angular/core';
+import { Component, Inject, Output, EventEmitter, ViewChild, ElementRef, Input, OnInit } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StartPopup } from '../start.popup/start.popup';
@@ -9,6 +9,7 @@ import { MessageService } from 'primeng/api';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 import { Shortcuts } from '../../directives/shortcuts';
+import { GraphApiService } from '../../services/graph-api.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -18,7 +19,7 @@ import { Shortcuts } from '../../directives/shortcuts';
   imports: [FormsModule, CommonModule, StartPopup, ResetButton, ViewGraphsDialog, ToastModule, ConfirmDialogModule],
   providers: [MessageService, ConfirmationService],
 })
-export class SidebarComponent {
+export class SidebarComponent implements OnInit {
   public isOpen = true;
   public isDarkMode = true;
   public showSimulationpopup = false;
@@ -44,8 +45,13 @@ export class SidebarComponent {
   constructor(
     @Inject(DOCUMENT) private document: Document,
     private messageService: MessageService,
-    private confirmationService: ConfirmationService
+    private confirmationService: ConfirmationService,
+    private graphApi: GraphApiService
   ) {}
+
+  public async ngOnInit(): Promise<void> {
+    await this.ensureGraphForMode(this.selectedArchitectures.spyker ? 'spyker' : 'hierfl');
+  }
 
   private showErrorToast(message: string) {
     this.messageService.add({
@@ -84,21 +90,35 @@ export class SidebarComponent {
     this.undoRequested.emit();
   }
 
-  public toggleArchitecture(): void {
+  public async toggleArchitecture(): Promise<void> {
     this.selectedArchitectures.spyker = !this.selectedArchitectures.spyker;
     this.selectedArchitectures.hierfl = !this.selectedArchitectures.spyker;
     this.modeChange.emit(this.selectedArchitectures.spyker ? 'spyker' : 'hierfl');
     if (this.selectedArchitectures.spyker) {
       this.closeSuperServerDisclosure();
     }
+    await this.ensureGraphForMode(this.selectedArchitectures.spyker ? 'spyker' : 'hierfl');
   }
 
-  public setArchitecture(isSpyker: boolean): void {
+  public async setArchitecture(isSpyker: boolean): Promise<void> {
     this.selectedArchitectures.spyker = isSpyker;
     this.selectedArchitectures.hierfl = !isSpyker;
     this.modeChange.emit(isSpyker ? 'spyker' : 'hierfl');
     if (isSpyker) {
       this.closeSuperServerDisclosure();
+    }
+    await this.ensureGraphForMode(isSpyker ? 'spyker' : 'hierfl');
+  }
+
+  private async ensureGraphForMode(mode: 'spyker' | 'hierfl'): Promise<void> {
+    try {
+      const graphs = await this.graphApi.listGraphs();
+      const hasGraph = graphs.some((graph) => graph.architecture === mode);
+      if (!hasGraph) {
+        this.showViewGraphsDialog = true;
+      }
+    } catch {
+      // Ignore loading errors for auto-open behavior.
     }
   }
 

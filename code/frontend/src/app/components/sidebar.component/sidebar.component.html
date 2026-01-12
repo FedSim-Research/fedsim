@@ -178,7 +178,13 @@
 </aside>
 
 @if (showViewGraphsDialog) {
-<app-view-graphs-dialog [isDarkMode]="isDarkMode" [shortcuts]="shortcuts" (graphSelected)="onGraphSelected($event)" (close)="closeViewGraphsDialog()"></app-view-graphs-dialog>
+<app-view-graphs-dialog
+  [isDarkMode]="isDarkMode"
+  [shortcuts]="shortcuts"
+  [activeMode]="selectedArchitectures.spyker ? 'spyker' : 'hierfl'"
+  (modeRequested)="setArchitecture($event === 'spyker')"
+  (graphSelected)="onGraphSelected($event)"
+  (close)="closeViewGraphsDialog()"></app-view-graphs-dialog>
 }
 <p-toast position="top-right" />
 <p-confirmDialog styleClass="reset-confirm" />
