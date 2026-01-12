@@ -291,7 +291,11 @@ export class Shortcuts{
     this.selectedEdgeIds = next;
   }
 
-  public exportGraph() {
+  public exportGraph(options?: {
+    graphId?: number | null;
+    graphName?: string | null;
+    architecture?: 'spyker' | 'hierfl';
+  }) {
     const serializedNodes = this.activeService().nodes().map((node) => {
       const { type, ...rest } = node as any;
       return rest;
@@ -309,7 +313,18 @@ export class Shortcuts{
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const filename = `graph-${this.activeService().loadGraphIdFromStorage}.json`;
+    const storedId = this.activeService().loadGraphIdFromStorage();
+    const graphId = options?.graphId ?? storedId ?? 'graph';
+    const rawName = options?.graphName ?? 'graph';
+    const safeName = rawName
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-_]+/g, '')
+      .slice(0, 48) || 'graph';
+    const architecture =
+      options?.architecture ??
+      (this.activeService() instanceof GraphServiceHierach ? 'hierfl' : 'spyker');
+    const filename = `${graphId}_${safeName}_${architecture}.json`;
     link.download = filename;
     link.click();
     URL.revokeObjectURL(url);

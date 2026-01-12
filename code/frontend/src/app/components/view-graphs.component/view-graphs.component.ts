@@ -76,7 +76,12 @@ export class ViewGraphsDialog implements OnInit {
 
   public onExport(): void {
     if (this.shortcuts) {
-      this.shortcuts.exportGraph();
+      const graph = this.selectedGraph;
+      this.shortcuts.exportGraph({
+        graphId: graph?.graph_id ?? null,
+        graphName: graph?.name ?? null,
+        architecture: graph?.architecture,
+      });
     }
   }
 
