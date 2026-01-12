@@ -6,6 +6,7 @@ from backend.db.database import SessionLocal
 from backend.db.models import Graph, Node, Edge
 from backend.schemas.graph import (
     GraphCreate,
+    GraphRename,
     NodeCreate,
     NodeUpdate,
     EdgeCreate,
@@ -39,6 +40,22 @@ def delete_graph(graph_id: int) -> bool:
         session.delete(graph)
         session.commit()
         return True
+    finally:
+        session.close()
+
+
+def rename_graph(graph_id: int, payload: GraphRename) -> Graph | None:
+    session = SessionLocal()
+    try:
+        stmt = select(Graph).where(Graph.id == graph_id)
+        graph = session.execute(stmt).scalar_one_or_none()
+        if graph is None:
+            return None
+
+        graph.name = payload.name
+        session.commit()
+        session.refresh(graph)
+        return graph
     finally:
         session.close()
 

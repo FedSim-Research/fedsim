@@ -34,7 +34,33 @@
       <ng-template let-graph pTemplate="item">
         <div class="graph-item">
           <div class="graph-item__header">
-            <strong class="graph-item__name">{{ graph.name || 'Untitled Graph' }}</strong>
+            <div class="graph-item__name-wrap" (dblclick)="startRename(graph, $event)">
+              @if (editingGraphId === graph.graph_id) {
+              <input
+                class="graph-item__name-edit"
+                type="text"
+                [(ngModel)]="editingName"
+                (click)="$event.stopPropagation()"
+                (mousedown)="$event.stopPropagation()"
+                (mouseup)="$event.stopPropagation()"
+                (keydown)="$event.stopPropagation()"
+                (keydown.enter)="saveRename(graph, $event)"
+                (keydown.escape)="cancelRename($event)"
+                (blur)="saveRename(graph, $event)"
+                autofocus
+              />
+              } @else {
+              <strong class="graph-item__name">{{ graph.name || 'Untitled Graph' }}</strong>
+              <button
+                class="graph-item__edit"
+                type="button"
+                (click)="startRename(graph, $event)"
+                aria-label="Edit graph name"
+              >
+                <i class="pi pi-pencil"></i>
+              </button>
+              }
+            </div>
             <span class="graph-item__architecture">{{ graph.architecture }}</span>
           </div>
           <div class="graph-item__meta">
@@ -48,12 +74,6 @@
 
   <ng-template pTemplate="footer">
     <div class="dialog-footer">
-      <p-button
-        label="Cancel"
-        severity="secondary"
-        (onClick)="onClose()"
-        [text]="true"
-      />
       <p-button
         label="Import"
         severity="secondary"
@@ -69,7 +89,7 @@
         icon="pi pi-download"
       />
       <p-button
-        label="Load Selected Graph"
+        label="Load"
         severity="primary"
         (onClick)="onLoadGraph()"
         [disabled]="!selectedGraph || isLoading"

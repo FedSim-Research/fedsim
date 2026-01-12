@@ -42,6 +42,10 @@ export interface GraphCreate {
   metadata?: Record<string, unknown> | null;
 }
 
+export interface GraphRename {
+  name: string;
+}
+
 
 export interface NodeCreate {
   external_id?: string | null;
@@ -87,6 +91,10 @@ export class GraphApiService {
 
   public async deleteGraph(graphId: number): Promise<void> {
     await firstValueFrom(this.http.delete(this.url(`/graphs/${graphId}`)));
+  }
+
+  public async renameGraph(graphId: number, payload: GraphRename): Promise<GraphResponse> {
+    return firstValueFrom(this.http.put<GraphResponse>(this.url(`/graphs/${graphId}/name`), payload));
   }
 
   public async createNode(graphId: number, payload: NodeCreate): Promise<NodeResponse> {

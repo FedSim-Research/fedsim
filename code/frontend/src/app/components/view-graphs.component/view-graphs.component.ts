@@ -25,9 +25,11 @@ export class ViewGraphsDialog implements OnInit {
   @Input() isDarkMode = true;
   @Input() shortcuts?: Shortcuts;
   public graphs: GraphResponse[] = [];
-  public isLoading = false;
+  public isLoading = true;
   public selectedGraph: GraphResponse | null = null;
   public visible = true;
+  public editingGraphId: number | null = null;
+  public editingName = '';
 
   @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
   @Output() close = new EventEmitter<void>();
@@ -37,7 +39,6 @@ export class ViewGraphsDialog implements OnInit {
   }
 
   private async loadGraphs(): Promise<void> {
-    this.isLoading = true;
     try {
       this.graphs = await this.graphApiService.listGraphs();
     } catch (error) {
@@ -88,5 +89,43 @@ export class ViewGraphsDialog implements OnInit {
         console.log("Error importing:", error);
       }
     }
+  }
+
+  public startRename(graph: GraphResponse, event?: Event): void {
+    event?.stopPropagation();
+    this.editingGraphId = graph.graph_id;
+    this.editingName = graph.name ?? '';
+  }
+
+  public async saveRename(graph: GraphResponse, event?: Event): Promise<void> {
+    event?.stopPropagation();
+    if (this.editingGraphId !== graph.graph_id) return;
+    const trimmed = this.editingName.trim();
+    if (!trimmed || trimmed === graph.name) {
+      this.editingGraphId = null;
+      return;
+    }
+    try {
+      const updated = await this.graphApiService.renameGraph(graph.graph_id, { name: trimmed });
+      this.graphs = this.graphs.map((item) =>
+        item.graph_id === graph.graph_id ? { ...item, name: updated.name } : item
+      );
+      if (this.selectedGraph?.graph_id === graph.graph_id) {
+        this.selectedGraph = { ...this.selectedGraph, name: updated.name };
+      }
+    } catch {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to rename graph',
+      });
+    } finally {
+      this.editingGraphId = null;
+    }
+  }
+
+  public cancelRename(event?: Event): void {
+    event?.stopPropagation();
+    this.editingGraphId = null;
   }
 }

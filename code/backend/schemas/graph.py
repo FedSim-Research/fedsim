@@ -26,6 +26,10 @@ class GraphResponse(BaseModel):
     metadata: Dict[str, Any] | None = None
 
 
+class GraphRename(BaseModel):
+    name: str
+
+
 class NodeCreate(BaseModel):
     external_id: str | None = None
     type: Literal["ClientNode", "ServerNode", "SuperServerNode"]

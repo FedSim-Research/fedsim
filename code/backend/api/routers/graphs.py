@@ -4,6 +4,7 @@ from backend.schemas.graph import (
     GraphCreate,
     GraphResponse,
     GraphDetail,
+    GraphRename,
     NodeCreate,
     NodeResponse,
     EdgeCreate,
@@ -72,6 +73,19 @@ def get_graph(graph_id: int):
         metadata=json.loads(graph.metadata_json) if graph.metadata_json else None,
         nodes=[_node_to_response(node) for node in graph.nodes],
         edges=[_edge_to_response(edge) for edge in graph.edges],
+    )
+
+@router.put("/{graph_id}/name", response_model=GraphResponse)
+def rename_graph(graph_id: int, payload: GraphRename):
+    graph = graph_service.rename_graph(graph_id, payload)
+    if graph is None:
+        raise HTTPException(status_code=404, detail="Graph not found")
+
+    return GraphResponse(
+        graph_id=graph.id,
+        name=graph.name,
+        architecture=graph.architecture,
+        metadata=json.loads(graph.metadata_json) if graph.metadata_json else None,
     )
 
 

@@ -38,11 +38,45 @@
   margin-bottom: 4px;
 }
 
+.graph-item__name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
 .graph-item__name {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.graph-item__name-edit {
+  flex: 1;
+  min-width: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+  padding: 4px 6px;
+  font-size: 0.9rem;
+}
+
+.graph-item__edit {
+  border: none;
+  background: transparent;
+  color: var(--text-color-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.graph-item__edit:hover {
+  color: inherit;
 }
 
 .graph-item__architecture {
@@ -62,7 +96,19 @@
 }
 
 .dialog-footer {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 12px;
   justify-content: flex-end;
+}
+
+.dialog-footer .p-button {
+  width: 100%;
+  min-height: 40px;
+  line-height: 1;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
