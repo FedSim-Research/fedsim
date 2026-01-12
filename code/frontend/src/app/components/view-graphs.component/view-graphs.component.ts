@@ -133,4 +133,24 @@ export class ViewGraphsDialog implements OnInit {
     event?.stopPropagation();
     this.editingGraphId = null;
   }
+
+  public async deleteGraph(graph: GraphResponse, event?: Event): Promise<void> {
+    event?.stopPropagation();
+    try {
+      await this.graphApiService.deleteGraph(graph.graph_id);
+      this.graphs = this.graphs.filter((item) => item.graph_id !== graph.graph_id);
+      if (this.selectedGraph?.graph_id === graph.graph_id) {
+        this.selectedGraph = null;
+      }
+      if (this.editingGraphId === graph.graph_id) {
+        this.editingGraphId = null;
+      }
+    } catch {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to delete graph',
+      });
+    }
+  }
 }

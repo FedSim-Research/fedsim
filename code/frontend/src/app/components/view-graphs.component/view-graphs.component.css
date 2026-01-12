@@ -79,6 +79,21 @@
   color: inherit;
 }
 
+.graph-item__delete {
+  border: none;
+  background: transparent;
+  color: var(--text-color-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.graph-item__delete:hover {
+  color: #f87171;
+}
+
 .graph-item__architecture {
   padding: 2px 8px;
   background-color: var(--surface-100);
