@@ -67,6 +67,20 @@ export interface EdgeCreate {
   target_external_id?: string | null;
 }
 
+export interface SimulationStartRequest {
+  graph_id: number;
+  training_config?: {
+    epochs: number;
+    lr: number;
+  };
+}
+
+export interface SimulationStartResponse {
+  status: 'started';
+  graph_id: number;
+  architecture: 'spyker' | 'hierfl';
+}
+
 @Injectable({ providedIn: 'root' })
 export class GraphApiService {
   private http = inject(HttpClient);
@@ -115,5 +129,9 @@ export class GraphApiService {
 
   public async deleteEdge(edgeId: number): Promise<void> {
     await firstValueFrom(this.http.delete(this.url(`/edges/${edgeId}`)));
+  }
+
+  public async startSimulation(payload: SimulationStartRequest): Promise<SimulationStartResponse> {
+    return firstValueFrom(this.http.post<SimulationStartResponse>(this.url('/start_simulation'), payload));
   }
 }

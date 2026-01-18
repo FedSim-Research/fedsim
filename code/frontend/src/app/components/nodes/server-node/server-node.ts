@@ -24,9 +24,14 @@ export class ServerNode extends CustomNodeComponent {
     const environment = ((this.node().data as any)?.environment) ?? (config.environment ?? 'spyker');
     return {
       name: config.name ?? '',
-      cpus: config.cpus ?? 0,
-      gpus: config.gpus ?? 0,
-      computeTimeMs: config.computeTimeMs ?? 0,
+      id: config.id ?? '',
+      computeTimeMs: config.computeTimeMs ?? 50,
+      pingMs: config.pingMs ?? 20,
+      jitterMs: config.jitterMs ?? 2,
+      packetloss: config.packetloss ?? 0.001,
+      packetlossStddev: config.packetlossStddev ?? 0.0001,
+      uploadMbps: config.uploadMbps ?? 20,
+      downloadMbps: config.downloadMbps ?? 100,
       environment,
     };
   });

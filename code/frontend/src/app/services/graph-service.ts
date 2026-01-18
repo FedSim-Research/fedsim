@@ -17,6 +17,10 @@ export abstract class GraphService<T extends GraphHistoryService> {
 
   protected constructor(protected graphHistory: T, private architecture: 'spyker' | 'hierfl'){}
 
+  public getGraphId(): number | null {
+    return this.graphId;
+  }
+
   public setGraphId(graphId: number | null): void {
     this.graphId = graphId;
     if (graphId === null) {

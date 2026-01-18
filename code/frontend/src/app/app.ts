@@ -277,6 +277,31 @@ export class App implements OnInit{
     return connection;
   }
 
+  public async handleSimulation(payload: { mode: 'spyker' | 'hierfl' | 'both'; trainingConfig: { epochs: number; lr: number } }): Promise<void> {
+    const runFor = async (architecture: 'spyker' | 'hierfl'): Promise<void> => {
+      const service = architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierach;
+      const graphId = service.getGraphId() ?? service.loadGraphIdFromStorage();
+      if (graphId === null) {
+        console.warn(`No graph ID available for ${architecture} simulation.`);
+        return;
+      }
+      await this.graphApi.startSimulation({
+        graph_id: graphId,
+        training_config: payload.trainingConfig,
+      });
+    };
+
+    try {
+      if (payload.mode === 'both') {
+        await Promise.all([runFor('spyker'), runFor('hierfl')]);
+      } else {
+        await runFor(payload.mode);
+      }
+    } catch (error) {
+      console.error('Failed to start simulation:', error);
+    }
+  }
+
   public async handleGraphSelected(event: { graphId: number; architecture: 'spyker' | 'hierfl' }): Promise<void> {
     try {
       // Switch to the selected architecture mode

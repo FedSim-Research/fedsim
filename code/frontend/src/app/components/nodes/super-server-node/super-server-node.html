@@ -34,15 +34,33 @@
       <span>ID</span>
       <span class="spec-value">{{ superserver().id || '—' }}</span>
     </div>
-    
     <div class="spec-row">
-      <span>CPU</span>
-      <span class="spec-value">{{ superserver().cpus }}</span>
+      <span>Compute time</span>
+      <span class="spec-value">{{ superserver().computeTimeMs }} ms</span>
     </div>
-
     <div class="spec-row">
-      <span>GPU</span>
-      <span class="spec-value">{{ superserver().gpus }}</span>
+      <span>Ping</span>
+      <span class="spec-value">{{ superserver().pingMs }} ms</span>
+    </div>
+    <div class="spec-row">
+      <span>Jitter</span>
+      <span class="spec-value">{{ superserver().jitterMs }} ms</span>
+    </div>
+    <div class="spec-row">
+      <span>Packetloss</span>
+      <span class="spec-value">{{ superserver().packetloss }}</span>
+    </div>
+    <div class="spec-row">
+      <span>Packetloss stddev</span>
+      <span class="spec-value">{{ superserver().packetlossStddev }}</span>
+    </div>
+    <div class="spec-row">
+      <span>Upload</span>
+      <span class="spec-value">{{ superserver().uploadMbps }} Mbps</span>
+    </div>
+    <div class="spec-row">
+      <span>Download</span>
+      <span class="spec-value">{{ superserver().downloadMbps }} Mbps</span>
     </div>
   </div>
     <div class="node-footer">

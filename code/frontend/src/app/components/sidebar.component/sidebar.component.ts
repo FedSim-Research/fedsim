@@ -30,16 +30,57 @@ export class SidebarComponent implements OnInit {
   @Output() resetGraph = new EventEmitter<void>();
   @Output() modeChange = new EventEmitter<'spyker' | 'hierfl'>();
   @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
+  @Output() simulationRequested = new EventEmitter<{
+    mode: 'spyker' | 'hierfl' | 'both';
+    trainingConfig: { epochs: number; lr: number };
+  }>();
 
   public selectedArchitectures = {
     spyker: false,
     hierfl: true,
   };
 
+  public simulationSettings = {
+    epochs: 1,
+    lr: 0.01,
+  };
+
   public configDraft = {
-    superserver: { name: 'Super Server', id: 'SS-01', cpus: 8, gpus: 1 },
-    server: { name: 'Server Node', environment: 'Spyker', cpus: 4, gpus: 0, computeTimeMs: 50 },
-    client: { id: 'CL-01', count: 50, type: 'mobile', computeTimeMs: 120, pingMs: 40, packetloss: 0.02 }
+    superserver: {
+      name: 'Super Server',
+      id: 'SS-01',
+      computeTimeMs: 50,
+      pingMs: 20,
+      jitterMs: 2,
+      packetloss: 0.001,
+      packetlossStddev: 0.0001,
+      uploadMbps: 20,
+      downloadMbps: 100,
+    },
+    server: {
+      name: 'Server Node',
+      id: 'SV-01',
+      environment: 'Spyker',
+      computeTimeMs: 50,
+      pingMs: 20,
+      jitterMs: 2,
+      packetloss: 0.001,
+      packetlossStddev: 0.0001,
+      uploadMbps: 20,
+      downloadMbps: 100,
+    },
+    client: {
+      id: 'CL-01',
+      count: 50,
+      type: 'mobile',
+      computeTimeMs: 120,
+      pingMs: 40,
+      jitterMs: 4,
+      packetloss: 0.02,
+      packetlossStddev: 0.002,
+      uploadMbps: 2,
+      downloadMbps: 10,
+    }
   };
 
   constructor(
@@ -192,7 +233,11 @@ export class SidebarComponent implements OnInit {
   }
   
   public runSimulation(type: 'spyker' | 'hierarchical' | 'both'): void { 
-    console.log('Starte Simulation für:', type); 
+    const normalized = type === 'hierarchical' ? 'hierfl' : type;
+    this.simulationRequested.emit({
+      mode: normalized,
+      trainingConfig: { ...this.simulationSettings },
+    });
     this.closeSimulationpopup();
   }
 }

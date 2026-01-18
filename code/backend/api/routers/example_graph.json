@@ -8,8 +8,13 @@
         "config": {
           "id": "root-1",
           "name": "RootServer",
-          "cpus": 8,
-          "gpus": 1
+          "computeTimeMs": 50,
+          "pingMs": 20,
+          "jitterMs": 2,
+          "packetloss": 0.001,
+          "packetlossStddev": 0.0001,
+          "uploadMbps": 20,
+          "downloadMbps": 100
         }
       }
     },
@@ -18,9 +23,15 @@
       "data": {
         "type": "ServerNode",
         "config": {
+          "id": "edge-1",
           "name": "EdgeEU",
-          "cpus": 4,
-          "gpus": 0
+          "computeTimeMs": 50,
+          "pingMs": 20,
+          "jitterMs": 2,
+          "packetloss": 0.001,
+          "packetlossStddev": 0.0001,
+          "uploadMbps": 20,
+          "downloadMbps": 100
         }
       }
     },
@@ -34,7 +45,11 @@
           "type": "mobile",
           "computeTimeMs": 120,
           "pingMs": 30,
-          "packetloss": 0.01
+          "jitterMs": 3,
+          "packetloss": 0.01,
+          "packetlossStddev": 0.001,
+          "uploadMbps": 2,
+          "downloadMbps": 10
         }
       }
     }

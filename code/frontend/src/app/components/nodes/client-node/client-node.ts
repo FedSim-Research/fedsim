@@ -31,11 +31,15 @@ export class ClientNode extends CustomNodeComponent {
 
     return {
       id: config.id ?? '',
-      count: config.count ?? 0,
+      count: config.count ?? 50,
       type,
-      computeTimeMs: config.computeTimeMs ?? 0,
-      pingMs: config.pingMs ?? 0,
-      packetloss: config.packetloss ?? 0,
+      computeTimeMs: config.computeTimeMs ?? 120,
+      pingMs: config.pingMs ?? 40,
+      jitterMs: config.jitterMs ?? 4,
+      packetloss: config.packetloss ?? 0.02,
+      packetlossStddev: config.packetlossStddev ?? 0.002,
+      uploadMbps: config.uploadMbps ?? 2,
+      downloadMbps: config.downloadMbps ?? 10,
       environment,
     };
   });

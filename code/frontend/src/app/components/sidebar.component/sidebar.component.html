@@ -65,6 +65,24 @@
       <div class="rightpane__subtitle">Configuration</div>
     </div>
 
+    <details class="disclosure">
+      <summary class="disclosure__summary">
+        <span>Simulation Settings</span>
+      </summary>
+      <div class="disclosure__body">
+        <div class="grid">
+          <label class="field">
+            <span>Epochs</span>
+            <input type="number" min="1" [(ngModel)]="simulationSettings.epochs" />
+          </label>
+          <label class="field">
+            <span>Learning rate</span>
+            <input type="number" step="0.0001" min="0" [(ngModel)]="simulationSettings.lr" />
+          </label>
+        </div>
+      </div>
+    </details>
+
     <div class="tooltip-wrapper" [title]="selectedArchitectures.spyker ? 'Not available in Spyker' : ''">
       <details #supDetails class="disclosure" [class.disclosure--disabled]="selectedArchitectures.spyker">
         <summary class="disclosure__summary" (click)="onSuperServerSummaryClick($event)">
@@ -81,12 +99,34 @@
           </label>
           <div class="grid">
             <label class="field">
-              <span>CPU</span>
-              <input type="number" min="1" [(ngModel)]="configDraft.superserver.cpus" />
+              <span>Computing time (ms)</span>
+              <input type="number" min="0" [(ngModel)]="configDraft.superserver.computeTimeMs" />
             </label>
             <label class="field">
-              <span>GPU</span>
-              <input type="number" min="0" [(ngModel)]="configDraft.superserver.gpus" />
+              <span>Ping (ms)</span>
+              <input type="number" min="0" [(ngModel)]="configDraft.superserver.pingMs" />
+            </label>
+            <label class="field">
+              <span>Jitter (ms)</span>
+              <input type="number" min="0" [(ngModel)]="configDraft.superserver.jitterMs" />
+            </label>
+            <label class="field">
+              <span>Packetloss</span>
+              <input type="number" step="0.001" min="0" max="1" [(ngModel)]="configDraft.superserver.packetloss" />
+            </label>
+            <label class="field">
+              <span>Packetloss stddev</span>
+              <input type="number" step="0.001" min="0" max="1" [(ngModel)]="configDraft.superserver.packetlossStddev" />
+            </label>
+          </div>
+          <div class="grid">
+            <label class="field">
+              <span>Upload (Mbps)</span>
+              <input type="number" min="0" [(ngModel)]="configDraft.superserver.uploadMbps" />
+            </label>
+            <label class="field">
+              <span>Download (Mbps)</span>
+              <input type="number" min="0" [(ngModel)]="configDraft.superserver.downloadMbps" />
             </label>
           </div>
           <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'SuperServerNode')">
@@ -105,20 +145,42 @@
           <span>Name</span>
           <input type="text" [(ngModel)]="configDraft.server.name" />
         </label>
+        <label class="field">
+          <span>ID</span>
+          <input type="text" [(ngModel)]="configDraft.server.id" />
+        </label>
         <div class="grid">
           <label class="field">
-            <span>CPU</span>
-            <input type="number" min="1" [(ngModel)]="configDraft.server.cpus" />
+            <span>Computing time (ms)</span>
+            <input type="number" min="0" [(ngModel)]="configDraft.server.computeTimeMs" />
           </label>
           <label class="field">
-            <span>GPU</span>
-            <input type="number" min="0" [(ngModel)]="configDraft.server.gpus" />
+            <span>Ping (ms)</span>
+            <input type="number" min="0" [(ngModel)]="configDraft.server.pingMs" />
+          </label>
+          <label class="field">
+            <span>Jitter (ms)</span>
+            <input type="number" min="0" [(ngModel)]="configDraft.server.jitterMs" />
+          </label>
+          <label class="field">
+            <span>Packetloss</span>
+            <input type="number" step="0.001" min="0" max="1" [(ngModel)]="configDraft.server.packetloss" />
+          </label>
+          <label class="field">
+            <span>Packetloss stddev</span>
+            <input type="number" step="0.001" min="0" max="1" [(ngModel)]="configDraft.server.packetlossStddev" />
           </label>
         </div>
-        <label class="field">
-          <span>Computing time (ms)</span>
-          <input type="number" min="0" [(ngModel)]="configDraft.server.computeTimeMs" />
-        </label>
+        <div class="grid">
+          <label class="field">
+            <span>Upload (Mbps)</span>
+            <input type="number" min="0" [(ngModel)]="configDraft.server.uploadMbps" />
+          </label>
+          <label class="field">
+            <span>Download (Mbps)</span>
+            <input type="number" min="0" [(ngModel)]="configDraft.server.downloadMbps" />
+          </label>
+        </div>
         <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'ServerNode')">
           Drag Server Node
         </div>
@@ -143,6 +205,10 @@
             <span>Ping (ms)</span>
             <input type="number" min="0" [(ngModel)]="configDraft.client.pingMs" />
           </label>
+          <label class="field">
+            <span>Jitter (ms)</span>
+            <input type="number" min="0" [(ngModel)]="configDraft.client.jitterMs" />
+          </label>
         </div>
         <label class="field">
           <span>Client type</span>
@@ -160,6 +226,20 @@
           <span>Packetloss</span>
           <input type="number" step="0.001" min="0" max="1" [(ngModel)]="configDraft.client.packetloss" />
         </label>
+        <label class="field">
+          <span>Packetloss stddev</span>
+          <input type="number" step="0.001" min="0" max="1" [(ngModel)]="configDraft.client.packetlossStddev" />
+        </label>
+        <div class="grid">
+          <label class="field">
+            <span>Upload (Mbps)</span>
+            <input type="number" min="0" [(ngModel)]="configDraft.client.uploadMbps" />
+          </label>
+          <label class="field">
+            <span>Download (Mbps)</span>
+            <input type="number" min="0" [(ngModel)]="configDraft.client.downloadMbps" />
+          </label>
+        </div>
         <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'ClientNode')">
           Drag Client Node
         </div>
