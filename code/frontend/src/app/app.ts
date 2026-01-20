@@ -284,7 +284,7 @@ export class App implements OnInit{
       const service = architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierach;
       const graphId = service.getGraphId() ?? service.loadGraphIdFromStorage();
       if (graphId === null) {
-        this.showErrorToast(`No graph available for ${architecture}.`);
+        this.showErrorToast(`No graph available for ${architecture}. Please check if the backend is running.`);
         return;
       }
       try {
