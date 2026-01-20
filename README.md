@@ -5,13 +5,14 @@
 From the project root:
 
 ```bash
+cd code
+
 python -m venv .venv
 # If `python` is not available, use: python3 -m venv .venv
 source .venv/bin/activate # Linux/macOS
 # Windows PowerShell:
 # .\\.venv\\Scripts\\Activate.ps1
 
-cd code
 pip install -r requirements.txt
 uvicorn backend.main:app --reload
 ```
@@ -39,6 +40,8 @@ The setup can be checked using the command `which pip` for Linux and `gcm pip` f
 - Powershell: `<path to project-root>/code/.venv/Scripts/pip`
 
 For the next step, flower has to be installed by pip. By using the `-e` flag it is ensured that changes made to the custom flower implementation in this project are instantly reflected when using the `flwr` command.
+
+Starting from project root:
 ```bash
 cd ./code/framework/flower/framework/
 pip install -e .
