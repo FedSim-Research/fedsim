@@ -11,6 +11,7 @@ import { GraphServiceSpyker } from './services/subservices/graph-service-spyker'
 import { GraphServiceHierach } from './services/subservices/graph-service-hierach';
 import { GraphPersistenceService } from './services/graph-persistence.service';
 import { GraphApiService } from './services/graph-api.service';
+import { MessageService } from 'primeng/api';
 
 export type modes = 'spyker' | 'hierfl';
 
@@ -30,6 +31,7 @@ export class App implements OnInit{
   private graphPersistence = inject(GraphPersistenceService);
   private graphApi = inject(GraphApiService);
   private cdr = inject(ChangeDetectorRef);
+  private messageService = inject(MessageService);
   public activeMode = signal<modes>('hierfl');
   public activeGraph = computed(() => {
     if (this.activeMode() === 'spyker') {
@@ -282,24 +284,41 @@ export class App implements OnInit{
       const service = architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierach;
       const graphId = service.getGraphId() ?? service.loadGraphIdFromStorage();
       if (graphId === null) {
-        console.warn(`No graph ID available for ${architecture} simulation.`);
+        this.showErrorToast(`No graph available for ${architecture}.`);
         return;
       }
-      await this.graphApi.startSimulation({
-        graph_id: graphId,
-        training_config: payload.trainingConfig,
-      });
+      try {
+        await this.graphApi.startSimulation({
+          graph_id: graphId,
+          training_config: payload.trainingConfig,
+        });
+        this.showSuccessToast(`${architecture} run started.`);
+      } catch {
+        this.showErrorToast(`Failed to start ${architecture} simulation.`);
+      }
     };
 
-    try {
-      if (payload.mode === 'both') {
-        await Promise.all([runFor('spyker'), runFor('hierfl')]);
-      } else {
-        await runFor(payload.mode);
-      }
-    } catch (error) {
-      console.error('Failed to start simulation:', error);
+    if (payload.mode === 'both') {
+      await Promise.all([runFor('spyker'), runFor('hierfl')]);
+    } else {
+      await runFor(payload.mode);
     }
+  }
+
+  private showSuccessToast(message: string) {
+    this.messageService.add({
+      severity: 'success',
+      summary: 'Simulation started',
+      detail: message,
+    });
+  }
+
+  private showErrorToast(message: string) {
+    this.messageService.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: message,
+    });
   }
 
   public async handleGraphSelected(event: { graphId: number; architecture: 'spyker' | 'hierfl' }): Promise<void> {

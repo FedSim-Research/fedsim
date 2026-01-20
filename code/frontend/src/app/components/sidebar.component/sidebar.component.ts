@@ -17,7 +17,7 @@ import { GraphApiService } from '../../services/graph-api.service';
   templateUrl: './sidebar.component.html',
   styleUrls: ['./sidebar.component.css'],
   imports: [FormsModule, CommonModule, StartPopup, ResetButton, ViewGraphsDialog, ToastModule, ConfirmDialogModule],
-  providers: [MessageService, ConfirmationService],
+  providers: [ConfirmationService],
 })
 export class SidebarComponent implements OnInit {
   public isOpen = true;
