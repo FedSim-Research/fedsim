@@ -9,35 +9,9 @@ This directory contains the backend, frontend, and framework code for RP-FedSim.
 - [framework/](framework): Federated learning framework implementation (Spyker and Hierarchical FL) used by the backend, built on [Flower](https://github.com/adap/flower).
 - [requirements.txt](requirements.txt): Python dependencies for the backend and frameworks.
 
-## Backend setup (Python)
+## Setup and run
 
-From the `code/` directory:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-Start the backend:
-
-```bash
-uvicorn backend.main:app --reload
-```
-
-The API is available at `http://127.0.0.1:8000`, and Swagger UI at
-`http://127.0.0.1:8000/docs`.
-
-## Frontend setup (Angular)
-
-From the `code/frontend/` directory:
-
-```bash
-npm install
-npm run start
-```
-
-The frontend is available at `http://localhost:4200`.
+See the [project root README.md](../README.md) for backend/frontend setup and run instructions.
 
 ## Notes
 
