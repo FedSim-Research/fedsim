@@ -35,11 +35,11 @@ Currently, the Flower simulation (explicitly ray) only supports Linux. To run si
 Assumes the `.venv` is already created and activated (see Backend setup above).
 
 The setup can be checked using the command `which pip` for Linux and `gcm pip` for PowerShell. Confirm that the path to pip corresponds to:
-- Linux: `<path to project-root>/.venv/bin/pip`
-- Powershell: `<path to project-root>/.venv/Scripts/pip`
+- Linux: `<path to project-root>/code/.venv/bin/pip`
+- Powershell: `<path to project-root>/code/.venv/Scripts/pip`
 
 For the next step, flower has to be installed by pip. By using the `-e` flag it is ensured that changes made to the custom flower implementation in this project are instantly reflected when using the `flwr` command.
-```
+```bash
 cd ./code/framework/flower/framework/
 pip install -e .
 pip install -e ".[simulation]"
@@ -49,19 +49,19 @@ Beware, the download size of all necessary dependencies is roughly 8GB.
 To confirm this step has succeeded, the following path checks can be performed:
 
 Linux:
-- `which flwr` should point to `<path to project-root>/bin/flwr`
-- `which flower-simulation` should point to `<path to project-root>/bin/flower-simulation`
+- `which flwr` should point to `<path to project-root>/code/.venv/bin/flwr`
+- `which flower-simulation` should point to `<path to project-root>/code/.venv/bin/flower-simulation`
 
 Powershell:
-- `gcm flwr` should point to `<path to project-root>/Scripts/flwr`
-- `gcm flower-simulation` should point to `<path to project-root>/Scripts/flower-simulation`
+- `gcm flwr` should point to `<path to project-root>/code/.venv/Scripts/flwr`
+- `gcm flower-simulation` should point to `<path to project-root>/code/.venv/Scripts/flower-simulation`
 
 In order to be REALLY sure that the custom implementation of the flower framework is used, the following code can be temporarily injected into the startup file located at:
 
  `<path to project-root>/code/framework/flower/framework/py/flwr/__init__.py`
 
 In order to work properly, the following code has to be inserted at the very top of the file. (even above all imports!)
- ```
+ ```python
 print("\n" + "="*53)
 print(">>> SUCCESS: You are using your CUSTOM LOCAL FLWR <<<")
 print("="*53 + "\n")
@@ -71,7 +71,7 @@ print("="*53 + "\n")
 Finally, to run a simulation and see the work of this code injection, use the following commands:
 
 Starting from project root:
-```
+```bash
 flwr run ./code/framework/impl/
 ```
 
