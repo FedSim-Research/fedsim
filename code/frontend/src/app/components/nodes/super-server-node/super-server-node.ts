@@ -24,7 +24,7 @@ export class SuperServerNode extends CustomNodeComponent {
     return {
       name: config.name ?? '',
       id: config.id ?? '',
-      computeTimeMs: config.computeTimeMs ?? 50,
+      computeFactor: config.computeFactor ?? 2.0,
       pingMs: config.pingMs ?? 20,
       jitterMs: config.jitterMs ?? 2,
       packetloss: config.packetloss ?? 0.001,

@@ -9,8 +9,6 @@ from typing import Any
 from backend.db.models import Graph, Node, Edge
 
 DEFAULT_RUN_TIME_LIMIT = 5000.0
-REFERENCE_COMPUTE_MS = 100.0
-MIN_COMPUTE_FACTOR = 0.1
 MIN_PERF_STDDEV = 0.01
 
 
@@ -40,12 +38,11 @@ def _node_config(node: Node) -> dict[str, Any]:
 
 def _performance_for(node_type: str, config: dict[str, Any]):
     _, Performance, _ = _import_hierfl()
-    if "computeTimeMs" not in config or config["computeTimeMs"] is None:
-        raise ValueError(f"hierfl_missing_{node_type}_computeTimeMs")
-    compute_time_ms = float(config["computeTimeMs"])
-    if compute_time_ms <= 0:
-        raise ValueError(f"hierfl_invalid_{node_type}_computeTimeMs")
-    compute_factor = max(MIN_COMPUTE_FACTOR, REFERENCE_COMPUTE_MS / compute_time_ms)
+    if "computeFactor" not in config or config["computeFactor"] is None:
+        raise ValueError(f"hierfl_missing_{node_type}_computeFactor")
+    compute_factor = float(config["computeFactor"])
+    if compute_factor <= 0:
+        raise ValueError(f"hierfl_invalid_{node_type}_computeFactor")
     perf_stddev = max(MIN_PERF_STDDEV, compute_factor * 0.1)
     return Performance(compute_factor=compute_factor, performance_stddev=perf_stddev)
 
@@ -140,7 +137,7 @@ def validate_hierfl_graph(graph: Graph) -> None:
 
     required_common = [
         "id",
-        "computeTimeMs",
+        "computeFactor",
         "pingMs",
         "jitterMs",
         "packetloss",

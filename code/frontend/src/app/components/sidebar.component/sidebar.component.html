@@ -99,8 +99,8 @@
           </label>
           <div class="grid">
             <label class="field">
-              <span>Computing time (ms)</span>
-              <input type="number" min="0" [(ngModel)]="configDraft.superserver.computeTimeMs" />
+              <span>Compute factor</span>
+              <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.superserver.computeFactor" />
             </label>
             <label class="field">
               <span>Ping (ms)</span>
@@ -151,8 +151,8 @@
         </label>
         <div class="grid">
           <label class="field">
-            <span>Computing time (ms)</span>
-            <input type="number" min="0" [(ngModel)]="configDraft.server.computeTimeMs" />
+            <span>Compute factor</span>
+            <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.server.computeFactor" />
           </label>
           <label class="field">
             <span>Ping (ms)</span>
@@ -219,8 +219,8 @@
           </select>
         </label>
         <label class="field">
-          <span>Computing time (ms)</span>
-          <input type="number" min="0" [(ngModel)]="configDraft.client.computeTimeMs" />
+          <span>Compute factor</span>
+          <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.client.computeFactor" />
         </label>
         <label class="field">
           <span>Packetloss</span>

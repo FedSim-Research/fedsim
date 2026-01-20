@@ -8,7 +8,7 @@
         "config": {
           "id": "root-1",
           "name": "RootServer",
-          "computeTimeMs": 50,
+          "computeFactor": 2.0,
           "pingMs": 20,
           "jitterMs": 2,
           "packetloss": 0.001,
@@ -25,7 +25,7 @@
         "config": {
           "id": "edge-1",
           "name": "EdgeEU",
-          "computeTimeMs": 50,
+          "computeFactor": 2.0,
           "pingMs": 20,
           "jitterMs": 2,
           "packetloss": 0.001,
@@ -43,7 +43,7 @@
           "id": "clients-eu",
           "count": 50,
           "type": "mobile",
-          "computeTimeMs": 120,
+          "computeFactor": 0.8,
           "pingMs": 30,
           "jitterMs": 3,
           "packetloss": 0.01,

@@ -33,7 +33,7 @@ export class ClientNode extends CustomNodeComponent {
       id: config.id ?? '',
       count: config.count ?? 50,
       type,
-      computeTimeMs: config.computeTimeMs ?? 120,
+      computeFactor: config.computeFactor ?? 0.8,
       pingMs: config.pingMs ?? 40,
       jitterMs: config.jitterMs ?? 4,
       packetloss: config.packetloss ?? 0.02,
