@@ -14,3 +14,5 @@ pyvenv.cfg
 final_model.pt
 final_model_hierarchical.pth
 data/
+# ML model artifacts
+*.pth
