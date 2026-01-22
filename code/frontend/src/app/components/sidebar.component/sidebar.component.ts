@@ -48,7 +48,6 @@ export class SidebarComponent implements OnInit {
   public configDraft = {
     superserver: {
       name: 'Super Server',
-      id: 'SS-01',
       computeFactor: 2.0,
       pingMs: 20,
       jitterMs: 2,
@@ -59,7 +58,6 @@ export class SidebarComponent implements OnInit {
     },
     server: {
       name: 'Server Node',
-      id: 'SV-01',
       environment: 'Spyker',
       computeFactor: 2.0,
       pingMs: 20,
@@ -70,7 +68,6 @@ export class SidebarComponent implements OnInit {
       downloadMbps: 100,
     },
     client: {
-      id: 'CL-01',
       count: 50,
       type: 'mobile',
       computeFactor: 0.8,

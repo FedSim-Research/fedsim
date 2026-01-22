@@ -47,10 +47,11 @@ export abstract class GraphService<T extends GraphHistoryService> {
     }
   }
 
-  public addNode(newNode: Node) {
-    this.nodes.update((nodes) => [...nodes, newNode]);
+  public addNode(newNode: Node): void {
+    const normalized = this.normalizeNodeId(newNode);
+    this.nodes.update((nodes) => [...nodes, normalized]);
     this.graphHistory.saveState({nodes: this.nodes(), edges: this.edges()});
-    void this.persistCreateNode(newNode);
+    void this.persistCreateNode(normalized);
   }
 
   public addEdge(newEdge: Edge) {
@@ -209,5 +210,91 @@ export abstract class GraphService<T extends GraphHistoryService> {
 
   private storageKey(): string {
     return `fedsim.graphId.${this.architecture}`;
+  }
+
+  protected normalizeNodeId(newNode: Node): Node {
+    const data = { ...((newNode as NodeWithData).data ?? {}) };
+    const config = { ...((data as Record<string, any>)['config'] ?? {}) };
+    const configId = typeof (config as Record<string, any>)['id'] === 'string'
+      ? ((config as Record<string, any>)['id'] as string).trim()
+      : '';
+    const existingBaseIds = new Set(
+      this.nodes()
+        .map((node) => {
+          const nodeData = (node as NodeWithData).data as Record<string, any> | undefined;
+          const nodeConfig = nodeData ? nodeData['config'] as Record<string, any> | undefined : undefined;
+          const nodeConfigId = typeof nodeConfig?.['id'] === 'string' ? nodeConfig['id'] as string : '';
+          if (nodeConfigId) return nodeConfigId;
+          const rawId = typeof node.id === 'string' ? node.id : '';
+          const parts = rawId.split(':');
+          return parts.length > 1 ? parts.slice(1).join(':') : rawId;
+        })
+        .filter((value) => value)
+    );
+    const typeKey = this.resolveTypeKey(newNode, data);
+    const prefix = this.prefixForType(typeKey);
+
+    let finalId: string;
+    if (prefix) {
+      finalId = this.nextAvailableId(prefix, existingBaseIds);
+    } else if (configId && !existingBaseIds.has(configId)) {
+      finalId = configId;
+    } else if (typeof newNode.id === 'string' && !existingBaseIds.has(newNode.id)) {
+      finalId = newNode.id;
+    } else {
+      finalId = this.nextAvailableId('ND', existingBaseIds);
+    }
+
+    (config as Record<string, any>)['id'] = finalId;
+    (data as Record<string, any>)['config'] = config;
+    const graphTag = this.graphId !== null ? `G${this.graphId}` : 'local';
+    const uniqueId = `${graphTag}:${finalId}`;
+    return { ...newNode, id: uniqueId, data } as Node;
+  }
+
+  protected resolveTypeKey(node: Node, data: Record<string, any>): string | null {
+    const explicit = typeof data['type'] === 'string' ? (data['type'] as string) : null;
+    if (explicit) return explicit;
+    const typeName = (node.type as any)?.name;
+    return typeof typeName === 'string' ? typeName : null;
+  }
+
+  protected prefixForType(typeKey: string | null): string | null {
+    if (!typeKey) return null;
+    switch (typeKey) {
+      case 'SuperServerNode':
+        return 'SS';
+      case 'ServerNode':
+        return 'SV';
+      case 'ClientNode':
+        return 'CL';
+      default:
+        return null;
+    }
+  }
+
+  protected nextAvailableId(prefix: string, existingIds: Set<string>): string {
+    const matcher = new RegExp(`^${prefix}-(\\d+)$`);
+    let max = 0;
+    for (const id of existingIds) {
+      const match = id.match(matcher);
+      if (match) {
+        const value = Number(match[1]);
+        if (Number.isFinite(value) && value > max) {
+          max = value;
+        }
+      }
+    }
+    let next = max + 1;
+    let candidate = this.formatId(prefix, next);
+    while (existingIds.has(candidate)) {
+      next += 1;
+      candidate = this.formatId(prefix, next);
+    }
+    return candidate;
+  }
+
+  private formatId(prefix: string, value: number): string {
+    return `${prefix}-${String(value).padStart(2, '0')}`;
   }
 }
