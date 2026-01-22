@@ -33,6 +33,7 @@ export class SidebarComponent implements OnInit {
   @Output() simulationRequested = new EventEmitter<{
     mode: 'spyker' | 'hierfl' | 'both';
     trainingConfig: { epochs: number; lr: number };
+    simulationSettings: { runTimeLimit: number; outputFilename: string; evaluateModel: boolean };
   }>();
 
   public selectedArchitectures = {
@@ -43,6 +44,9 @@ export class SidebarComponent implements OnInit {
   public simulationSettings = {
     epochs: 1,
     lr: 0.01,
+    runTimeLimit: 5000,
+    outputFilename: 'final_model_hierfl.pth',
+    evaluateModel: false,
   };
 
   public configDraft = {
@@ -233,7 +237,15 @@ export class SidebarComponent implements OnInit {
     const normalized = type === 'hierarchical' ? 'hierfl' : type;
     this.simulationRequested.emit({
       mode: normalized,
-      trainingConfig: { ...this.simulationSettings },
+      trainingConfig: {
+        epochs: this.simulationSettings.epochs,
+        lr: this.simulationSettings.lr,
+      },
+      simulationSettings: {
+        runTimeLimit: this.simulationSettings.runTimeLimit,
+        outputFilename: this.simulationSettings.outputFilename,
+        evaluateModel: this.simulationSettings.evaluateModel,
+      },
     });
     this.closeSimulationpopup();
   }

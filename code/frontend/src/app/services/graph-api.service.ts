@@ -73,6 +73,11 @@ export interface SimulationStartRequest {
     epochs: number;
     lr: number;
   };
+  simulation_settings?: {
+    run_time_limit?: number;
+    output_filename?: string | null;
+    evaluate_model?: boolean;
+  };
 }
 
 export interface SimulationStartResponse {

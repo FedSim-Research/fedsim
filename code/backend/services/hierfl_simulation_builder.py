@@ -20,11 +20,11 @@ def _import_hierfl():
     if impl_path not in sys.path:
         sys.path.append(impl_path)
 
-    from main.main_hierarchical import HierarchicalSimulation  # type: ignore
+    from main.main_hierarchical import HierarchicalSimulation, evaluate_model  # type: ignore
     from specs.performance_metrics import Performance  # type: ignore
     from specs.network_metrics import Network  # type: ignore
 
-    return HierarchicalSimulation, Performance, Network
+    return HierarchicalSimulation, Performance, Network, evaluate_model
 
 
 def _node_config(node: Node) -> dict[str, Any]:
@@ -37,7 +37,7 @@ def _node_config(node: Node) -> dict[str, Any]:
 
 
 def _performance_for(node_type: str, config: dict[str, Any]):
-    _, Performance, _ = _import_hierfl()
+    _, Performance, _, _ = _import_hierfl()
     if "computeFactor" not in config or config["computeFactor"] is None:
         raise ValueError(f"hierfl_missing_{node_type}_computeFactor")
     compute_factor = float(config["computeFactor"])
@@ -48,7 +48,7 @@ def _performance_for(node_type: str, config: dict[str, Any]):
 
 
 def _network_for(node_type: str, config: dict[str, Any]):
-    _, _, Network = _import_hierfl()
+    _, _, Network, _ = _import_hierfl()
     if "pingMs" not in config or config["pingMs"] is None:
         raise ValueError(f"hierfl_missing_{node_type}_pingMs")
     if "jitterMs" not in config or config["jitterMs"] is None:
@@ -182,8 +182,12 @@ def _require_training_config(training_config: dict[str, Any] | None) -> dict[str
     return {"epochs": epochs, "lr": lr}
 
 
-def build_hierfl_simulation(graph: Graph, training_config: dict[str, Any] | None = None):
-    HierarchicalSimulation, _, _ = _import_hierfl()
+def build_hierfl_simulation(
+    graph: Graph,
+    training_config: dict[str, Any] | None = None,
+    run_time_limit: float | None = None,
+):
+    HierarchicalSimulation, _, _, _ = _import_hierfl()
     validate_hierfl_graph(graph)
 
     nodes = list(graph.nodes)
@@ -201,7 +205,10 @@ def build_hierfl_simulation(graph: Graph, training_config: dict[str, Any] | None
     super_net = _network_for(super_node.type, super_config)
     training_config = _require_training_config(training_config)
 
-    sim = HierarchicalSimulation(run_time_limit=DEFAULT_RUN_TIME_LIMIT)
+    limit = DEFAULT_RUN_TIME_LIMIT if run_time_limit is None else float(run_time_limit)
+    if limit <= 0:
+        raise ValueError("hierfl_invalid_run_time_limit")
+    sim = HierarchicalSimulation(run_time_limit=limit)
     sim.set_super_server(
         server_id=super_id,
         name=super_name,
@@ -268,3 +275,8 @@ def build_hierfl_simulation(graph: Graph, training_config: dict[str, Any] | None
             client_index += 1
 
     return sim
+
+
+def get_hierfl_evaluate_model():
+    _, _, _, evaluate_model = _import_hierfl()
+    return evaluate_model

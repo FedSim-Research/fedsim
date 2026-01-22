@@ -279,7 +279,11 @@ export class App implements OnInit{
     return connection;
   }
 
-  public async handleSimulation(payload: { mode: 'spyker' | 'hierfl' | 'both'; trainingConfig: { epochs: number; lr: number } }): Promise<void> {
+  public async handleSimulation(payload: {
+    mode: 'spyker' | 'hierfl' | 'both';
+    trainingConfig: { epochs: number; lr: number };
+    simulationSettings: { runTimeLimit: number; outputFilename: string; evaluateModel: boolean };
+  }): Promise<void> {
     const runFor = async (architecture: 'spyker' | 'hierfl'): Promise<void> => {
       const service = architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierach;
       const graphId = service.getGraphId() ?? service.loadGraphIdFromStorage();
@@ -291,6 +295,11 @@ export class App implements OnInit{
         await this.graphApi.startSimulation({
           graph_id: graphId,
           training_config: payload.trainingConfig,
+          simulation_settings: {
+            run_time_limit: payload.simulationSettings.runTimeLimit,
+            output_filename: payload.simulationSettings.outputFilename || null,
+            evaluate_model: payload.simulationSettings.evaluateModel,
+          },
         });
         this.showSuccessToast(`${architecture} run started.`);
       } catch {
