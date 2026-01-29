@@ -158,6 +158,8 @@ class EdgeServer(BaseAsyncServer):
         delay = estimate_transmission_time(
             sender_spec=edge_server_spec,
             receiver_spec=super_server_spec,
+            network_metrics=edge_server_spec.network_metrics,
+            metrics_id=self.super_server_id,
             payload_size_mb=payload_size_mb,
         )
 

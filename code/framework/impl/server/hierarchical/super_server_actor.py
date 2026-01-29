@@ -100,6 +100,8 @@ class SuperServer(BaseAsyncServer):
             latency = estimate_transmission_time(
                 sender_spec=super_spec,
                 receiver_spec=edge_spec,
+                network_metrics=edge_spec.network_metrics,
+                metrics_id=self.server_id,
                 payload_size_mb=model_size_mb,
             )
 

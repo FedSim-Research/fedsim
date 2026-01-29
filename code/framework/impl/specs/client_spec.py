@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from specs.performance_metrics import Performance
-from specs.network_metrics import Network
 
 
 @dataclass
@@ -8,4 +7,5 @@ class ClientSpec:
     id: str
     name: str
     performance_metrics: Performance
-    network_metrics: Network
+    upload_speed: float  # in Mbps
+    download_speed: float  # in Mbps

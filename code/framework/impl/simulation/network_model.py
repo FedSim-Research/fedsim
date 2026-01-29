@@ -1,27 +1,29 @@
 from specs.client_spec import ClientSpec
 from specs.server_spec import ServerSpec
+from specs.network_metrics import Network
 import random
 
 
 def estimate_transmission_time(
     sender_spec: ClientSpec | ServerSpec,
     receiver_spec: ClientSpec | ServerSpec,
+    network_metrics: dict[str, Network],
+    metrics_id: str,
     payload_size_mb: float,
 ) -> float:
     # We treat packet loss as a reduction in effective throughput (TCP throughput model approximation)
     # Assuming packet_loss_avg is a percentage (0.0 to 1.0).
-    sender_loss = sender_spec.network_metrics.packet_loss_avg
-    receiver_loss = receiver_spec.network_metrics.packet_loss_avg
+    packet_loss = random.gauss(
+        network_metrics[metrics_id].packet_loss_avg,
+        network_metrics[metrics_id].packet_loss_stddev,
+    )
 
-    # Conservative estimate: max loss determines flow stability
-    worst_loss = max(sender_loss, receiver_loss)
-
-    throughput_factor = max(0.1, 1.0 - worst_loss)
+    throughput_factor = max(0.001, 1.0 - packet_loss)
 
     bottleneck_mbps = (
         min(
-            sender_spec.network_metrics.upload_speed,
-            receiver_spec.network_metrics.download_speed,
+            sender_spec.upload_speed,
+            receiver_spec.download_speed,
         )
         * throughput_factor
     )
@@ -29,17 +31,12 @@ def estimate_transmission_time(
     payload_size_mbits = 8 * payload_size_mb
     transmission_delay_sec = payload_size_mbits / bottleneck_mbps
 
-    sender_latency_ms = random.gauss(
-        sender_spec.network_metrics.latency_avg,
-        sender_spec.network_metrics.latency_stddev,
+    latency_ms = random.gauss(
+        network_metrics[metrics_id].latency_avg,
+        network_metrics[metrics_id].latency_stddev,
     )
 
-    receiver_latency_ms = random.gauss(
-        receiver_spec.network_metrics.latency_avg,
-        receiver_spec.network_metrics.latency_stddev,
-    )
+    latency_sec = (latency_ms) / 1000.0
+    latency_sec = max(0.0, latency_sec)
 
-    total_latency_sec = (sender_latency_ms + receiver_latency_ms) / 1000.0
-    total_latency_sec = max(0.0, total_latency_sec)
-
-    return transmission_delay_sec + total_latency_sec
+    return transmission_delay_sec + latency_sec
