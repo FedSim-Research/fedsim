@@ -36,7 +36,7 @@
   height: 12px;
   border-right: 2px solid currentColor;
   border-bottom: 2px solid currentColor;
-  transform: rotate(-45deg);
+  transform: translateX(-1.7px) rotate(-45deg);
 }
 
 .sidebar {
@@ -111,7 +111,7 @@
   height: 12px;
   border-left: 2px solid currentColor;
   border-bottom: 2px solid currentColor;
-  transform: rotate(45deg);
+  transform: translateX(1px) rotate(45deg);
 }
 
 .content {
