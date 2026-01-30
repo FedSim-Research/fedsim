@@ -56,3 +56,9 @@ body.light-mode g[alignmentHelper] line {
   outline: 4px solid #007BFF;
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
 }
+
+/* Larger connection sockets */
+.default-handle {
+  r: 6px;
+  stroke-width: 2.5px;
+}
