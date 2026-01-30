@@ -19,6 +19,12 @@
     view="auto"
     [background]="{ type: 'dots', backgroundColor: 'transparent' }" 
     [alignmentHelper]="true">
+    <ng-template edgeLabelHtml let-labelContext>
+      <app-edge-metrics-box
+        [edge]="labelContext.edge"
+        [graphService]="activeGraph()"
+      ></app-edge-metrics-box>
+    </ng-template>
     </vflow>
   <ngx-selecto
     [className]="'selecto-selection'"

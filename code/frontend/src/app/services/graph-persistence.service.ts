@@ -5,6 +5,7 @@ import { GraphService } from './graph-service';
 import { ClientNode } from '../components/nodes/client-node/client-node';
 import { ServerNode } from '../components/nodes/server-node/server-node';
 import { SuperServerNode } from '../components/nodes/super-server-node/super-server-node';
+import { EDGE_METRIC_DEFAULTS } from '../models/edge-metrics';
 
 const NODE_TYPE_MAP = {
   ClientNode: ClientNode,
@@ -101,6 +102,7 @@ export class GraphPersistenceService {
         floating: false,
         data: {
           backendId: edge.edge_id,
+          metrics: edge.config ?? EDGE_METRIC_DEFAULTS,
         },
       });
     }

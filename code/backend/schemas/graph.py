@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Literal
 
 
@@ -30,6 +30,13 @@ class GraphRename(BaseModel):
     name: str
 
 
+class EdgeConfig(BaseModel):
+    pingMs: float = Field(20, ge=0)
+    jitterMs: float = Field(2, ge=0)
+    packetloss: float = Field(0.001, ge=0, le=1)
+    packetlossStddev: float = Field(0.0001, ge=0, le=1)
+
+
 class NodeCreate(BaseModel):
     external_id: str | None = None
     type: Literal["ClientNode", "ServerNode", "SuperServerNode"]
@@ -57,6 +64,11 @@ class EdgeCreate(BaseModel):
     target_node_id: int | None = None
     source_external_id: str | None = None
     target_external_id: str | None = None
+    config: EdgeConfig | None = None
+
+
+class EdgeUpdate(BaseModel):
+    config: EdgeConfig
 
 
 class EdgeResponse(BaseModel):
@@ -64,6 +76,7 @@ class EdgeResponse(BaseModel):
     graph_id: int
     source_node_id: int
     target_node_id: int
+    config: EdgeConfig
 
 
 class GraphDetail(BaseModel):
@@ -98,6 +111,7 @@ class VflowEdge(BaseModel):
     targetHandle: str | None = None
     reconnectable: bool = True
     floating: bool = False
+    data: Dict[str, Any] | None = None
 
 
 class VflowGraph(BaseModel):
