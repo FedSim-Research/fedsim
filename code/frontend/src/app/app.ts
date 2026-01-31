@@ -7,7 +7,6 @@ import { SidebarComponent } from './components/sidebar.component/sidebar.compone
 import { ClientNode } from './components/nodes/client-node/client-node';
 import { ServerNode } from './components/nodes/server-node/server-node';
 import { SuperServerNode } from './components/nodes/super-server-node/super-server-node';
-import { EdgeMetricsBoxComponent } from './components/edges/edge-metrics-box/edge-metrics-box';
 import { GraphServiceSpyker } from './services/subservices/graph-service-spyker';
 import { GraphServiceHierach } from './services/subservices/graph-service-hierach';
 import { GraphPersistenceService } from './services/graph-persistence.service';
@@ -21,7 +20,7 @@ export type modes = 'spyker' | 'hierfl';
   standalone: true,
   templateUrl: './app.html',
   styleUrls: ['./app.css'],
-  imports: [Vflow, SidebarComponent, CommonModule, Shortcuts, NgxSelectoModule, EdgeMetricsBoxComponent],
+  imports: [Vflow, SidebarComponent, CommonModule, Shortcuts, NgxSelectoModule],
 })
 export class App implements OnInit{
   @ViewChild(VflowComponent) public flow?: VflowComponent;

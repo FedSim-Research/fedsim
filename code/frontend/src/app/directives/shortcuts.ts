@@ -38,23 +38,12 @@ export class Shortcuts{
       return;
     }
     if (event.ctrlKey || event.metaKey) {
-      const key = event.key.toLowerCase();
-      if (key === 'z') {
-        event.preventDefault();
-        this.applyHistoryAction('undo');
-        return;
-      }
-      if (key === 'y') {
-        event.preventDefault();
-        this.applyHistoryAction('redo');
-        return;
-      }
-      if (key === 'c') {
+      if (event.key.toLowerCase() === 'c') {
         event.preventDefault();
         this.copySelectedNodes();
         return;
       }
-      if (key === 'v') {
+      if (event.key.toLowerCase() === 'v') {
         event.preventDefault();
         this.pasteCopiedNodes();
         return;
@@ -287,20 +276,6 @@ export class Shortcuts{
     });
 
     this.applySelection(new Set(newNodeIds));
-  }
-
-  private applyHistoryAction(action: 'undo' | 'redo'): void {
-    const service = this.activeService();
-    if (!service) return;
-    const history = service.getGraphHistory();
-    if (action === 'undo') {
-      history.undo();
-    } else {
-      history.redo();
-    }
-    const snapshot = history.getState();
-    service.nodes.set(snapshot.nodes);
-    service.edges.set(snapshot.edges);
   }
 
   public onEdgeSelectionChange(changes: Array<{ id: string; selected: boolean }>): void {

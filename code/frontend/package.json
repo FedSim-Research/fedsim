@@ -34,7 +34,6 @@
     "ngx-vflow": "^1.16.4",
     "primeicons": "^7.0.0",
     "primeng": "^21.0.2",
-    "pydantic": "^0.0.1-security",
     "rxjs": "~7.8.0",
     "selecto": "^1.26.3",
     "tslib": "^2.3.0"

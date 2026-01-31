@@ -36,15 +36,6 @@ def _node_config(node: Node) -> dict[str, Any]:
         return {}
 
 
-def _edge_config(edge: Edge) -> dict[str, Any]:
-    if not edge.config_json:
-        return {}
-    try:
-        return json.loads(edge.config_json)
-    except json.JSONDecodeError:
-        return {}
-
-
 def _performance_for(node_type: str, config: dict[str, Any]):
     _, Performance, _, _ = _import_hierfl()
     if "computeFactor" not in config or config["computeFactor"] is None:
@@ -56,20 +47,20 @@ def _performance_for(node_type: str, config: dict[str, Any]):
     return Performance(compute_factor=compute_factor, performance_stddev=perf_stddev)
 
 
-def _network_from_config(label: str, config: dict[str, Any]):
+def _network_for(node_type: str, config: dict[str, Any]):
     _, _, Network, _ = _import_hierfl()
     if "pingMs" not in config or config["pingMs"] is None:
-        raise ValueError(f"hierfl_missing_{label}_pingMs")
+        raise ValueError(f"hierfl_missing_{node_type}_pingMs")
     if "jitterMs" not in config or config["jitterMs"] is None:
-        raise ValueError(f"hierfl_missing_{label}_jitterMs")
+        raise ValueError(f"hierfl_missing_{node_type}_jitterMs")
     if "packetloss" not in config or config["packetloss"] is None:
-        raise ValueError(f"hierfl_missing_{label}_packetloss")
+        raise ValueError(f"hierfl_missing_{node_type}_packetloss")
     if "packetlossStddev" not in config or config["packetlossStddev"] is None:
-        raise ValueError(f"hierfl_missing_{label}_packetlossStddev")
+        raise ValueError(f"hierfl_missing_{node_type}_packetlossStddev")
     if "uploadMbps" not in config or config["uploadMbps"] is None:
-        raise ValueError(f"hierfl_missing_{label}_uploadMbps")
+        raise ValueError(f"hierfl_missing_{node_type}_uploadMbps")
     if "downloadMbps" not in config or config["downloadMbps"] is None:
-        raise ValueError(f"hierfl_missing_{label}_downloadMbps")
+        raise ValueError(f"hierfl_missing_{node_type}_downloadMbps")
 
     latency_avg = int(config["pingMs"])
     latency_stddev = int(config["jitterMs"])
@@ -79,11 +70,11 @@ def _network_from_config(label: str, config: dict[str, Any]):
     download_speed = float(config["downloadMbps"])
 
     if latency_avg < 0 or latency_stddev < 0:
-        raise ValueError(f"hierfl_invalid_{label}_latency")
+        raise ValueError(f"hierfl_invalid_{node_type}_latency")
     if not (0.0 <= packet_loss_avg <= 1.0) or not (0.0 <= packet_loss_stddev <= 1.0):
-        raise ValueError(f"hierfl_invalid_{label}_packetloss")
+        raise ValueError(f"hierfl_invalid_{node_type}_packetloss")
     if upload_speed <= 0 or download_speed <= 0:
-        raise ValueError(f"hierfl_invalid_{label}_bandwidth")
+        raise ValueError(f"hierfl_invalid_{node_type}_bandwidth")
     return Network(
         latency_avg=latency_avg,
         latency_stddev=latency_stddev,
@@ -114,50 +105,10 @@ def _build_adjacency(edges: list[Edge]) -> dict[int, set[int]]:
     return adjacency
 
 
-def _edge_metric_map(edges: list[Edge]) -> dict[frozenset[int], dict[str, Any]]:
-    metrics: dict[frozenset[int], dict[str, Any]] = {}
-    for edge in edges:
-        key = frozenset({edge.source_node_id, edge.target_node_id})
-        metrics[key] = _edge_config(edge)
-    return metrics
-
-
-def _edge_metrics_between(
-    metrics: dict[frozenset[int], dict[str, Any]],
-    a: int,
-    b: int,
-    relation: str,
-) -> dict[str, Any]:
-    config = metrics.get(frozenset({a, b}))
-    if not config:
-        raise ValueError(f"hierfl_missing_{relation}_edge")
-    return config
-
-
-def _merge_network_config(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    merged = dict(base)
-    merged.update(override)
-    return merged
-
-
-def _average_edge_metrics(metric_list: list[dict[str, Any]]) -> dict[str, float]:
-    if not metric_list:
-        return {}
-    keys = ["pingMs", "jitterMs", "packetloss", "packetlossStddev"]
-    averages: dict[str, float] = {}
-    for key in keys:
-        values = [float(item[key]) for item in metric_list if key in item]
-        if not values:
-            continue
-        averages[key] = sum(values) / len(values)
-    return averages
-
-
 def validate_hierfl_graph(graph: Graph) -> None:
     nodes = list(graph.nodes)
     edges = list(graph.edges)
     adjacency = _build_adjacency(edges)
-    edge_metrics = _edge_metric_map(edges)
 
     super_nodes = [n for n in nodes if n.type == "SuperServerNode"]
     if len(super_nodes) != 1:
@@ -187,6 +138,10 @@ def validate_hierfl_graph(graph: Graph) -> None:
     required_common = [
         "id",
         "computeFactor",
+        "pingMs",
+        "jitterMs",
+        "packetloss",
+        "packetlossStddev",
         "uploadMbps",
         "downloadMbps",
     ]
@@ -203,13 +158,6 @@ def validate_hierfl_graph(graph: Graph) -> None:
             raise ValueError("hierfl_missing_ClientNode_count")
         if not client_config.get("type"):
             raise ValueError("hierfl_missing_ClientNode_type")
-
-    edge_required = ["pingMs", "jitterMs", "packetloss", "packetlossStddev"]
-    for edge in edges:
-        config = _edge_config(edge)
-        for key in edge_required:
-            if key not in config or config[key] is None:
-                raise ValueError(f"hierfl_missing_edge_{key}")
 
 
 def _require_training_config(training_config: dict[str, Any] | None) -> dict[str, Any]:
@@ -254,15 +202,7 @@ def build_hierfl_simulation(
     super_id = _node_id(super_node, super_config, super_node.type)
     super_name = _node_name(super_id, super_config)
     super_perf = _performance_for(super_node.type, super_config)
-    super_neighbor_metrics = [
-        _edge_metrics_between(edge_metrics, super_node.id, server.id, "superserver_server")
-        for server in server_nodes
-    ]
-    super_link_metrics = _average_edge_metrics(super_neighbor_metrics)
-    super_net = _network_from_config(
-        super_node.type,
-        _merge_network_config(super_config, super_link_metrics),
-    )
+    super_net = _network_for(super_node.type, super_config)
     training_config = _require_training_config(training_config)
 
     limit = DEFAULT_RUN_TIME_LIMIT if run_time_limit is None else float(run_time_limit)
@@ -287,16 +227,11 @@ def build_hierfl_simulation(
         used_server_ids.add(server_id)
         server_id_map[server.id] = server_id
 
-        link_metrics = _edge_metrics_between(edge_metrics, super_node.id, server.id, "server_superserver")
-        server_net = _network_from_config(
-            server.type,
-            _merge_network_config(config, link_metrics),
-        )
         sim.add_edge_server(
             server_id=server_id,
             name=_node_name(server_id, config),
             perf=_performance_for(server.type, config),
-            net=server_net,
+            net=_network_for(server.type, config),
         )
 
     total_clients = 0
@@ -328,17 +263,12 @@ def build_hierfl_simulation(
             suffix = f"-{idx + 1}" if count > 1 else ""
             client_id = f"{base_id}{suffix}"
             client_name = f"{base_name}{suffix}" if count > 1 else base_name
-            link_metrics = _edge_metrics_between(edge_metrics, client.id, server_node_id, "client_server")
-            client_net = _network_from_config(
-                client.type,
-                _merge_network_config(config, link_metrics),
-            )
             sim.add_client(
                 client_id=client_id,
                 edge_id=server_id,
                 name=client_name,
                 perf=_performance_for(client.type, config),
-                net=client_net,
+                net=_network_for(client.type, config),
                 dataset_partition_id=client_index,
                 total_partitions=total_clients,
             )

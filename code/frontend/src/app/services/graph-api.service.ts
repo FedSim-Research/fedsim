@@ -2,7 +2,6 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { EdgeMetrics } from '../models/edge-metrics';
 
 export interface Position {
   x: number;
@@ -30,7 +29,6 @@ export interface EdgeResponse {
   graph_id: number;
   source_node_id: number;
   target_node_id: number;
-  config: EdgeMetrics;
 }
 
 export interface GraphDetail extends GraphResponse {
@@ -67,11 +65,6 @@ export interface EdgeCreate {
   target_node_id?: number | null;
   source_external_id?: string | null;
   target_external_id?: string | null;
-  config?: EdgeMetrics | null;
-}
-
-export interface EdgeUpdate {
-  config: EdgeMetrics;
 }
 
 export interface SimulationStartRequest {
@@ -137,10 +130,6 @@ export class GraphApiService {
 
   public async createEdge(graphId: number, payload: EdgeCreate): Promise<EdgeResponse> {
     return firstValueFrom(this.http.post<EdgeResponse>(this.url(`/graphs/${graphId}/edges`), payload));
-  }
-
-  public async updateEdge(edgeId: number, payload: EdgeUpdate): Promise<EdgeResponse> {
-    return firstValueFrom(this.http.put<EdgeResponse>(this.url(`/edges/${edgeId}`), payload));
   }
 
   public async deleteEdge(edgeId: number): Promise<void> {

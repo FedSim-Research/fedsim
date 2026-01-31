@@ -47,6 +47,24 @@
       <span class="spec-value">{{ server().computeFactor }}</span>
     </div>
 
+    <div class="spec-row">
+      <span>Ping</span>
+      <span class="spec-value">{{ server().pingMs }} ms</span>
+    </div>
+
+    <div class="spec-row">
+      <span>Jitter</span>
+      <span class="spec-value">{{ server().jitterMs }} ms</span>
+    </div>
+
+    <div class="spec-row">
+      <span>Packetloss</span>
+      <span class="spec-value">{{ server().packetloss }}</span>
+    </div>
+    <div class="spec-row">
+      <span>Packetloss stddev</span>
+      <span class="spec-value">{{ server().packetlossStddev }}</span>
+    </div>
 
     <div class="spec-row">
       <span>Upload</span>
