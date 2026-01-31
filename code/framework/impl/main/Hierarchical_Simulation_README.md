@@ -39,32 +39,26 @@ legacy_cpu = Performance(compute_factor=2.0, performance_stddev=1.0)
 ```
 
 #### Network
-Controls data transmission speeds, latency, and reliability.
+Controls data transmission latency and reliability. Bandwidth is defined per-node.
 *   `latency_avg` (int): Average latency in milliseconds.
 *   `latency_stddev` (int): Jitter or standard deviation of latency in milliseconds.
 *   `packet_loss_avg` (float): Average packet loss probability (0.0 to 1.0).
 *   `packet_loss_stddev` (float): Standard deviation of packet loss.
-*   `upload_speed` (float): Upload bandwidth in Mbps.
-*   `download_speed` (float): Download bandwidth in Mbps.
 
 ```python
-# Network(latency_avg, latency_stddev, packet_loss_avg, packet_loss_stddev, upload_speed, download_speed)
+# Network(latency_avg, latency_stddev, packet_loss_avg, packet_loss_stddev)
 fiber_internet = Network(
     latency_avg=20, 
     latency_stddev=5, 
     packet_loss_avg=0.001, 
-    packet_loss_stddev=0.0001, 
-    upload_speed=100.0, 
-    download_speed=500.0
+    packet_loss_stddev=0.0001
 )
 
 unstable_3g = Network(
     latency_avg=150, 
     latency_stddev=50, 
     packet_loss_avg=0.05, 
-    packet_loss_stddev=0.01, 
-    upload_speed=2.0, 
-    download_speed=10.0
+    packet_loss_stddev=0.01
 )
 ```
 
@@ -73,28 +67,43 @@ unstable_3g = Network(
 You must configure the hierarchy in top-down order (Super Server -> Edge Servers -> Clients).
 
 #### Set Super Server
+Network metrics are omitted for the Super Server since they are provided through the edge servers.
+
 ```python
 sim.set_super_server(
     server_id="super_server",
     name="Main Coordinator",
     perf=high_end_gpu,
-    net=fiber_internet,
+    upload_speed=1000.0,    # Mbps
+    download_speed=400.0,  # Mbps
     training_config={"epochs": 1, "lr": 0.01}
 )
 ```
 
 #### Add Edge Servers
+Edge servers require a dictionary mapping connected Node IDs (Super Server and Clients) to the `Network` conditions of that link.
+
 ```python
+# Keys map to the IDs of the nodes this edge server communicates with.
+# Usually, this includes the Super Server and its assigned Clients.
+network_map = {
+    "super_server": fiber_internet,
+    "client_0": unstable_3g,
+    # "client_1": ...
+}
+
 sim.add_edge_server(
     server_id="edge_1", 
     name="Edge Node 1", 
     perf=high_end_gpu, 
-    net=fiber_internet
+    net=network_map,
+    upload_speed=100.0,    # Mbps
+    download_speed=500.0   # Mbps
 )
 ```
 
 #### Add Clients
-Clients must be assigned to an existing Edge Server. The `dataset_partition_id` determines which slice of the CIFAR-10 data the client receives.
+Clients must be assigned to an existing Edge Server. The `dataset_partition_id` determines which slice of the CIFAR-10 data the client receives. Link quality is defined at the Edge Server level.
 
 ```python
 sim.add_client(
@@ -102,7 +111,8 @@ sim.add_client(
     edge_id="edge_1",      # Must match an added edge server ID
     name="Client 0",
     perf=legacy_cpu,
-    net=unstable_3g,
+    upload_speed=2.0,      # Mbps
+    download_speed=10.0,   # Mbps
     dataset_partition_id=0,
     total_partitions=10
 )

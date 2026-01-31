@@ -7,5 +7,3 @@ class Network:
     latency_stddev: int  # in ms
     packet_loss_avg: float  # from 0 to 1
     packet_loss_stddev: float  # from 0 to 1
-    upload_speed: float  # in Mbps
-    download_speed: float  # in Mbps

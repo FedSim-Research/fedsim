@@ -69,7 +69,8 @@ class HierarchicalSimulation:
         server_id: str,
         name: str,
         perf: Performance,
-        net: Network,
+        upload_speed: float,
+        download_speed: float,
         training_config: Dict[str, Any],
     ):
         """Registers the super server configuration."""
@@ -78,12 +79,20 @@ class HierarchicalSimulation:
             id=server_id,
             name=name,
             performance_metrics=perf,
-            network_metrics=net,
+            network_metrics=None,
+            upload_speed=upload_speed,
+            download_speed=download_speed,
         )
         self.super_config = training_config
 
     def add_edge_server(
-        self, server_id: str, name: str, perf: Performance, net: Network
+        self,
+        server_id: str,
+        name: str,
+        perf: Performance,
+        net: dict[str, Network],
+        upload_speed: float,
+        download_speed: float,
     ):
         """Registers an edge server configuration."""
         if server_id not in self.edge_ids:
@@ -94,6 +103,8 @@ class HierarchicalSimulation:
             name=name,
             performance_metrics=perf,
             network_metrics=net,
+            upload_speed=upload_speed,
+            download_speed=download_speed,
         )
         if server_id not in self.client_map:
             self.client_map[server_id] = []
@@ -104,7 +115,8 @@ class HierarchicalSimulation:
         edge_id: str,
         name: str,
         perf: Performance,
-        net: Network,
+        upload_speed: float,
+        download_speed: float,
         dataset_partition_id: int,
         total_partitions: int,
     ):
@@ -119,7 +131,8 @@ class HierarchicalSimulation:
             id=client_id,
             name=name,
             performance_metrics=perf,
-            network_metrics=net,
+            upload_speed=upload_speed,
+            download_speed=download_speed,
         )
 
         sim_client = SimulationFlowerClient(dataset_partition_id, total_partitions)
@@ -263,18 +276,27 @@ def run_default_simulation():
     sim = HierarchicalSimulation(run_time_limit=RUNTIME_LIMIT)
 
     default_perf = Performance(10, 1)
-    default_net = Network(15, 5, 0.001, 0.0005, 20, 100)
+    default_net = Network(15, 5, 0.001, 0.0005)
+    default_upload = 20
+    default_download = 100
+    default_net_dict = {}
+    default_net_dict[SUPER_ID] = (default_net)
+    for i in range(TOTAL_CLIENTS):
+        default_net_dict[f"client_{i}"] = (default_net)
 
     sim.set_super_server(
         server_id=SUPER_ID,
         name="Super Server",
         perf=default_perf,
-        net=default_net,
+        upload_speed=default_upload,
+        download_speed=default_download,
         training_config={"epochs": 1, "lr": 0.01},
     )
 
     for eid in EDGE_IDS:
-        sim.add_edge_server(eid, eid, default_perf, default_net)
+        sim.add_edge_server(
+            eid, eid, default_perf, default_net_dict, default_upload, default_download
+        )
 
     clients_per_edge = TOTAL_CLIENTS // len(EDGE_IDS)
 
@@ -287,7 +309,8 @@ def run_default_simulation():
                 edge_id=eid,
                 name=cid,
                 perf=default_perf,
-                net=default_net,
+                upload_speed=default_upload,
+                download_speed=default_download,
                 dataset_partition_id=client_idx,
                 total_partitions=TOTAL_CLIENTS,
             )

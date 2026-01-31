@@ -44,6 +44,8 @@ class VirtualClient(flwr.client.Client):
         t_download = estimate_transmission_time(
             sender_spec=server_spec,
             receiver_spec=client_spec,
+            network_metrics=server_spec.network_metrics,
+            metrics_id=self.client_id,
             payload_size_mb=model_size_mb,
         )
 
@@ -60,8 +62,10 @@ class VirtualClient(flwr.client.Client):
         res_size_mb = res_size_bytes / (1024 * 1024)
 
         t_upload = estimate_transmission_time(
-            sender_spec=client_spec,
-            receiver_spec=server_spec,
+            sender_spec=server_spec,
+            receiver_spec=client_spec,
+            network_metrics=server_spec.network_metrics,
+            metrics_id=self.client_id,
             payload_size_mb=res_size_mb,
         )
 
@@ -89,7 +93,13 @@ class VirtualClient(flwr.client.Client):
         param_arrays = parameters_to_ndarrays(ins.parameters)
         model_size_mb = sum([a.nbytes for a in param_arrays]) / (1024 * 1024)
 
-        t_download = estimate_transmission_time(server_spec, client_spec, model_size_mb)
+        t_download = estimate_transmission_time(
+            sender_spec=server_spec,
+            receiver_spec=client_spec,
+            network_metrics=server_spec.network_metrics,
+            metrics_id=self.client_id,
+            payload_size_mb=model_size_mb,
+        )
 
         eval_res = self.inner_client.evaluate(ins)
 
@@ -100,7 +110,17 @@ class VirtualClient(flwr.client.Client):
             model_complexity=model_complexity,
         )
 
-        t_upload = estimate_transmission_time(client_spec, server_spec, 0.001)
+        res_arrays = parameters_to_ndarrays(eval_res.parameters)
+        res_size_bytes = sum([a.nbytes for a in res_arrays])
+        res_size_mb = res_size_bytes / (1024 * 1024)
+
+        t_upload = estimate_transmission_time(
+            sender_spec=server_spec,
+            receiver_spec=client_spec,
+            network_metrics=server_spec.network_metrics,
+            metrics_id=self.client_id,
+            payload_size_mb=res_size_mb,
+        )
 
         total_virtual_duration = t_download + t_eval + t_upload
 
