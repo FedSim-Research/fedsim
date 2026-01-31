@@ -2,9 +2,15 @@ import { Injectable, WritableSignal, signal, inject } from '@angular/core';
 import { Node, Edge, NodePositionChange } from 'ngx-vflow';
 import { GraphHistoryService } from './graph-history.service';
 import { GraphApiService } from './graph-api.service';
+import { EdgeMetrics, EDGE_METRIC_DEFAULTS } from '../models/edge-metrics';
 
 type NodeWithData = Node & { data?: Record<string, any> };
-type EdgeWithData = Edge & { data?: Record<string, any> };
+type EdgeDataPayload = {
+  backendId?: number;
+  metrics: EdgeMetrics;
+  selected?: boolean;
+};
+type EdgeWithData = Edge & { data?: EdgeDataPayload };
 
 @Injectable({
   providedIn: 'root',
@@ -14,6 +20,7 @@ export abstract class GraphService<T extends GraphHistoryService> {
   public edges: WritableSignal<Edge[]> = signal([]);
   protected api = inject(GraphApiService);
   private graphId: number | null = null;
+  private pendingEdgeConfig = new Map<string, EdgeMetrics>();
 
   protected constructor(protected graphHistory: T, private architecture: 'spyker' | 'hierfl'){}
 
@@ -39,11 +46,12 @@ export abstract class GraphService<T extends GraphHistoryService> {
 
   public setGraphState(nodes: Node[], edges: Edge[], resetHistory: boolean): void {
     this.nodes.set(nodes);
-    this.edges.set(edges);
+    const normalizedEdges = edges.map((edge) => this.normalizeEdge(edge));
+    this.edges.set(normalizedEdges);
     if (resetHistory) {
-      this.graphHistory.resetHistory({ nodes, edges });
+      this.graphHistory.resetHistory({ nodes, edges: normalizedEdges });
     } else {
-      this.graphHistory.saveState({ nodes, edges });
+      this.graphHistory.saveState({ nodes, edges: normalizedEdges });
     }
   }
 
@@ -55,9 +63,10 @@ export abstract class GraphService<T extends GraphHistoryService> {
   }
 
   public addEdge(newEdge: Edge) {
-    this.edges.update((edges) => [...edges, newEdge]);
+    const normalizedEdge = this.normalizeEdge(newEdge);
+    this.edges.update((edges) => [...edges, normalizedEdge]);
     this.graphHistory.saveState({nodes: this.nodes(), edges: this.edges()});
-    void this.persistCreateEdge(newEdge);
+    void this.persistCreateEdge(normalizedEdge);
   }
 
   public removeNodeById(nodeId: String){
@@ -73,24 +82,50 @@ export abstract class GraphService<T extends GraphHistoryService> {
 
   public removeEdge(edgeToRemove: Edge){
     const edge = edgeToRemove as EdgeWithData;
-    const backendId = edge.data?.['backendId'] as number | undefined;
+    const backendId = edge.data?.backendId;
     if (backendId !== undefined) {
       void this.api.deleteEdge(backendId).catch(() => undefined);
     }
+    this.pendingEdgeConfig.delete(edge.id);
     this.edges.update(edges => edges.filter(edge => edge !== edgeToRemove));
     this.graphHistory.saveState({nodes: this.nodes(), edges: this.edges()});
   }
 
   public removeEdgeById(edgeId: String){
     const edge = this.edges().find((e) => e.id === edgeId) as EdgeWithData | undefined;
-    const backendId = edge?.data?.['backendId'] as number | undefined;
+    const backendId = edge?.data?.backendId;
     if (backendId !== undefined) {
       void this.api.deleteEdge(backendId).catch(() => undefined);
     } else if (typeof edgeId === 'string' && /^\d+$/.test(edgeId)) {
       void this.api.deleteEdge(Number(edgeId)).catch(() => undefined);
     }
+    this.pendingEdgeConfig.delete(String(edgeId));
     this.edges.update(edges => edges.filter(edge => edge.id !== edgeId));
     this.graphHistory.saveState({nodes: this.nodes(), edges: this.edges()});
+  }
+
+  public updateEdgeMetrics(edgeId: string, metrics: EdgeMetrics): void {
+    const normalized = this.normalizeEdgeMetrics(metrics);
+    let backendId: number | undefined;
+    this.edges.update((edges) =>
+      edges.map((edge) => {
+        if (edge.id !== edgeId) return edge;
+        const payload = (edge as EdgeWithData).data ?? { metrics: normalized };
+        backendId = payload.backendId;
+        return {
+          ...edge,
+          data: { ...payload, metrics: normalized },
+        } as EdgeWithData;
+      })
+    );
+    this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
+    const targetId = backendId ?? this.extractNumericId(edgeId);
+    if (targetId === undefined || targetId === null) {
+      this.pendingEdgeConfig.set(edgeId, normalized);
+      return;
+    }
+    this.pendingEdgeConfig.delete(edgeId);
+    void this.api.updateEdge(targetId, { config: normalized }).catch(() => undefined);
   }
 
   public resetGraph(){
@@ -117,6 +152,58 @@ export abstract class GraphService<T extends GraphHistoryService> {
   });
   this.nodes.set(newNodes);
   void this.persistPositionUpdates(posChanges);
+  }
+
+  private normalizeEdge(edge: Edge): EdgeWithData {
+    return this.withEdgeLabel(this.withEdgeMetrics(edge));
+  }
+
+  private withEdgeMetrics(edge: Edge): EdgeWithData {
+    const payload = (edge as EdgeWithData).data ?? { metrics: EDGE_METRIC_DEFAULTS };
+    const normalizedMetrics = this.normalizeEdgeMetrics(payload.metrics);
+    return {
+      ...edge,
+      data: { ...payload, metrics: normalizedMetrics },
+    };
+  }
+
+  private withEdgeLabel(edge: EdgeWithData): EdgeWithData {
+    const labels = edge.edgeLabels ?? {};
+    if (labels.center?.type === 'html-template') {
+      return edge;
+    }
+    return {
+      ...edge,
+      edgeLabels: {
+        ...labels,
+        center: {
+          type: 'html-template',
+          data: { edgeId: edge.id },
+        },
+      },
+    };
+  }
+
+  private normalizeEdgeMetrics(metrics?: EdgeMetrics | null): EdgeMetrics {
+    const source = metrics ?? EDGE_METRIC_DEFAULTS;
+    return {
+      pingMs: this.clampMetric(source.pingMs, EDGE_METRIC_DEFAULTS.pingMs),
+      jitterMs: this.clampMetric(source.jitterMs, EDGE_METRIC_DEFAULTS.jitterMs),
+      packetloss: this.clampMetric(source.packetloss, EDGE_METRIC_DEFAULTS.packetloss, 0, 1),
+      packetlossStddev: this.clampMetric(source.packetlossStddev, EDGE_METRIC_DEFAULTS.packetlossStddev, 0, 1),
+    };
+  }
+
+  private clampMetric(value: number, fallback: number, min = 0, max?: number): number {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return fallback;
+    }
+    const boundedMin = Math.max(min, numeric);
+    if (max === undefined) {
+      return boundedMin;
+    }
+    return Math.min(max, boundedMin);
   }
 
   protected persistCreateNode(newNode: Node): void {
@@ -150,7 +237,8 @@ export abstract class GraphService<T extends GraphHistoryService> {
 
   protected persistCreateEdge(newEdge: Edge): void {
     if (this.graphId === null) return;
-    const existingBackendId = (newEdge as EdgeWithData).data?.['backendId'] as number | undefined;
+    const edgeInState = this.edges().find((edge) => edge.id === newEdge.id) as EdgeWithData | undefined;
+    const existingBackendId = edgeInState?.data?.backendId;
     if (existingBackendId !== undefined) return;
     const sourceNode = this.nodes().find((n) => n.id === newEdge.source) as NodeWithData | undefined;
     const targetNode = this.nodes().find((n) => n.id === newEdge.target) as NodeWithData | undefined;
@@ -159,9 +247,11 @@ export abstract class GraphService<T extends GraphHistoryService> {
     if (sourceBackend === undefined || targetBackend === undefined) {
       return;
     }
+    const metrics = edgeInState?.data?.metrics ?? EDGE_METRIC_DEFAULTS;
     const payload = {
       source_external_id: newEdge.source,
       target_external_id: newEdge.target,
+      config: metrics,
     };
     void this.api.createEdge(this.graphId, payload).then((created) => {
       this.edges.update((edges) =>
@@ -171,6 +261,11 @@ export abstract class GraphService<T extends GraphHistoryService> {
           return { ...edge, data: { ...edgeData, backendId: created.edge_id } } as Edge;
         })
       );
+      const pending = this.pendingEdgeConfig.get(newEdge.id);
+      if (pending) {
+        this.pendingEdgeConfig.delete(newEdge.id);
+        void this.api.updateEdge(created.edge_id, { config: pending }).catch(() => undefined);
+      }
     }).catch(() => undefined);
   }
 
@@ -179,7 +274,7 @@ export abstract class GraphService<T extends GraphHistoryService> {
       edge.source === nodeId || edge.target === nodeId
     );
     for (const edge of candidateEdges) {
-      const backendId = (edge as EdgeWithData).data?.['backendId'] as number | undefined;
+      const backendId = (edge as EdgeWithData).data?.backendId;
       if (backendId !== undefined) continue;
       this.persistCreateEdge(edge);
     }
@@ -296,5 +391,9 @@ export abstract class GraphService<T extends GraphHistoryService> {
 
   private formatId(prefix: string, value: number): string {
     return `${prefix}-${String(value).padStart(2, '0')}`;
+  }
+
+  private extractNumericId(edgeId: string): number | null {
+    return typeof edgeId === 'string' && /^\d+$/.test(edgeId) ? Number(edgeId) : null;
   }
 }

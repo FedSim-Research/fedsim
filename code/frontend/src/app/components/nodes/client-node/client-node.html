@@ -40,14 +40,6 @@
       <span>Clientanzahl</span>
       <span class="spec-value">{{ client().count }}</span>
     </div>
-    <div class="spec-row">
-      <span>Ping</span>
-      <span class="spec-value">{{ client().pingMs }} ms</span>
-    </div>
-    <div class="spec-row">
-      <span>Jitter</span>
-      <span class="spec-value">{{ client().jitterMs }} ms</span>
-    </div>
      <div class="spec-row">
       <span>Client type</span>
       <span class="spec-value">{{ client().type || '—' }}</span>
@@ -55,14 +47,6 @@
      <div class="spec-row">
       <span>Compute factor</span>
       <span class="spec-value">{{ client().computeFactor }}</span>
-    </div>
-    <div class="spec-row">
-      <span>Packetloss</span>
-      <span class="spec-value">{{ client().packetloss }}</span>
-    </div>
-    <div class="spec-row">
-      <span>Packetloss stddev</span>
-      <span class="spec-value">{{ client().packetlossStddev }}</span>
     </div>
     <div class="spec-row">
       <span>Upload</span>
