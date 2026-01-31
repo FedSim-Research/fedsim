@@ -4,7 +4,7 @@
 }
 
 .edge-card {
-  width: 245px;
+  width: 220px;
   background: rgba(8, 8, 8, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
@@ -27,47 +27,13 @@
   text-transform: uppercase;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 2px;
-}
-
-.edge-card__title {
-  flex: 1;
-}
-
-.delete-button {
-  width: 32px;
-  height: 20px;
-  border: none;
-  background: transparent;
-  color: #ef4444;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  transform: translateY(-2px);
-}
-
-.edge-card:hover .delete-button,
-.delete-button:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
-.delete-button:hover {
-  color: #f87171;
 }
 
 .edge-card__body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 8px 12px 8px;
+  padding: 10px 12px 12px;
 }
 
 .comparison__body {
@@ -97,20 +63,19 @@
 
 .comparison__value,
 .comparison__extra {
-  border-radius: 6px;
-  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.04);
   color: #fff;
   font-size: 0.8rem;
-  padding: 4px 8px;
+  padding: 4px 6px;
   text-align: center;
   font-family: 'Menlo', 'Monaco', monospace;
   width: 1.5cm;
 }
 
 .comparison__extra {
-  width: 100%;
-  padding-right: 16px;
+  width: 1.8cm;
 }
 
 .comparison__pm {
@@ -122,41 +87,4 @@
   color: rgba(255, 255, 255, 0.85);
   width: 20px;
   margin: 0 2px;
-}
-
-.spinner-field {
-  position: relative;
-  width: 2.3cm;
-  display: flex;
-  margin-left: 2px;
-}
-
-.spinner-controls {
-  position: absolute;
-  top: 3px;
-  bottom: 2.8px;
-  right: 3px;
-  display: flex;
-  flex-direction: column;
-  width: 16px;
-  border-left: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.spinner-btn {
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.5rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.15s ease, background 0.15s ease;
-}
-
-.spinner-btn:hover,
-.spinner-btn:focus-visible {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.12);
 }

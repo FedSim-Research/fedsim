@@ -6,20 +6,7 @@
   (click)="stopPropagation($event)"
 >
   <header class="edge-card__header">
-    <span class="edge-card__title">Edge parameters</span>
-    <button
-      class="delete-button"
-      type="button"
-      (click)="onDelete($event)"
-      aria-label="Edge entfernen"
-    >
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-        <path
-          d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h2v9H7V9z"
-          fill="currentColor"
-        />
-      </svg>
-    </button>
+    <span>Edge parameters</span>
   </header>
   <div class="edge-card__body comparison__body">
     <div class="comparison__row">
@@ -36,26 +23,16 @@
           (mousedown)="stopPropagation($event)"
         />
         <span class="comparison__pm">±</span>
-        <div class="spinner-field">
-          <input
-            class="comparison__extra"
-            type="text"
-            inputmode="decimal"
-            pattern="[0-9]*[.,]?[0-9]*"
-            [value]="formatMetric('jitterMs', 0)"
-            (input)="handleInput($event, 'jitterMs', 0)"
-            (blur)="onBlur()"
-            (mousedown)="stopPropagation($event)"
-          />
-          <div class="spinner-controls">
-            <button type="button" class="spinner-btn" (click)="adjustMetric('jitterMs', 1)" (mousedown)="stopPropagation($event)" aria-label="Increase jitter">
-              <span>&#9650;</span>
-            </button>
-            <button type="button" class="spinner-btn" (click)="adjustMetric('jitterMs', -1)" (mousedown)="stopPropagation($event)" aria-label="Decrease jitter">
-              <span>&#9660;</span>
-            </button>
-          </div>
-        </div>
+        <input
+          class="comparison__extra"
+          type="text"
+          inputmode="decimal"
+          pattern="[0-9]*[.,]?[0-9]*"
+          [value]="formatMetric('jitterMs')"
+          (input)="handleInput($event, 'jitterMs', 0)"
+          (blur)="onBlur()"
+          (mousedown)="stopPropagation($event)"
+        />
       </div>
     </div>
     <div class="comparison__row">
@@ -72,26 +49,16 @@
           (mousedown)="stopPropagation($event)"
         />
         <span class="comparison__pm">±</span>
-        <div class="spinner-field">
-          <input
-            class="comparison__extra"
-            type="text"
-            inputmode="decimal"
-            pattern="[0-9]*[.,]?[0-9]*"
-            [value]="formatMetric('packetlossStddev', 4)"
-            (input)="handleInput($event, 'packetlossStddev', 0, 1)"
-            (blur)="onBlur()"
-            (mousedown)="stopPropagation($event)"
-          />
-          <div class="spinner-controls">
-            <button type="button" class="spinner-btn" (click)="adjustMetric('packetlossStddev', 0.0001, 0, 1)" (mousedown)="stopPropagation($event)" aria-label="Increase packet loss deviation">
-              <span>&#9650;</span>
-            </button>
-            <button type="button" class="spinner-btn" (click)="adjustMetric('packetlossStddev', -0.0001, 0, 1)" (mousedown)="stopPropagation($event)" aria-label="Decrease packet loss deviation">
-              <span>&#9660;</span>
-            </button>
-          </div>
-        </div>
+        <input
+          class="comparison__extra"
+          type="text"
+          inputmode="decimal"
+          pattern="[0-9]*[.,]?[0-9]*"
+          [value]="formatMetric('packetlossStddev')"
+          (input)="handleInput($event, 'packetlossStddev', 0, 1)"
+          (blur)="onBlur()"
+          (mousedown)="stopPropagation($event)"
+        />
       </div>
     </div>
   </div>
