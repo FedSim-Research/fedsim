@@ -30,11 +30,15 @@ export class GraphServiceSpyker extends GraphService<GraphHistoryServiceSpyker> 
           (e.source === resolvedNode.id && e.target === s.id)
       );
       if (!exists){
-      super.addEdge({id: crypto.randomUUID(),
-            source: s.id,
-            target: resolvedNode.id,
-            reconnectable: true,
-            floating: false,})}
+      super.addEdge({
+        id: crypto.randomUUID(),
+        source: s.id,
+        target: resolvedNode.id,
+        sourceHandle: 'server-out',
+        targetHandle: 'server-in',
+        reconnectable: true,
+        floating: false,
+        })}
       }
 
     this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });

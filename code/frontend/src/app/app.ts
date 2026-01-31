@@ -152,7 +152,7 @@ export class App implements OnInit{
   public handleConnect(connection: Connection): void {
     const resolved = this.activeMode() === 'hierfl'
       ? this.normalizeHierConnection(connection)
-      : connection;
+      : this.normalizeSpykerConnection(connection);
     const newEdge: Edge = {
       id: crypto.randomUUID(),
       source: resolved.source,
@@ -168,7 +168,11 @@ export class App implements OnInit{
   }
   public handleNodePositionChange(posChanges: NodePositionChange[]){
     if (!posChanges?.length) return;
-    this._lastPosChanges = posChanges;
+    const expandedChanges = this.expandSelectedNodeChanges(posChanges);
+    if (expandedChanges !== posChanges) {
+      this.previewNodePositionChanges(expandedChanges);
+    }
+    this._lastPosChanges = expandedChanges;
     if (!this._dragging) {
       this._dragging = true;
       const finish = () => {
@@ -183,6 +187,74 @@ export class App implements OnInit{
       window.addEventListener('mouseup', finish, { once: true });
       window.addEventListener('touchend', finish, { once: true });
     }
+  }
+
+  private expandSelectedNodeChanges(posChanges: NodePositionChange[]): NodePositionChange[] {
+    const selection = this.shortcuts?.selectedNodeIds;
+    if (!selection || selection.size <= 1) {
+      return posChanges;
+    }
+    const nodes = this.activeGraph().nodes();
+    const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+    const primaryChange = posChanges[0];
+    if (!primaryChange) {
+      return posChanges;
+    }
+    if (!selection.has(primaryChange.id)) {
+      return posChanges;
+    }
+    const primaryNode = nodeMap.get(primaryChange.id);
+    if (!primaryNode) {
+      return posChanges;
+    }
+    const basePoint = primaryNode.point ?? { x: 0, y: 0 };
+    const dx = primaryChange.point.x - basePoint.x;
+    const dy = primaryChange.point.y - basePoint.y;
+    if (dx === 0 && dy === 0) {
+      return posChanges;
+    }
+
+    const alreadyChanged = new Set(posChanges.map((change) => change.id));
+    const additions: NodePositionChange[] = [];
+    for (const id of selection) {
+      if (alreadyChanged.has(id)) {
+        continue;
+      }
+      const node = nodeMap.get(id);
+      if (!node) {
+        continue;
+      }
+      const point = node.point ?? { x: 0, y: 0 };
+      additions.push({
+        type: 'position',
+        id,
+        point: {
+          x: point.x + dx,
+          y: point.y + dy,
+        },
+      });
+      alreadyChanged.add(id);
+    }
+
+    if (!additions.length) {
+      return posChanges;
+    }
+    return [...posChanges, ...additions];
+  }
+
+  private previewNodePositionChanges(posChanges: NodePositionChange[]): void {
+    const changeMap = new Map(posChanges.map((change) => [change.id, change.point]));
+    const updatedNodes = this.activeGraph().nodes().map((node) => {
+      const nextPoint = changeMap.get(node.id);
+      if (!nextPoint) {
+        return node;
+      }
+      return {
+        ...node,
+        point: nextPoint,
+      } as Node;
+    });
+    this.activeGraph().nodes.set(updatedNodes);
   }
 
   private canConnect(connection: Connection): boolean {
@@ -212,7 +284,17 @@ export class App implements OnInit{
 
     if (!valid) return false;
 
-    const resolved = isHier ? this.normalizeHierConnection(connection) : connection;
+    const isSpyker = !isHier;
+    const isServerServer = sourceType === 'ServerNode' && targetType === 'ServerNode';
+    if (
+      isSpyker &&
+      isServerServer &&
+      (connection.sourceHandle !== 'server-out' || connection.targetHandle !== 'server-in')
+    ) {
+      return false;
+    }
+
+    const resolved = isHier ? this.normalizeHierConnection(connection) : this.normalizeSpykerConnection(connection);
 
     if (sourceType === 'ClientNode' || targetType === 'ClientNode') {
       const clientId = sourceType === 'ClientNode' ? connection.source : connection.target;
@@ -229,7 +311,7 @@ export class App implements OnInit{
     }
 
     const isSpykerServerPair = !isHier && sourceType === 'ServerNode' && targetType === 'ServerNode';
-    if (isSpykerServerPair && this.edges().some(e => e.source === connection.source && e.target === connection.target)) {
+    if (isSpykerServerPair && this.edges().some(e => e.source === resolved.source && e.target === resolved.target)) {
       return false;
     }
 
@@ -272,6 +354,43 @@ export class App implements OnInit{
       return {
         source: connection.source,
         target: connection.target,
+        sourceHandle: 'server-out-bottom',
+        targetHandle: 'client-in',
+      };
+    }
+
+    return connection;
+  }
+
+  private normalizeSpykerConnection(connection: Connection): Connection {
+    const sourceNode = this.nodes().find(n => n.id === connection.source);
+    const targetNode = this.nodes().find(n => n.id === connection.target);
+    if (!sourceNode || !targetNode) return connection;
+    const sourceType = (sourceNode as any).data?.type as string | undefined;
+    const targetType = (targetNode as any).data?.type as string | undefined;
+    if (!sourceType || !targetType) return connection;
+
+    if (sourceType === 'ServerNode' && targetType === 'ServerNode') {
+      return {
+        ...connection,
+        sourceHandle: 'server-out',
+        targetHandle: 'server-in',
+      };
+    }
+
+    if (sourceType === 'ServerNode' && targetType === 'ClientNode') {
+      return {
+        ...connection,
+        sourceHandle: 'server-out-bottom',
+        targetHandle: 'client-in',
+      };
+    }
+
+    if (sourceType === 'ClientNode' && targetType === 'ServerNode') {
+      return {
+        ...connection,
+        source: connection.target,
+        target: connection.source,
         sourceHandle: 'server-out-bottom',
         targetHandle: 'client-in',
       };

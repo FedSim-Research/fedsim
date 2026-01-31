@@ -97,7 +97,18 @@ export class Shortcuts{
 
   @HostListener('document:pointerdown', ['$event'])
   public onPointerDown(event: PointerEvent) {
-    if (!this.shiftDown || event.button !== 0) return;
+    if (event.button !== 0) return;
+    if (this.shiftDown) return;
+
+    const target = event.target as Element | null;
+    if (!target) return;
+    const hostEl = this.elRef.nativeElement;
+    if (!hostEl.contains(target)) return;
+    if (this.findNodeId(target)) return;
+    if (target.closest('app-sidebar')) return;
+    if (target.closest('.selecto-selection')) return;
+    if (!this.selectedNodeIds.size && !this.selectedEdgeIds.size) return;
+    this.clearNodeSelection();
   }
 
   @HostListener('document:pointermove', ['$event'])
