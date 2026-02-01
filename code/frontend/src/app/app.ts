@@ -48,8 +48,12 @@ export class App implements OnInit{
   public edges = computed(() => {
     return this.activeGraph().edges();
   });
+
   private _dragging = false;
   private _lastPosChanges: NodePositionChange[] | null = null;
+  // Tracks the node actively held by the mouse
+  private _dragPrimaryId: string | null = null; 
+
   public connectionModel = new ConnectionModel({
     mode: 'loose',
     validator: (connection) => this.canConnect(connection),
@@ -166,27 +170,47 @@ export class App implements OnInit{
     this.activeGraph().addEdge(newEdge);
     console.log('added new edge', newEdge);
   }
+
   public handleNodePositionChange(posChanges: NodePositionChange[]){
     if (!posChanges?.length) return;
-    const expandedChanges = this.expandSelectedNodeChanges(posChanges);
-    if (expandedChanges !== posChanges) {
-      this.previewNodePositionChanges(expandedChanges);
+
+    const currentId = posChanges[0].id;
+
+    // FIX: Always ensure the primary ID is set to the current node being dragged,
+    // regardless of whether _dragging is true/false. This solves the "first click ignored" issue.
+    if (this._dragPrimaryId !== currentId) {
+      this._dragPrimaryId = currentId;
     }
-    this._lastPosChanges = expandedChanges;
+
     if (!this._dragging) {
       this._dragging = true;
+      const dragSessionId = currentId;
+
       const finish = () => {
         this._dragging = false;
+
+        // Only clear dragPrimaryId if we are finishing the SAME drag session.
+        // If the user has already clicked another node, _dragPrimaryId will correspond
+        // to that new node, so we must NOT clear it.
+        if (this._dragPrimaryId === dragSessionId) {
+          this._dragPrimaryId = null; 
+        }
+        
         if (this._lastPosChanges) {
           this.activeGraph().updateNodePositions(this._lastPosChanges);
           this.activeGraph().getGraphHistory().saveState({nodes: this.activeGraph().nodes(), edges: this.activeGraph().edges()});
           this._lastPosChanges = null;
         }
       };
+      
       window.addEventListener('pointerup', finish, { once: true });
       window.addEventListener('mouseup', finish, { once: true });
       window.addEventListener('touchend', finish, { once: true });
     }
+
+    const expandedChanges = this.expandSelectedNodeChanges(posChanges);
+    this.previewNodePositionChanges(expandedChanges);
+    this._lastPosChanges = expandedChanges;
   }
 
   private expandSelectedNodeChanges(posChanges: NodePositionChange[]): NodePositionChange[] {
@@ -242,19 +266,32 @@ export class App implements OnInit{
     return [...posChanges, ...additions];
   }
 
+  // Mutates the primary node in place to prevent DOM destruction during drag
   private previewNodePositionChanges(posChanges: NodePositionChange[]): void {
     const changeMap = new Map(posChanges.map((change) => [change.id, change.point]));
-    const updatedNodes = this.activeGraph().nodes().map((node) => {
+    const currentNodes = this.activeGraph().nodes();
+    
+    const updatedNodes = currentNodes.map((node) => {
       const nextPoint = changeMap.get(node.id);
       if (!nextPoint) {
         return node;
       }
+
+      // If this is the node being dragged, mutate it in-place
+      // This preserves object identity so Angular doesn't destroy the DOM element
+      if (node.id === this._dragPrimaryId) {
+        (node as any).point = nextPoint;
+        return node;
+      }
+
+      // For followers, create new references so Angular detects changes
       return {
         ...node,
         point: nextPoint,
       } as Node;
     });
-    this.activeGraph().nodes.set(updatedNodes);
+    
+    this.activeGraph().nodes.set([...updatedNodes]);
   }
 
   private canConnect(connection: Connection): boolean {
