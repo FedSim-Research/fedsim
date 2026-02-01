@@ -50,7 +50,6 @@ export class App implements OnInit{
   });
 
   private _dragging = false;
-  // Added: Prevents trailing events from starting a "ghost" drag session
   private _dragCooldown = false;
   
   private _lastPosChanges: NodePositionChange[] | null = null;
@@ -176,7 +175,6 @@ export class App implements OnInit{
   public handleNodePositionChange(posChanges: NodePositionChange[]){
     if (!posChanges?.length) return;
 
-    // FIX: Ignore trailing events that arrive immediately after a drag finishes
     if (this._dragCooldown) return;
 
     const currentId = posChanges[0].id;
@@ -191,8 +189,6 @@ export class App implements OnInit{
 
       const finish = () => {
         this._dragging = false;
-
-        // FIX: Start a cooldown period to ignore trailing events
         this._dragCooldown = true;
         setTimeout(() => {
           this._dragCooldown = false;
@@ -204,6 +200,9 @@ export class App implements OnInit{
         
         if (this._lastPosChanges) {
           this.activeGraph().updateNodePositions(this._lastPosChanges);
+          if (this.activeMode() === 'spyker') {
+            this.normalizeSpykerServerEdges();
+          }
           this.activeGraph().getGraphHistory().saveState({nodes: this.activeGraph().nodes(), edges: this.activeGraph().edges()});
           this._lastPosChanges = null;
         }
@@ -330,12 +329,6 @@ export class App implements OnInit{
       if (connection.sourceHandle === 'server-out-bottom' || connection.targetHandle === 'server-out-bottom') {
         return false;
       }
-      // Allow drag between server-in and server-out (in any direction)
-      const handles = [connection.sourceHandle, connection.targetHandle];
-      if (!handles.includes('server-in') || !handles.includes('server-out')) {
-        return false;
-      }
-
       const alreadyConnected = this.edges().some(e => 
         (e.source === connection.source && e.target === connection.target) ||
         (e.source === connection.target && e.target === connection.source)
@@ -418,17 +411,19 @@ export class App implements OnInit{
     if (!sourceType || !targetType) return connection;
 
     if (sourceType === 'ServerNode' && targetType === 'ServerNode') {
-      // Normalization: Ensure edge always flows Right (out) -> Left (in)
-      if (connection.sourceHandle === 'server-in' && connection.targetHandle === 'server-out') {
-        return {
-          source: connection.target,
-          target: connection.source,
-          sourceHandle: 'server-out',
-          targetHandle: 'server-in',
-        };
+      const sourcePoint = (sourceNode as any).point as { x: number; y: number } | undefined;
+      const targetPoint = (targetNode as any).point as { x: number; y: number } | undefined;
+      if (!sourcePoint || !targetPoint) {
+        return connection;
       }
+
+      const sourceIsLeft = sourcePoint.x <= targetPoint.x;
+      const leftId = sourceIsLeft ? connection.source : connection.target;
+      const rightId = sourceIsLeft ? connection.target : connection.source;
+
       return {
-        ...connection,
+        source: leftId,
+        target: rightId,
         sourceHandle: 'server-out',
         targetHandle: 'server-in',
       };
@@ -453,6 +448,56 @@ export class App implements OnInit{
     }
 
     return connection;
+  }
+
+  private normalizeSpykerServerEdges(): void {
+    const nodes = this.graphServiceSpyker.nodes();
+    const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+    const edges = this.graphServiceSpyker.edges();
+    let changed = false;
+
+    const updated = edges.map((edge) => {
+      const sourceNode = nodeMap.get(edge.source);
+      const targetNode = nodeMap.get(edge.target);
+      const sourceType = (sourceNode as any)?.data?.type as string | undefined;
+      const targetType = (targetNode as any)?.data?.type as string | undefined;
+      if (!sourceNode || !targetNode || sourceType !== 'ServerNode' || targetType !== 'ServerNode') {
+        return edge;
+      }
+
+      const sourcePoint = (sourceNode as any).point as { x: number; y: number } | undefined;
+      const targetPoint = (targetNode as any).point as { x: number; y: number } | undefined;
+      if (!sourcePoint || !targetPoint) {
+        return edge;
+      }
+
+      const sourceIsLeft = sourcePoint.x <= targetPoint.x;
+      const leftId = sourceIsLeft ? sourceNode.id : targetNode.id;
+      const rightId = sourceIsLeft ? targetNode.id : sourceNode.id;
+
+      const next = {
+        ...edge,
+        source: leftId,
+        target: rightId,
+        sourceHandle: 'server-out',
+        targetHandle: 'server-in',
+      };
+
+      if (
+        next.source !== edge.source ||
+        next.target !== edge.target ||
+        next.sourceHandle !== edge.sourceHandle ||
+        next.targetHandle !== edge.targetHandle
+      ) {
+        changed = true;
+      }
+
+      return next;
+    });
+
+    if (changed) {
+      this.graphServiceSpyker.edges.set(updated);
+    }
   }
 
   public async handleSimulation(payload: {
