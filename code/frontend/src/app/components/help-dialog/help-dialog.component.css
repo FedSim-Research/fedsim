@@ -1,0 +1,42 @@
+.help-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  padding: 4px 4px 8px;
+}
+
+:host ::ng-deep .p-dialog .p-dialog-header .p-dialog-title {
+  font-size: 1.6rem;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.help-section {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.help-section h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.help-section p,
+.help-section li {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.help-section ul {
+  padding-left: 18px;
+  margin: 8px 0 0;
+}
+
+.help-footer {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}

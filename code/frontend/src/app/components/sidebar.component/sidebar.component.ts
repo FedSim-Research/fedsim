@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { StartPopup } from '../start.popup/start.popup';
 import { ResetButton } from '../reset.button/reset.button';
 import { ViewGraphsDialog } from '../view-graphs.component/view-graphs.component';
+import { HelpDialog } from '../help-dialog/help-dialog.component';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
@@ -16,7 +17,7 @@ import { GraphApiService } from '../../services/graph-api.service';
   standalone: true,
   templateUrl: './sidebar.component.html',
   styleUrls: ['./sidebar.component.css'],
-  imports: [FormsModule, CommonModule, StartPopup, ResetButton, ViewGraphsDialog, ToastModule, ConfirmDialogModule],
+  imports: [FormsModule, CommonModule, StartPopup, ResetButton, ViewGraphsDialog, HelpDialog, ToastModule, ConfirmDialogModule],
   providers: [ConfirmationService],
 })
 export class SidebarComponent implements OnInit {
@@ -24,6 +25,7 @@ export class SidebarComponent implements OnInit {
   public isDarkMode = true;
   public showSimulationpopup = false;
   public showViewGraphsDialog = false;
+  public showHelpDialog = false;
   @ViewChild('supDetails') private supDetails?: ElementRef<HTMLDetailsElement>;
 
   @Input() shortcuts?: Shortcuts;
@@ -214,6 +216,14 @@ export class SidebarComponent implements OnInit {
 
   public closeViewGraphsDialog(): void {
     this.showViewGraphsDialog = false;
+  }
+
+  public openHelpDialog(): void {
+    this.showHelpDialog = true;
+  }
+
+  public closeHelpDialog(): void {
+    this.showHelpDialog = false;
   }
 
   public onGraphSelected(event: { graphId: number; architecture: 'spyker' | 'hierfl' }): void {
