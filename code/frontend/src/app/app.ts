@@ -50,8 +50,10 @@ export class App implements OnInit{
   });
 
   private _dragging = false;
+  // Added: Prevents trailing events from starting a "ghost" drag session
+  private _dragCooldown = false;
+  
   private _lastPosChanges: NodePositionChange[] | null = null;
-  // Tracks the node actively held by the mouse
   private _dragPrimaryId: string | null = null; 
 
   public connectionModel = new ConnectionModel({
@@ -174,10 +176,11 @@ export class App implements OnInit{
   public handleNodePositionChange(posChanges: NodePositionChange[]){
     if (!posChanges?.length) return;
 
+    // FIX: Ignore trailing events that arrive immediately after a drag finishes
+    if (this._dragCooldown) return;
+
     const currentId = posChanges[0].id;
 
-    // FIX: Always ensure the primary ID is set to the current node being dragged,
-    // regardless of whether _dragging is true/false. This solves the "first click ignored" issue.
     if (this._dragPrimaryId !== currentId) {
       this._dragPrimaryId = currentId;
     }
@@ -189,9 +192,12 @@ export class App implements OnInit{
       const finish = () => {
         this._dragging = false;
 
-        // Only clear dragPrimaryId if we are finishing the SAME drag session.
-        // If the user has already clicked another node, _dragPrimaryId will correspond
-        // to that new node, so we must NOT clear it.
+        // FIX: Start a cooldown period to ignore trailing events
+        this._dragCooldown = true;
+        setTimeout(() => {
+          this._dragCooldown = false;
+        }, 50);
+
         if (this._dragPrimaryId === dragSessionId) {
           this._dragPrimaryId = null; 
         }
@@ -266,7 +272,6 @@ export class App implements OnInit{
     return [...posChanges, ...additions];
   }
 
-  // Mutates the primary node in place to prevent DOM destruction during drag
   private previewNodePositionChanges(posChanges: NodePositionChange[]): void {
     const changeMap = new Map(posChanges.map((change) => [change.id, change.point]));
     const currentNodes = this.activeGraph().nodes();
@@ -277,14 +282,11 @@ export class App implements OnInit{
         return node;
       }
 
-      // If this is the node being dragged, mutate it in-place
-      // This preserves object identity so Angular doesn't destroy the DOM element
       if (node.id === this._dragPrimaryId) {
         (node as any).point = nextPoint;
         return node;
       }
 
-      // For followers, create new references so Angular detects changes
       return {
         ...node,
         point: nextPoint,
@@ -304,6 +306,8 @@ export class App implements OnInit{
     if (!sourceType || !targetType) return false;
 
     const isHier = this.activeMode() === 'hierfl';
+    const isSpyker = !isHier;
+
     const pair = `${sourceType}->${targetType}`;
     const validPairs = isHier
       ? new Set([
@@ -321,19 +325,30 @@ export class App implements OnInit{
 
     if (!valid) return false;
 
-    const isSpyker = !isHier;
-    const isServerServer = sourceType === 'ServerNode' && targetType === 'ServerNode';
-    if (
-      isSpyker &&
-      isServerServer &&
-      (connection.sourceHandle !== 'server-out' || connection.targetHandle !== 'server-in')
-    ) {
-      return false;
+
+    if (isSpyker && sourceType === 'ServerNode' && targetType === 'ServerNode') {
+      if (connection.sourceHandle === 'server-out-bottom' || connection.targetHandle === 'server-out-bottom') {
+        return false;
+      }
+      // Allow drag between server-in and server-out (in any direction)
+      const handles = [connection.sourceHandle, connection.targetHandle];
+      if (!handles.includes('server-in') || !handles.includes('server-out')) {
+        return false;
+      }
+
+      const alreadyConnected = this.edges().some(e => 
+        (e.source === connection.source && e.target === connection.target) ||
+        (e.source === connection.target && e.target === connection.source)
+      );
+
+      if (alreadyConnected) return false;
+      
+      return true;
     }
 
     const resolved = isHier ? this.normalizeHierConnection(connection) : this.normalizeSpykerConnection(connection);
 
-    if (sourceType === 'ClientNode' || targetType === 'ClientNode') {
+    if (isHier && (sourceType === 'ClientNode' || targetType === 'ClientNode')) {
       const clientId = sourceType === 'ClientNode' ? connection.source : connection.target;
       if (this.edges().some(e => e.source === clientId || e.target === clientId)) {
         return false;
@@ -344,11 +359,6 @@ export class App implements OnInit{
       (sourceType === 'SuperServerNode' && targetType === 'ServerNode') ||
       (sourceType === 'ServerNode' && targetType === 'SuperServerNode');
     if (isHier && involvesSuperAndServer && this.edges().some(e => e.source === resolved.source && e.target === resolved.target)) {
-      return false;
-    }
-
-    const isSpykerServerPair = !isHier && sourceType === 'ServerNode' && targetType === 'ServerNode';
-    if (isSpykerServerPair && this.edges().some(e => e.source === resolved.source && e.target === resolved.target)) {
       return false;
     }
 
@@ -408,6 +418,15 @@ export class App implements OnInit{
     if (!sourceType || !targetType) return connection;
 
     if (sourceType === 'ServerNode' && targetType === 'ServerNode') {
+      // Normalization: Ensure edge always flows Right (out) -> Left (in)
+      if (connection.sourceHandle === 'server-in' && connection.targetHandle === 'server-out') {
+        return {
+          source: connection.target,
+          target: connection.source,
+          sourceHandle: 'server-out',
+          targetHandle: 'server-in',
+        };
+      }
       return {
         ...connection,
         sourceHandle: 'server-out',
