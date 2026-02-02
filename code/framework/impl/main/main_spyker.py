@@ -197,8 +197,6 @@ class SpykerSimulation:
 
         self._spawn_actors()
 
-        ray.get(self.context.set_server_actor_handles.remote(self.spyker_actors_map))
-
         self._configure_network()
     
     def run(self):
@@ -306,14 +304,16 @@ def run_default_simulation():
     total_clients = 6
     for i in range(total_clients):
         cid = f"client_{i}"
-        assigned_server = s1 if i < 2 else s2 if i >= 2 and i < 4 else s3
 
         if i < 2:
+            assigned_server = s1
             s1_edges[cid] = net_client
-        if i >= 2 and i < 4:
+        elif i < 4:
+            assigned_server = s2
             s2_edges[cid] = net_client
-        if i >= 5:
-            s3_edges[cid] = net_client
+        else:
+            assigned_server = s3
+            s3_edges[cid] = net_client 
 
         sim.add_client(
             client_id=cid,
