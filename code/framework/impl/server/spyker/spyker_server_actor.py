@@ -13,7 +13,6 @@ from flwr.common import (
 )
 
 from flwr.client import Client
-
 from server.server_actor import BaseAsyncServer
 from simulation.context import SimulationContext, set_global_context
 from simulation.spyker_config import SpykerConfig
@@ -26,7 +25,16 @@ from client.virtual_client import VirtualClient
 class SpykerServer(BaseAsyncServer):
     def __init__(self, 
                  server_id: str,
-                 config: SpykerConfig):
+                 config: SpykerConfig,
+                 context: SimulationContext):
+        
+        set_global_context(context)
+        self.context = context 
+        try:
+            self.self_ref = ray.get_runtime_context().current_actor
+        except Exception:
+            self.self_ref = None
+
         super().__init__(server_id)
         
         self.server_id = server_id
@@ -56,12 +64,8 @@ class SpykerServer(BaseAsyncServer):
     def set_global_context_remote(self, context: SimulationContext):
         """Sets the simulation context for this worker."""
         set_global_context(context)
-        try:
-            self.self_ref = ray.get_runtime_context().current_actor
-        except Exception:
-            raise ValueError(
-                "Context for Ray actor could not be loaded into self reference."
-            )
+
+        self.context = context
 
     def set_initial_weights(self, weights: List[np.ndarray]):
         """Sets the initial global model."""

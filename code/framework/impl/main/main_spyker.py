@@ -51,7 +51,7 @@ class SpykerSimulation:
 
         self.context = None
         self.orchestrator = None
-        self.spyker_actors_map = {}
+        self.spyker_actors_map: Dict[str, Any] = {}
 
     def set_spyker_config(self, config: SpykerConfig):
         self.spyker_config = config
@@ -127,25 +127,30 @@ class SpykerSimulation:
 
         for s_id in self.server_ids:
             actor = SpykerServer.remote(
-                server_id = s_id,
-                config=self.spyker_config
+                server_id=s_id,
+                config=self.spyker_config,
+                context=self.context
             )
+            self.spyker_actors_map[s_id] = actor
 
-            ray.get(actor.set_orchestrator.remote(self.orchestrator))
+        self.context.set_server_actor_handles(self.spyker_actors_map)
+
+        for s_id in self.server_ids:
+            actor = self.spyker_actors_map[s_id]
+
+            # Update Context
             ray.get(actor.set_global_context_remote.remote(self.context))
-
+            
+            # Inject Orchestrator & Weights
+            ray.get(actor.set_orchestrator.remote(self.orchestrator))
             ray.get(actor.set_initial_weights.remote(initial_weights_np))
 
+            # Register Clients
             assigned_clients = {
                 c_id: sim_client
                 for c_id, sim_client in self.client_map[s_id]
             }
             ray.get(actor.register_clients.remote(assigned_clients))
-
-            self.spyker_actors_map[s_id] = actor
-        
-        # Actor map for p2p communication between servers
-        ray.get(self.context.set_server_actor_handles.remote(self.spyker_actors_map))
     
     def _configure_network(self):
         print("Wiring Spyker Mesh and Token Ring...")
