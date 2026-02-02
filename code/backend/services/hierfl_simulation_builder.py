@@ -86,10 +86,7 @@ def _network_for(node_type: str, config: dict[str, Any]):
 
 
 def _node_id(node: Node, config: dict[str, Any], node_type: str) -> str:
-    raw = config.get("id")
-    if raw is None or str(raw).strip() == "":
-        raise ValueError(f"hierfl_missing_{node_type}_id")
-    return str(raw).strip()
+    return str(node.id)
 
 
 def _node_name(node_id: str, config: dict[str, Any]) -> str:
@@ -136,7 +133,6 @@ def validate_hierfl_graph(graph: Graph) -> None:
             raise ValueError("hierfl_client_requires_single_server_link")
 
     required_common = [
-        "id",
         "computeFactor",
         "pingMs",
         "jitterMs",

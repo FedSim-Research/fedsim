@@ -575,16 +575,16 @@ export class App implements OnInit{
       } as const;
 
       const nodes: Node[] = [];
-      const externalByBackendId = new Map<number, string>();
+    const externalByBackendId = new Map<string, string>();
 
       for (const node of graphDetail.nodes) {
         const nodeType = NODE_TYPE_MAP[node.type as keyof typeof NODE_TYPE_MAP];
         if (!nodeType) {
           continue;
         }
-        externalByBackendId.set(node.node_id, node.external_id);
+      externalByBackendId.set(node.node_id, node.node_id);
         nodes.push({
-          id: node.external_id,
+        id: node.node_id,
           point: node.position,
           type: nodeType,
           data: {
@@ -593,7 +593,7 @@ export class App implements OnInit{
             environment: event.architecture,
             fromJson: true,
             selected: false,
-            backendId: node.node_id,
+          backendId: node.node_id,
           },
         });
       }

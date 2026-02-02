@@ -56,10 +56,9 @@ export abstract class GraphService<T extends GraphHistoryService> {
   }
 
   public addNode(newNode: Node): void {
-    const normalized = this.normalizeNodeId(newNode);
-    this.nodes.update((nodes) => [...nodes, normalized]);
+    this.nodes.update((nodes) => [...nodes, newNode]);
     this.graphHistory.saveState({nodes: this.nodes(), edges: this.edges()});
-    void this.persistCreateNode(normalized);
+    void this.persistCreateNode(newNode);
   }
 
   public addEdge(newEdge: Edge) {
@@ -71,7 +70,7 @@ export abstract class GraphService<T extends GraphHistoryService> {
 
   public removeNodeById(nodeId: String){
     const node = this.nodes().find((n) => n.id === nodeId) as NodeWithData | undefined;
-    const backendId = node?.data?.['backendId'] as number | undefined;
+    const backendId = node?.data?.['backendId'] as string | undefined;
     if (backendId !== undefined) {
       void this.api.deleteNode(backendId).catch(() => undefined);
     }
@@ -215,23 +214,36 @@ export abstract class GraphService<T extends GraphHistoryService> {
       y: typeof point.y === 'number' ? point.y : 0,
     };
     const payload = {
-      external_id: newNode.id,
       type: data.type,
       config: data.config ?? {},
       position,
     };
     void this.api.createNode(this.graphId, payload).then((created) => {
+      const oldId = newNode.id;
       this.nodes.update((nodes) =>
         nodes.map((node) => {
-          if (node.id !== newNode.id) return node;
+          if (node.id !== oldId) return node;
           const nodeData = (node as NodeWithData).data ?? {};
           return {
             ...node,
-            data: { ...nodeData, backendId: created.node_id },
+            id: created.node_id,
+            data: { ...nodeData, backendId: created.node_id, config: created.config },
           };
         })
       );
-      this.persistPendingEdgesForNode(newNode.id);
+      this.edges.update((edges) =>
+        edges.map((edge) => {
+          if (edge.source === oldId || edge.target === oldId) {
+            return {
+              ...edge,
+              source: edge.source === oldId ? created.node_id : edge.source,
+              target: edge.target === oldId ? created.node_id : edge.target,
+            };
+          }
+          return edge;
+        })
+      );
+      this.persistPendingEdgesForNode(created.node_id);
     }).catch(() => undefined);
   }
 
@@ -242,15 +254,15 @@ export abstract class GraphService<T extends GraphHistoryService> {
     if (existingBackendId !== undefined) return;
     const sourceNode = this.nodes().find((n) => n.id === newEdge.source) as NodeWithData | undefined;
     const targetNode = this.nodes().find((n) => n.id === newEdge.target) as NodeWithData | undefined;
-    const sourceBackend = sourceNode?.data?.['backendId'] as number | undefined;
-    const targetBackend = targetNode?.data?.['backendId'] as number | undefined;
-    if (sourceBackend === undefined || targetBackend === undefined) {
+    const sourceBackend = sourceNode?.data?.['backendId'] as string | undefined;
+    const targetBackend = targetNode?.data?.['backendId'] as string | undefined;
+    if (!sourceBackend || !targetBackend) {
       return;
     }
     const metrics = edgeInState?.data?.metrics ?? EDGE_METRIC_DEFAULTS;
     const payload = {
-      source_external_id: newEdge.source,
-      target_external_id: newEdge.target,
+      source_node_id: sourceBackend,
+      target_node_id: targetBackend,
       config: metrics,
     };
     void this.api.createEdge(this.graphId, payload).then((created) => {
@@ -284,9 +296,9 @@ export abstract class GraphService<T extends GraphHistoryService> {
     if (this.graphId === null) return;
     for (const change of posChanges) {
       const node = this.nodes().find((n) => n.id === change.id) as NodeWithData | undefined;
-      const backendId = node?.data?.['backendId'] as number | undefined;
-      if (backendId === undefined) continue;
-      void this.api.updateNode(backendId, { position: change.point }).catch(() => undefined);
+    const backendId = node?.data?.['backendId'] as string | undefined;
+    if (backendId === undefined) continue;
+    void this.api.updateNode(backendId, { position: change.point }).catch(() => undefined);
     }
   }
 
@@ -305,92 +317,6 @@ export abstract class GraphService<T extends GraphHistoryService> {
 
   private storageKey(): string {
     return `fedsim.graphId.${this.architecture}`;
-  }
-
-  protected normalizeNodeId(newNode: Node): Node {
-    const data = { ...((newNode as NodeWithData).data ?? {}) };
-    const config = { ...((data as Record<string, any>)['config'] ?? {}) };
-    const configId = typeof (config as Record<string, any>)['id'] === 'string'
-      ? ((config as Record<string, any>)['id'] as string).trim()
-      : '';
-    const existingBaseIds = new Set(
-      this.nodes()
-        .map((node) => {
-          const nodeData = (node as NodeWithData).data as Record<string, any> | undefined;
-          const nodeConfig = nodeData ? nodeData['config'] as Record<string, any> | undefined : undefined;
-          const nodeConfigId = typeof nodeConfig?.['id'] === 'string' ? nodeConfig['id'] as string : '';
-          if (nodeConfigId) return nodeConfigId;
-          const rawId = typeof node.id === 'string' ? node.id : '';
-          const parts = rawId.split(':');
-          return parts.length > 1 ? parts.slice(1).join(':') : rawId;
-        })
-        .filter((value) => value)
-    );
-    const typeKey = this.resolveTypeKey(newNode, data);
-    const prefix = this.prefixForType(typeKey);
-
-    let finalId: string;
-    if (prefix) {
-      finalId = this.nextAvailableId(prefix, existingBaseIds);
-    } else if (configId && !existingBaseIds.has(configId)) {
-      finalId = configId;
-    } else if (typeof newNode.id === 'string' && !existingBaseIds.has(newNode.id)) {
-      finalId = newNode.id;
-    } else {
-      finalId = this.nextAvailableId('ND', existingBaseIds);
-    }
-
-    (config as Record<string, any>)['id'] = finalId;
-    (data as Record<string, any>)['config'] = config;
-    const graphTag = this.graphId !== null ? `G${this.graphId}` : 'local';
-    const uniqueId = `${graphTag}:${finalId}`;
-    return { ...newNode, id: uniqueId, data } as Node;
-  }
-
-  protected resolveTypeKey(node: Node, data: Record<string, any>): string | null {
-    const explicit = typeof data['type'] === 'string' ? (data['type'] as string) : null;
-    if (explicit) return explicit;
-    const typeName = (node.type as any)?.name;
-    return typeof typeName === 'string' ? typeName : null;
-  }
-
-  protected prefixForType(typeKey: string | null): string | null {
-    if (!typeKey) return null;
-    switch (typeKey) {
-      case 'SuperServerNode':
-        return 'SS';
-      case 'ServerNode':
-        return 'SV';
-      case 'ClientNode':
-        return 'CL';
-      default:
-        return null;
-    }
-  }
-
-  protected nextAvailableId(prefix: string, existingIds: Set<string>): string {
-    const matcher = new RegExp(`^${prefix}-(\\d+)$`);
-    let max = 0;
-    for (const id of existingIds) {
-      const match = id.match(matcher);
-      if (match) {
-        const value = Number(match[1]);
-        if (Number.isFinite(value) && value > max) {
-          max = value;
-        }
-      }
-    }
-    let next = max + 1;
-    let candidate = this.formatId(prefix, next);
-    while (existingIds.has(candidate)) {
-      next += 1;
-      candidate = this.formatId(prefix, next);
-    }
-    return candidate;
-  }
-
-  private formatId(prefix: string, value: number): string {
-    return `${prefix}-${String(value).padStart(2, '0')}`;
   }
 
   private extractNumericId(edgeId: string): number | null {
