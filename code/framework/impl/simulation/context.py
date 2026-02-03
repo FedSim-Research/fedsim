@@ -19,6 +19,8 @@ class SimulationContext:
         self.orchestrator = orchestrator_actor
         self.client_registry = client_registry
         self.server_registry = server_registry
+        
+        self.server_actor_handles = None
 
     def get_client_spec(self, client_id: str) -> ClientSpec:
         if client_id not in self.client_registry:
@@ -29,6 +31,9 @@ class SimulationContext:
         if server_id not in self.server_registry:
             raise KeyError(f"Server ID '{server_id}' not found in registry.")
         return self.server_registry[server_id]
+    
+    def set_server_actor_handles(self, handles: Dict[str, Any]):
+        self.server_actor_handles = handles
 
 
 # Global singleton pattern (optional, but useful for Ray workers to grab context)

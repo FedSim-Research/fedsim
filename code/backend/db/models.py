@@ -39,16 +39,11 @@ class Node(Base):
     """
 
     __tablename__ = "nodes"
-    __table_args__ = (
-        UniqueConstraint("graph_id", "external_id", name="uq_nodes_graph_external_id"),
-    )
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
     graph_id: Mapped[int] = mapped_column(
         ForeignKey("graphs.id", ondelete="CASCADE"),
         nullable=False,
     )
-    external_id: Mapped[str] = mapped_column(String(64), nullable=False)
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     config_json: Mapped[str] = mapped_column(Text, nullable=False)
     position_json: Mapped[str] = mapped_column(Text, nullable=False)
@@ -76,14 +71,15 @@ class Edge(Base):
         ForeignKey("graphs.id", ondelete="CASCADE"),
         nullable=False,
     )
-    source_node_id: Mapped[int] = mapped_column(
+    source_node_id: Mapped[str] = mapped_column(
         ForeignKey("nodes.id", ondelete="CASCADE"),
         nullable=False,
     )
-    target_node_id: Mapped[int] = mapped_column(
+    target_node_id: Mapped[str] = mapped_column(
         ForeignKey("nodes.id", ondelete="CASCADE"),
         nullable=False,
     )
+    config_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     graph: Mapped["Graph"] = relationship("Graph", back_populates="edges")
     source_node: Mapped["Node"] = relationship(

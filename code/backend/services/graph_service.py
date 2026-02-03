@@ -10,6 +10,7 @@ from backend.schemas.graph import (
     NodeCreate,
     NodeUpdate,
     EdgeCreate,
+    EdgeUpdate,
 )
 
 
@@ -92,12 +93,13 @@ def create_node(graph_id: int, payload: NodeCreate) -> Node:
         if graph is None:
             raise ValueError("graph_not_found")
 
-        external_id = payload.external_id or str(uuid.uuid4())
+        node_id = str(uuid.uuid4())
+        config = dict(payload.config)
         node = Node(
+            id=node_id,
             graph_id=graph_id,
-            external_id=external_id,
             type=payload.type,
-            config_json=json.dumps(payload.config),
+            config_json=json.dumps(config),
             position_json=json.dumps(payload.position.model_dump()),
         )
         session.add(node)
@@ -108,7 +110,7 @@ def create_node(graph_id: int, payload: NodeCreate) -> Node:
         session.close()
 
 
-def update_node(node_id: int, payload: NodeUpdate) -> Node | None:
+def update_node(node_id: str, payload: NodeUpdate) -> Node | None:
     session = SessionLocal()
     try:
         stmt = select(Node).where(Node.id == node_id)
@@ -140,22 +142,6 @@ def create_edge(graph_id: int, payload: EdgeCreate) -> Edge:
 
         source_node_id = payload.source_node_id
         target_node_id = payload.target_node_id
-        if payload.source_external_id or payload.target_external_id:
-            if not payload.source_external_id or not payload.target_external_id:
-                raise ValueError("edge_payload_incomplete")
-            node_stmt = select(Node).where(
-                Node.graph_id == graph_id,
-                Node.external_id.in_([payload.source_external_id, payload.target_external_id]),
-            )
-            nodes = list(session.execute(node_stmt).scalars().all())
-            if len(nodes) != 2:
-                raise ValueError("node_not_found")
-            source_node_id = next(
-                node.id for node in nodes if node.external_id == payload.source_external_id
-            )
-            target_node_id = next(
-                node.id for node in nodes if node.external_id == payload.target_external_id
-            )
 
         if source_node_id is None or target_node_id is None:
             raise ValueError("edge_payload_incomplete")
@@ -177,10 +163,12 @@ def create_edge(graph_id: int, payload: EdgeCreate) -> Edge:
         if session.execute(existing_stmt).scalar_one_or_none() is not None:
             raise ValueError("edge_exists")
 
+        config = payload.config.model_dump() if payload.config else {}
         edge = Edge(
             graph_id=graph_id,
             source_node_id=source_node_id,
             target_node_id=target_node_id,
+            config_json=json.dumps(config),
         )
         session.add(edge)
         session.commit()
@@ -190,7 +178,7 @@ def create_edge(graph_id: int, payload: EdgeCreate) -> Edge:
         session.close()
 
 
-def delete_node(node_id: int) -> bool:
+def delete_node(node_id: str) -> bool:
     session = SessionLocal()
     try:
         stmt = select(Node).where(Node.id == node_id)
@@ -221,5 +209,20 @@ def delete_edge(edge_id: int) -> bool:
         session.delete(edge)
         session.commit()
         return True
+    finally:
+        session.close()
+
+
+def update_edge(edge_id: int, payload: EdgeUpdate) -> Edge | None:
+    session = SessionLocal()
+    try:
+        stmt = select(Edge).where(Edge.id == edge_id)
+        edge = session.execute(stmt).scalar_one_or_none()
+        if edge is None:
+            return None
+        edge.config_json = json.dumps(payload.config.model_dump())
+        session.commit()
+        session.refresh(edge)
+        return edge
     finally:
         session.close()

@@ -64,16 +64,16 @@ export class GraphPersistenceService {
 
   private applyGraph(service: GraphService<any>, architecture: Architecture, graph: GraphDetail): void {
     const nodes: Node[] = [];
-    const externalByBackendId = new Map<number, string>();
+    const externalByBackendId = new Map<string, string>();
 
     for (const node of graph.nodes) {
       const nodeType = NODE_TYPE_MAP[node.type as keyof typeof NODE_TYPE_MAP];
       if (!nodeType) {
         continue;
       }
-      externalByBackendId.set(node.node_id, node.external_id);
+      externalByBackendId.set(node.node_id, node.node_id);
       nodes.push({
-        id: node.external_id,
+        id: node.node_id,
         point: node.position,
         type: nodeType,
         data: {

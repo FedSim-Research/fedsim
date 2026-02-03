@@ -17,9 +17,8 @@ export interface GraphResponse {
 }
 
 export interface NodeResponse {
-  node_id: number;
+  node_id: string;
   graph_id: number;
-  external_id: string;
   type: string;
   config: Record<string, unknown>;
   position: Position;
@@ -28,8 +27,8 @@ export interface NodeResponse {
 export interface EdgeResponse {
   edge_id: number;
   graph_id: number;
-  source_node_id: number;
-  target_node_id: number;
+  source_node_id: string;
+  target_node_id: string;
   config: EdgeMetrics;
 }
 
@@ -50,7 +49,6 @@ export interface GraphRename {
 
 
 export interface NodeCreate {
-  external_id?: string | null;
   type: 'ClientNode' | 'ServerNode' | 'SuperServerNode';
   config: Record<string, unknown>;
   position: Position;
@@ -63,10 +61,8 @@ export interface NodeUpdate {
 }
 
 export interface EdgeCreate {
-  source_node_id?: number | null;
-  target_node_id?: number | null;
-  source_external_id?: string | null;
-  target_external_id?: string | null;
+  source_node_id?: string | null;
+  target_node_id?: string | null;
   config?: EdgeMetrics | null;
 }
 
@@ -127,11 +123,11 @@ export class GraphApiService {
     return firstValueFrom(this.http.post<NodeResponse>(this.url(`/graphs/${graphId}/nodes`), payload));
   }
 
-  public async updateNode(nodeId: number, payload: NodeUpdate): Promise<NodeResponse> {
+  public async updateNode(nodeId: string, payload: NodeUpdate): Promise<NodeResponse> {
     return firstValueFrom(this.http.put<NodeResponse>(this.url(`/nodes/${nodeId}`), payload));
   }
 
-  public async deleteNode(nodeId: number): Promise<void> {
+  public async deleteNode(nodeId: string): Promise<void> {
     await firstValueFrom(this.http.delete(this.url(`/nodes/${nodeId}`)));
   }
 
