@@ -79,6 +79,7 @@ class Edge(Base):
         ForeignKey("nodes.id", ondelete="CASCADE"),
         nullable=False,
     )
+    config_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     graph: Mapped["Graph"] = relationship("Graph", back_populates="edges")
     source_node: Mapped["Node"] = relationship(

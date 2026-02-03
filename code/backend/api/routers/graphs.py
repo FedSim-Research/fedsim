@@ -31,6 +31,7 @@ def _edge_to_response(edge) -> EdgeResponse:
         graph_id=edge.graph_id,
         source_node_id=edge.source_node_id,
         target_node_id=edge.target_node_id,
+        config=json.loads(edge.config_json) if edge.config_json else None,
     )
 
 
@@ -123,6 +124,7 @@ def get_graph_vflow(graph_id: int):
                 "id": str(edge.id),
                 "source": source_node.id,
                 "target": target_node.id,
+                "config": json.loads(edge.config_json) if edge.config_json else None,
                 "sourceHandle": None,
                 "targetHandle": None,
                 "reconnectable": True,

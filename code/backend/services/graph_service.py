@@ -10,6 +10,7 @@ from backend.schemas.graph import (
     NodeCreate,
     NodeUpdate,
     EdgeCreate,
+    EdgeUpdate,
 )
 
 
@@ -162,10 +163,12 @@ def create_edge(graph_id: int, payload: EdgeCreate) -> Edge:
         if session.execute(existing_stmt).scalar_one_or_none() is not None:
             raise ValueError("edge_exists")
 
+        config = payload.config.model_dump() if payload.config else {}
         edge = Edge(
             graph_id=graph_id,
             source_node_id=source_node_id,
             target_node_id=target_node_id,
+            config_json=json.dumps(config),
         )
         session.add(edge)
         session.commit()
@@ -206,5 +209,20 @@ def delete_edge(edge_id: int) -> bool:
         session.delete(edge)
         session.commit()
         return True
+    finally:
+        session.close()
+
+
+def update_edge(edge_id: int, payload: EdgeUpdate) -> Edge | None:
+    session = SessionLocal()
+    try:
+        stmt = select(Edge).where(Edge.id == edge_id)
+        edge = session.execute(stmt).scalar_one_or_none()
+        if edge is None:
+            return None
+        edge.config_json = json.dumps(payload.config.model_dump())
+        session.commit()
+        session.refresh(edge)
+        return edge
     finally:
         session.close()

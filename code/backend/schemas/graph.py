@@ -16,6 +16,13 @@ class Position(BaseModel):
     y: float
 
 
+class NetworkConfig(BaseModel):
+    pingMs: int
+    jitterMs: int
+    packetloss: float
+    packetlossStddev: float
+
+
 class GraphResponse(BaseModel):
     """
     Response returned after persisting a graph.
@@ -53,6 +60,11 @@ class NodeResponse(BaseModel):
 class EdgeCreate(BaseModel):
     source_node_id: str | None = None
     target_node_id: str | None = None
+    config: NetworkConfig | None = None
+
+
+class EdgeUpdate(BaseModel):
+    config: NetworkConfig
 
 
 class EdgeResponse(BaseModel):
@@ -60,6 +72,7 @@ class EdgeResponse(BaseModel):
     graph_id: int
     source_node_id: str
     target_node_id: str
+    config: NetworkConfig | None = None
 
 
 class GraphDetail(BaseModel):
