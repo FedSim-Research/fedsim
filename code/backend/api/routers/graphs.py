@@ -19,7 +19,6 @@ def _node_to_response(node) -> NodeResponse:
     return NodeResponse(
         node_id=node.id,
         graph_id=node.graph_id,
-        external_id=node.external_id,
         type=node.type,
         config=json.loads(node.config_json),
         position=json.loads(node.position_json),
@@ -32,6 +31,7 @@ def _edge_to_response(edge) -> EdgeResponse:
         graph_id=edge.graph_id,
         source_node_id=edge.source_node_id,
         target_node_id=edge.target_node_id,
+        config=json.loads(edge.config_json) if edge.config_json else None,
     )
 
 
@@ -100,7 +100,7 @@ def get_graph_vflow(graph_id: int):
     for node in graph.nodes:
         nodes.append(
             {
-                "id": node.external_id,
+                "id": node.id,
                 "point": json.loads(node.position_json),
                 "type": node.type,
                 "data": {
@@ -122,8 +122,9 @@ def get_graph_vflow(graph_id: int):
         edges.append(
             {
                 "id": str(edge.id),
-                "source": source_node.external_id,
-                "target": target_node.external_id,
+                "source": source_node.id,
+                "target": target_node.id,
+                "config": json.loads(edge.config_json) if edge.config_json else None,
                 "sourceHandle": None,
                 "targetHandle": None,
                 "reconnectable": True,
@@ -140,6 +141,27 @@ def delete_graph(graph_id: int):
         raise HTTPException(status_code=404, detail="Graph not found")
 
     return {"status": "deleted"}
+
+
+@router.put("/{graph_id}/state", response_model=GraphDetail)
+def replace_graph_state(graph_id: int, payload: VflowGraph):
+    try:
+        graph = graph_service.replace_graph_state(graph_id, payload)
+    except ValueError as exc:
+        if str(exc) == "edge_payload_incomplete":
+            raise HTTPException(status_code=400, detail="Edge references missing nodes")
+        raise
+    if graph is None:
+        raise HTTPException(status_code=404, detail="Graph not found")
+
+    return GraphDetail(
+        graph_id=graph.id,
+        name=graph.name,
+        architecture=graph.architecture,
+        metadata=json.loads(graph.metadata_json) if graph.metadata_json else None,
+        nodes=[_node_to_response(node) for node in graph.nodes],
+        edges=[_edge_to_response(edge) for edge in graph.edges],
+    )
 
 
 @router.post("/{graph_id}/nodes", response_model=NodeResponse)
@@ -168,7 +190,7 @@ def create_edge(graph_id: int, payload: EdgeCreate):
         if str(exc) == "edge_payload_incomplete":
             raise HTTPException(
                 status_code=400,
-                detail="Provide node IDs or external IDs for both source and target",
+                detail="Provide node IDs for both source and target",
             )
         if str(exc) == "edge_exists":
             raise HTTPException(status_code=409, detail="Edge already exists")

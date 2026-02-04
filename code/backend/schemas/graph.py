@@ -16,6 +16,13 @@ class Position(BaseModel):
     y: float
 
 
+class NetworkConfig(BaseModel):
+    pingMs: int
+    jitterMs: int
+    packetloss: float
+    packetlossStddev: float
+
+
 class GraphResponse(BaseModel):
     """
     Response returned after persisting a graph.
@@ -31,7 +38,6 @@ class GraphRename(BaseModel):
 
 
 class NodeCreate(BaseModel):
-    external_id: str | None = None
     type: Literal["ClientNode", "ServerNode", "SuperServerNode"]
     config: Dict[str, Any]
     position: Position
@@ -44,26 +50,29 @@ class NodeUpdate(BaseModel):
 
 
 class NodeResponse(BaseModel):
-    node_id: int
+    node_id: str
     graph_id: int
-    external_id: str
     type: str
     config: Dict[str, Any]
     position: Position
 
 
 class EdgeCreate(BaseModel):
-    source_node_id: int | None = None
-    target_node_id: int | None = None
-    source_external_id: str | None = None
-    target_external_id: str | None = None
+    source_node_id: str | None = None
+    target_node_id: str | None = None
+    config: NetworkConfig | None = None
+
+
+class EdgeUpdate(BaseModel):
+    config: NetworkConfig
 
 
 class EdgeResponse(BaseModel):
     edge_id: int
     graph_id: int
-    source_node_id: int
-    target_node_id: int
+    source_node_id: str
+    target_node_id: str
+    config: NetworkConfig | None = None
 
 
 class GraphDetail(BaseModel):
@@ -94,6 +103,7 @@ class VflowEdge(BaseModel):
     id: str
     source: str
     target: str
+    config: NetworkConfig | None = None
     sourceHandle: str | None = None
     targetHandle: str | None = None
     reconnectable: bool = True

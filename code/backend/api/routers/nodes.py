@@ -7,7 +7,7 @@ router = APIRouter(prefix="/nodes", tags=["nodes"])
 
 
 @router.put("/{node_id}", response_model=NodeResponse)
-def update_node(node_id: int, payload: NodeUpdate):
+def update_node(node_id: str, payload: NodeUpdate):
     node = graph_service.update_node(node_id, payload)
     if node is None:
         raise HTTPException(status_code=404, detail="Node not found")
@@ -15,7 +15,6 @@ def update_node(node_id: int, payload: NodeUpdate):
     return NodeResponse(
         node_id=node.id,
         graph_id=node.graph_id,
-        external_id=node.external_id,
         type=node.type,
         config=json.loads(node.config_json),
         position=json.loads(node.position_json),
@@ -23,7 +22,7 @@ def update_node(node_id: int, payload: NodeUpdate):
 
 
 @router.delete("/{node_id}")
-def delete_node(node_id: int):
+def delete_node(node_id: str):
     deleted = graph_service.delete_node(node_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Node not found")
