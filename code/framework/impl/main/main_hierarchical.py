@@ -224,7 +224,7 @@ def initialize_environment():
     """Initializes the Ray runtime."""
     if ray.is_initialized():
         ray.shutdown()
-    ray.init()
+    ray.init(address="auto")
     print("Ray environment initialized.")
 
 
