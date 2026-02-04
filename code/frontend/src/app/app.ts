@@ -135,18 +135,26 @@ export class App implements OnInit{
     console.log("changed mode to:" + mode);
   }
 
-  public undo(){
-    this.activeGraph().getGraphHistory().undo();
-    this.activeGraph().getGraphHistory().getState();
-    this.activeGraph().nodes.set(this.activeGraph().getGraphHistory().getState().nodes);
-    this.activeGraph().edges.set(this.activeGraph().getGraphHistory().getState().edges);
+  public async undo(){
+    const history = this.activeGraph().getGraphHistory();
+    const before = history.getState();
+    history.undo();
+    const after = history.getState();
+    if (before === after) return;
+    this.activeGraph().nodes.set(after.nodes);
+    this.activeGraph().edges.set(after.edges);
+    await this.graphPersistence.syncGraphState(this.activeGraph(), this.activeMode(), false);
   }
 
-  public redo(){
-    this.activeGraph().getGraphHistory().redo();
-    this.activeGraph().getGraphHistory().getState();
-    this.activeGraph().nodes.set(this.activeGraph().getGraphHistory().getState().nodes);
-    this.activeGraph().edges.set(this.activeGraph().getGraphHistory().getState().edges);
+  public async redo(){
+    const history = this.activeGraph().getGraphHistory();
+    const before = history.getState();
+    history.redo();
+    const after = history.getState();
+    if (before === after) return;
+    this.activeGraph().nodes.set(after.nodes);
+    this.activeGraph().edges.set(after.edges);
+    await this.graphPersistence.syncGraphState(this.activeGraph(), this.activeMode(), false);
   }
 
   public reloadUI(){

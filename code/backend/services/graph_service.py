@@ -11,6 +11,7 @@ from backend.schemas.graph import (
     NodeUpdate,
     EdgeCreate,
     EdgeUpdate,
+    VflowGraph,
 )
 
 
@@ -224,5 +225,57 @@ def update_edge(edge_id: int, payload: EdgeUpdate) -> Edge | None:
         session.commit()
         session.refresh(edge)
         return edge
+    finally:
+        session.close()
+
+
+def replace_graph_state(graph_id: int, payload: VflowGraph) -> Graph | None:
+    session = SessionLocal()
+    try:
+        stmt = select(Graph).where(Graph.id == graph_id)
+        graph = session.execute(stmt).scalar_one_or_none()
+        if graph is None:
+            return None
+
+        session.execute(delete(Edge).where(Edge.graph_id == graph_id))
+        session.execute(delete(Node).where(Node.graph_id == graph_id))
+
+        node_ids: set[str] = set()
+        for node in payload.nodes:
+            node_type = node.data.type or node.type
+            node_ids.add(node.id)
+            session.add(
+                Node(
+                    id=node.id,
+                    graph_id=graph_id,
+                    type=node_type,
+                    config_json=json.dumps(node.data.config),
+                    position_json=json.dumps(node.point.model_dump()),
+                )
+            )
+
+        for edge in payload.edges:
+            if edge.source not in node_ids or edge.target not in node_ids:
+                raise ValueError("edge_payload_incomplete")
+            config_json = json.dumps(edge.config.model_dump()) if edge.config else None
+            session.add(
+                Edge(
+                    graph_id=graph_id,
+                    source_node_id=edge.source,
+                    target_node_id=edge.target,
+                    config_json=config_json,
+                )
+            )
+
+        session.commit()
+        refreshed = (
+            session.execute(
+                select(Graph)
+                .where(Graph.id == graph_id)
+                .options(selectinload(Graph.nodes), selectinload(Graph.edges))
+            )
+            .scalar_one_or_none()
+        )
+        return refreshed
     finally:
         session.close()

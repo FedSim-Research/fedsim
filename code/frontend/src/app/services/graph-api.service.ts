@@ -70,6 +70,37 @@ export interface EdgeUpdate {
   config: EdgeMetrics;
 }
 
+export interface VflowNodeData {
+  type: 'ClientNode' | 'ServerNode' | 'SuperServerNode';
+  config: Record<string, unknown>;
+  environment?: string | null;
+  fromJson?: boolean;
+  selected?: boolean;
+}
+
+export interface VflowNode {
+  id: string;
+  point: Position;
+  type: string;
+  data: VflowNodeData;
+}
+
+export interface VflowEdge {
+  id: string;
+  source: string;
+  target: string;
+  config?: EdgeMetrics | null;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
+  reconnectable?: boolean | 'source' | 'target';
+  floating?: boolean;
+}
+
+export interface VflowGraph {
+  nodes: VflowNode[];
+  edges: VflowEdge[];
+}
+
 export interface SimulationStartRequest {
   graph_id: number;
   training_config?: {
@@ -145,5 +176,9 @@ export class GraphApiService {
 
   public async startSimulation(payload: SimulationStartRequest): Promise<SimulationStartResponse> {
     return firstValueFrom(this.http.post<SimulationStartResponse>(this.url('/start_simulation'), payload));
+  }
+
+  public async replaceGraphState(graphId: number, payload: VflowGraph): Promise<GraphDetail> {
+    return firstValueFrom(this.http.put<GraphDetail>(this.url(`/graphs/${graphId}/state`), payload));
   }
 }

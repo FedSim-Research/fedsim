@@ -143,6 +143,27 @@ def delete_graph(graph_id: int):
     return {"status": "deleted"}
 
 
+@router.put("/{graph_id}/state", response_model=GraphDetail)
+def replace_graph_state(graph_id: int, payload: VflowGraph):
+    try:
+        graph = graph_service.replace_graph_state(graph_id, payload)
+    except ValueError as exc:
+        if str(exc) == "edge_payload_incomplete":
+            raise HTTPException(status_code=400, detail="Edge references missing nodes")
+        raise
+    if graph is None:
+        raise HTTPException(status_code=404, detail="Graph not found")
+
+    return GraphDetail(
+        graph_id=graph.id,
+        name=graph.name,
+        architecture=graph.architecture,
+        metadata=json.loads(graph.metadata_json) if graph.metadata_json else None,
+        nodes=[_node_to_response(node) for node in graph.nodes],
+        edges=[_edge_to_response(edge) for edge in graph.edges],
+    )
+
+
 @router.post("/{graph_id}/nodes", response_model=NodeResponse)
 def create_node(graph_id: int, payload: NodeCreate):
     try:

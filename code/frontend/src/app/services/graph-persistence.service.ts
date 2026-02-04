@@ -1,11 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { Node, Edge } from 'ngx-vflow';
-import { GraphApiService, GraphDetail } from './graph-api.service';
+import { GraphApiService, GraphDetail, VflowGraph } from './graph-api.service';
 import { GraphService } from './graph-service';
 import { ClientNode } from '../components/nodes/client-node/client-node';
 import { ServerNode } from '../components/nodes/server-node/server-node';
 import { SuperServerNode } from '../components/nodes/super-server-node/super-server-node';
-import { EDGE_METRIC_DEFAULTS } from '../models/edge-metrics';
+import { EdgeMetrics, EDGE_METRIC_DEFAULTS } from '../models/edge-metrics';
 
 const NODE_TYPE_MAP = {
   ClientNode: ClientNode,
@@ -108,5 +108,93 @@ export class GraphPersistenceService {
     }
 
     service.setGraphState(nodes, edges, true);
+  }
+
+  public async syncGraphState(
+    service: GraphService<any>,
+    architecture: Architecture,
+    refreshFromBackend: boolean = true
+  ): Promise<void> {
+    const graphId = service.getGraphId() ?? service.loadGraphIdFromStorage();
+    if (graphId === null) return;
+    const payload = this.buildVflowGraph(service, architecture);
+    const updated = await this.api.replaceGraphState(graphId, payload);
+    if (refreshFromBackend) {
+      this.applyGraph(service, architecture, updated);
+    }
+    service.setGraphId(graphId);
+  }
+
+  private buildVflowGraph(service: GraphService<any>, architecture: Architecture): VflowGraph {
+    const nodes = service.nodes().map((node) => {
+      const data = (node as any).data ?? {};
+      const type = data.type ?? (node.type as any)?.name ?? 'Unknown';
+      const point = (node as any).point ?? {};
+      const normalizedPoint = {
+        x: typeof point.x === 'number' ? point.x : 0,
+        y: typeof point.y === 'number' ? point.y : 0,
+      };
+      return {
+        id: node.id,
+        point: normalizedPoint,
+        type,
+        data: {
+          type,
+          config: data.config ?? {},
+          environment: data.environment ?? architecture,
+          fromJson: true,
+          selected: Boolean(data.selected),
+        },
+      };
+    });
+
+    const edges = service.edges().map((edge) => {
+      const payload = (edge as any).data ?? {};
+      const metrics = this.normalizeEdgeMetrics(payload.metrics);
+      const reconnectable = edge.reconnectable === 'source' || edge.reconnectable === 'target'
+        ? true
+        : edge.reconnectable ?? true;
+      return {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        config: metrics,
+        sourceHandle: edge.sourceHandle ?? null,
+        targetHandle: edge.targetHandle ?? null,
+        reconnectable,
+        floating: edge.floating ?? false,
+      };
+    });
+
+    return { nodes, edges };
+  }
+
+  private normalizeEdgeMetrics(metrics?: EdgeMetrics | null): EdgeMetrics {
+    const source = metrics ?? EDGE_METRIC_DEFAULTS;
+    return {
+      pingMs: this.clampMetric(source.pingMs, EDGE_METRIC_DEFAULTS.pingMs, 0, undefined, true),
+      jitterMs: this.clampMetric(source.jitterMs, EDGE_METRIC_DEFAULTS.jitterMs, 0, undefined, true),
+      packetloss: this.clampMetric(source.packetloss, EDGE_METRIC_DEFAULTS.packetloss, 0, 1),
+      packetlossStddev: this.clampMetric(source.packetlossStddev, EDGE_METRIC_DEFAULTS.packetlossStddev, 0, 1),
+    };
+  }
+
+  private clampMetric(
+    value: number,
+    fallback: number,
+    min = 0,
+    max?: number,
+    integer = false
+  ): number {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return fallback;
+    }
+    const adjusted = integer ? Math.round(numeric) : numeric;
+    const boundedMin = Math.max(min, adjusted);
+    if (max === undefined) {
+      return boundedMin;
+    }
+    return Math.min(max, boundedMin);
   }
 }

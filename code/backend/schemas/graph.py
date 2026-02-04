@@ -103,6 +103,7 @@ class VflowEdge(BaseModel):
     id: str
     source: str
     target: str
+    config: NetworkConfig | None = None
     sourceHandle: str | None = None
     targetHandle: str | None = None
     reconnectable: bool = True
