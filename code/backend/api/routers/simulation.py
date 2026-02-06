@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from backend.simulation_controller import SimulationController
 from backend.services import graph_service
@@ -22,15 +22,20 @@ class SimulationStartRequest(BaseModel):
     training_config: SimulationTrainingConfig | None = None
     simulation_settings: SimulationSettings | None = None
 
+class SimulationEvaluationResult(BaseModel):
+    accuracy: float
+    avg_loss: float
+
 class SimulationStartResponse(BaseModel):
     status: str
     graph_id: int
     architecture: str
+    output_filename: str | None = None
+    evaluation: SimulationEvaluationResult | None = None
 
-@router.post("/start_simulation", response_model=SimulationStartResponse, status_code=202)
+@router.post("/start_simulation", response_model=SimulationStartResponse)
 def start_simulation(
     payload: SimulationStartRequest,
-    background_tasks: BackgroundTasks,
 ):
     graph = graph_service.get_graph(payload.graph_id)
     if graph is None:
@@ -55,10 +60,11 @@ def start_simulation(
         training_config=payload.training_config.model_dump() if payload.training_config else None,
         simulation_settings=payload.simulation_settings.model_dump() if payload.simulation_settings else None,
     )
-    background_tasks.add_task(controller.start)
+    result = controller.start()
 
     return {
-        "status": "started",
+        "status": "completed",
         "graph_id": graph.id,
         "architecture": graph.architecture,
+        **(result or {}),
     }

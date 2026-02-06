@@ -243,8 +243,12 @@ class SpykerSimulation:
 def initialize_environment():
     if ray.is_initialized():
         ray.shutdown()
-    ray.init()
-    print("Ray environment initialized.")
+    try:
+        ray.init(address="auto")
+        print("Ray environment initialized (connected to existing cluster).")
+    except Exception:
+        ray.init()
+        print("Ray environment initialized (local).")
     
 def evaluate_model(filename: str):
     print(f"Starting evaluation for model: {filename}")
@@ -266,6 +270,7 @@ def evaluate_model(filename: str):
     print(f"Accuracy: {accuracy*100:.2f}%")
     print(f"Avg Loss: {avg_loss:.4f}")
     print("=" * 30)
+    return {"accuracy": float(accuracy), "avg_loss": float(avg_loss)}
 
     # ==============================================================
 

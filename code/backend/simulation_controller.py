@@ -24,11 +24,15 @@ class SimulationController:
             simulation.build()
             simulation.run()
             output_filename = self.simulation_settings.get("output_filename")
+            evaluation = None
             if output_filename:
                 simulation.save_model(output_filename)
                 if self.simulation_settings.get("evaluate_model"):
                     evaluate_model = get_hierfl_evaluate_model()
-                    evaluate_model(output_filename)
-            return
+                    evaluation = evaluate_model(output_filename)
+            result = {"output_filename": output_filename}
+            if evaluation is not None:
+                result["evaluation"] = evaluation
+            return result
 
         raise NotImplementedError(f"Architecture not supported: {self.architecture}")

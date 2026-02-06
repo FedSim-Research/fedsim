@@ -115,9 +115,14 @@ export interface SimulationStartRequest {
 }
 
 export interface SimulationStartResponse {
-  status: 'started';
+  status: 'completed';
   graph_id: number;
   architecture: 'spyker' | 'hierfl';
+  output_filename?: string | null;
+  evaluation?: {
+    accuracy: number;
+    avg_loss: number;
+  } | null;
 }
 
 @Injectable({ providedIn: 'root' })
