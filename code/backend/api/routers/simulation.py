@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from backend.simulation_controller import SimulationController
 from backend.services import graph_service
 from backend.services.hierfl_simulation_builder import validate_hierfl_graph
+from backend.services.spyker_simulation_builder import validate_spyker_graph
 
 router = APIRouter(tags=["simulation"])
 
@@ -51,6 +52,16 @@ def start_simulation(
                 raise HTTPException(status_code=400, detail="hierfl_invalid_run_time_limit")
         try:
             validate_hierfl_graph(graph)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if graph.architecture == "spyker":
+        if payload.simulation_settings:
+            if payload.simulation_settings.evaluate_model and not payload.simulation_settings.output_filename:
+                raise HTTPException(status_code=400, detail="spyker_missing_output_filename")
+            if payload.simulation_settings.run_time_limit is not None and payload.simulation_settings.run_time_limit <= 0:
+                raise HTTPException(status_code=400, detail="spyker_invalid_run_time_limit")
+        try:
+            validate_spyker_graph(graph)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
