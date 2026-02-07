@@ -9,6 +9,7 @@ from torchvision.transforms import Compose, Normalize, ToTensor
 from flwr.common import parameters_to_ndarrays
 
 from main.task import Net, test
+from main.ray_runtime import ensure_ray_initialized
 from simulation.context import SimulationContext, set_global_context
 from simulation.orchestrator import SimulationOrchestrator
 from simulation.spyker_config import SpykerConfig
@@ -241,14 +242,8 @@ class SpykerSimulation:
     # ===========================
 
 def initialize_environment():
-    if ray.is_initialized():
-        ray.shutdown()
-    try:
-        ray.init(address="auto")
-        print("Ray environment initialized (connected to existing cluster).")
-    except Exception:
-        ray.init()
-        print("Ray environment initialized (local).")
+    ensure_ray_initialized()
+    print("Ray environment initialized.")
     
 def evaluate_model(filename: str):
     print(f"Starting evaluation for model: {filename}")
