@@ -23,14 +23,29 @@ class SimulationOrchestrator:
         event = heapq.heappop(self._event_heap)
         self.global_virtual_time = max(self.global_virtual_time, event.trigger_time)
         actor_ref, method_name, payload = event.callback
-        print(
-            "[Orchestrator] Executing event:",
-            payload["event_type"],
-            "at time",
-            self.global_virtual_time,
-            "for",
-            actor_ref,
-        )
+
+        event_type = payload.get("event_type", "UNKNOWN")
+        log_message = f"[Orchestrator] t={self.global_virtual_time:.3f} | {event_type}"
+
+        if event_type == "SERVER_MESSAGE":
+            data = payload.get("data", {})
+            sub_type = data.get("type", "RAW")
+            sender = data.get("sender_id", "?")
+            log_message += f"({sub_type}) from {sender}"
+
+            if sub_type == "TOKEN":
+                pass
+            elif sub_type == "MODEL_BROADCAST":
+                age = data.get("age", -1)
+                log_message += f" [Age: {age}]"
+
+        elif event_type == "CLIENT_UPDATE":
+            data = payload.get("data", {})
+            cid = data.get("client_id", "unknown")
+            log_message += f" from {cid}"
+        
+        print(log_message)
+        
         return getattr(actor_ref, method_name).remote(payload)
 
     def run_until(self, target_time: float):

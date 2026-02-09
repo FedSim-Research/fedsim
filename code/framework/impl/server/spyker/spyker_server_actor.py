@@ -61,6 +61,18 @@ class SpykerServer(BaseAsyncServer):
         # Self-Reference for scheduling events back to this actor
         self.self_ref = None
 
+        # Maps a sync_id (bid) to the number of models received for that sync
+        self.sync_counts: Dict[str, int] = {}
+
+        # Set of sync_ids that we have already broadcasted our model for
+        self.did_broadcast_ids: set = set()
+
+        # The current broadcast ID
+        self.current_bid: str = ""
+
+        self.total_servers = 1 # start at 1 for self reference
+
+
     def set_global_context_remote(self, context: SimulationContext):
         """Sets the simulation context for this worker."""
         set_global_context(context)
@@ -78,6 +90,8 @@ class SpykerServer(BaseAsyncServer):
         self.peer_connections = peer_connections
         self.next_token_peer = next_token_peer
         self.assigned_clients = assigned_clients
+        self.total_servers += len(peer_connections)
+        print(f"[{self.server_id}] Total Servers set to {self.total_servers}")
 
         for peer in peer_connections:
             self.server_ages[peer] = 0
@@ -203,24 +217,27 @@ class SpykerServer(BaseAsyncServer):
             self._pass_token()
     
     def _broadcast_model_to_all(self):
-        weights_ref = ray.put(self.global_model_weights)
-        
-        for peer_id in self.peer_connections.keys():
-            self._send_server_message(
-                target_id = peer_id,
-                msg_type = "MODEL_BROADCAST",
-                payload = {
-                    "weights_ref": weights_ref,
-                    "age": self.model_age
-                }
-            )
-        
-        # After broadcasting, we pass the token
-        self._pass_token()
+        # Unique Broadcast ID
+        bid = f"{self.server_id}_{self.model_age}"
+        self.current_bid = bid
+
+        self.did_broadcast_ids.add(bid)
+
+        self.sync_counts[bid] = 1
+
+        print(f"[{self.server_id}] Initiating SYNC {bid}. Holding Token.")
+
+        self._perform_broadcast(bid)
 
     def _handle_model_broadcast(self, sender_id, payload):
+        bid = payload['bid']
         sender_age = payload['age']
         weights_ref = payload['weights_ref']
+
+        if bid not in self.did_broadcast_ids:
+            print(f"[{self.server_id}] Joining Sync {bid} (Reflex Broadcast)")
+            self.did_broadcast_ids.add(bid)
+            self._perform_broadcast(bid)
         
         # Fetch the actual numpy arrays from Ray Object Store
         peer_weights = ray.get(weights_ref)
@@ -242,7 +259,16 @@ class SpykerServer(BaseAsyncServer):
         )
         
         # Update local age
+        self.server_ages[sender_id] = sender_age
         self.model_age = max(self.model_age, sender_age)
+
+        if self.has_token and bid == self.current_bid:
+            self.sync_counts[bid] += 1
+
+            if self.sync_counts[bid] >= self.total_servers:
+                print(f"[{self.server_id}] Sync {bid} Complete. Releasing Token.")
+                self.current_bid = ""
+                self._pass_token()
 
     def _handle_token_arrival(self, sender_id, payload):
         self.has_token = True
@@ -262,13 +288,30 @@ class SpykerServer(BaseAsyncServer):
         
         self.has_token = False
 
+        token_processing_delay = 1.0 # 100 ms processing delay for token check
+
         self._send_server_message(
             target_id = self.next_token_peer,
             msg_type = "TOKEN",
             payload = {
                 "server_ages": self.server_ages.copy()
-            }
+            },
+            added_delay=token_processing_delay
         )
+
+    def _perform_broadcast(self, bid):
+        weights_ref = ray.put(self.global_model_weights)
+
+        for peer_id in self.peer_connections.keys():
+            self._send_server_message(
+                target_id=peer_id,
+                msg_type="MODEL_BROADCAST",
+                payload= {
+                    "weights_ref": weights_ref,
+                    "age": self.model_age,
+                    "bid": bid
+                }
+            )
 
     # =====================================================================
 
@@ -305,7 +348,7 @@ class SpykerServer(BaseAsyncServer):
             }
         )
 
-    def _send_server_message(self, target_id: str, msg_type: str, payload: Any):
+    def _send_server_message(self, target_id: str, msg_type: str, payload: Any, added_delay: float = 0.0):
         """
         Calculates network delay for Server-to-Server comms and schedules the event.
         """
@@ -326,13 +369,15 @@ class SpykerServer(BaseAsyncServer):
             payload_size_mb=payload_size_mb
         )
 
+        final_delay = delay + added_delay
+
         payload['sender_id'] = self.server_id
         payload['type'] = msg_type
 
         target_actor = self.context.server_actor_handles[target_id]
 
         self._schedule_event(
-            delay=delay,
+            delay=final_delay,
             target_actor=target_actor,
             event_type="SERVER_MESSAGE",
             data=payload
