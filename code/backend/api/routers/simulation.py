@@ -1,8 +1,9 @@
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from backend.simulation_controller import SimulationController
 from backend.services import graph_service
 from backend.services.hierfl_simulation_builder import validate_hierfl_graph
+from backend.services.spyker_simulation_builder import validate_spyker_graph
 
 router = APIRouter(tags=["simulation"])
 
@@ -22,15 +23,20 @@ class SimulationStartRequest(BaseModel):
     training_config: SimulationTrainingConfig | None = None
     simulation_settings: SimulationSettings | None = None
 
+class SimulationEvaluationResult(BaseModel):
+    accuracy: float
+    avg_loss: float
+
 class SimulationStartResponse(BaseModel):
     status: str
     graph_id: int
     architecture: str
+    output_filename: str | None = None
+    evaluation: SimulationEvaluationResult | None = None
 
-@router.post("/start_simulation", response_model=SimulationStartResponse, status_code=202)
+@router.post("/start_simulation", response_model=SimulationStartResponse)
 def start_simulation(
     payload: SimulationStartRequest,
-    background_tasks: BackgroundTasks,
 ):
     graph = graph_service.get_graph(payload.graph_id)
     if graph is None:
@@ -48,6 +54,16 @@ def start_simulation(
             validate_hierfl_graph(graph)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if graph.architecture == "spyker":
+        if payload.simulation_settings:
+            if payload.simulation_settings.evaluate_model and not payload.simulation_settings.output_filename:
+                raise HTTPException(status_code=400, detail="spyker_missing_output_filename")
+            if payload.simulation_settings.run_time_limit is not None and payload.simulation_settings.run_time_limit <= 0:
+                raise HTTPException(status_code=400, detail="spyker_invalid_run_time_limit")
+        try:
+            validate_spyker_graph(graph)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     controller = SimulationController(
         graph.architecture,
@@ -55,10 +71,11 @@ def start_simulation(
         training_config=payload.training_config.model_dump() if payload.training_config else None,
         simulation_settings=payload.simulation_settings.model_dump() if payload.simulation_settings else None,
     )
-    background_tasks.add_task(controller.start)
+    result = controller.start()
 
     return {
-        "status": "started",
+        "status": "completed",
         "graph_id": graph.id,
         "architecture": graph.architecture,
+        **(result or {}),
     }

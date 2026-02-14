@@ -1,4 +1,7 @@
+from typing import Any, Callable
+
 from backend.services.hierfl_simulation_builder import build_hierfl_simulation, get_hierfl_evaluate_model
+from backend.services.spyker_simulation_builder import build_spyker_simulation, get_spyker_evaluate_model
 
 class SimulationController:
 
@@ -12,23 +15,47 @@ class SimulationController:
         graph_info = f" graph_id={self.graph.id}" if self.graph is not None else ""
         print(f"Starting architecture: {self.architecture}{graph_info}")
 
+        if self.graph is None:
+            raise ValueError(f"{self.architecture}_requires_graph")
+
         if self.architecture == "hierfl":
-            if self.graph is None:
-                raise ValueError("hierfl_requires_graph")
-            run_time_limit = self.simulation_settings.get("run_time_limit")
-            simulation = build_hierfl_simulation(
-                self.graph,
-                training_config=self.training_config,
-                run_time_limit=run_time_limit,
+            return self._run_simulation(
+                builder=lambda: build_hierfl_simulation(
+                    self.graph,
+                    training_config=self.training_config,
+                    run_time_limit=self.simulation_settings.get("run_time_limit"),
+                ),
+                evaluator=get_hierfl_evaluate_model,
             )
-            simulation.build()
-            simulation.run()
-            output_filename = self.simulation_settings.get("output_filename")
-            if output_filename:
-                simulation.save_model(output_filename)
-                if self.simulation_settings.get("evaluate_model"):
-                    evaluate_model = get_hierfl_evaluate_model()
-                    evaluate_model(output_filename)
-            return
+
+        if self.architecture == "spyker":
+            return self._run_simulation(
+                builder=lambda: build_spyker_simulation(
+                    self.graph,
+                    run_time_limit=self.simulation_settings.get("run_time_limit"),
+                ),
+                evaluator=get_spyker_evaluate_model,
+            )
 
         raise NotImplementedError(f"Architecture not supported: {self.architecture}")
+
+    def _run_simulation(
+        self,
+        builder: Callable[[], Any],
+        evaluator: Callable[[], Callable[[str], dict[str, float]]],
+    ) -> dict[str, Any]:
+        simulation = builder()
+        simulation.build()
+        simulation.run()
+
+        output_filename = self.simulation_settings.get("output_filename")
+        evaluation = None
+        if output_filename:
+            simulation.save_model(output_filename)
+            if self.simulation_settings.get("evaluate_model"):
+                evaluate_model = evaluator()
+                evaluation = evaluate_model(output_filename)
+        result = {"output_filename": output_filename}
+        if evaluation is not None:
+            result["evaluation"] = evaluation
+        return result

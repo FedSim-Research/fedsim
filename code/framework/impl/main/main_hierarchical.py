@@ -9,6 +9,7 @@ from torchvision.transforms import Compose, Normalize, ToTensor
 from flwr.common import parameters_to_ndarrays
 
 from main.task import Net, test
+from main.ray_runtime import ensure_ray_initialized
 from simulation.context import SimulationContext, set_global_context
 from simulation.orchestrator import SimulationOrchestrator
 from specs.server_spec import ServerSpec
@@ -235,9 +236,7 @@ class HierarchicalSimulation:
 
 def initialize_environment():
     """Initializes the Ray runtime."""
-    if ray.is_initialized():
-        ray.shutdown()
-    ray.init(address="auto")
+    ensure_ray_initialized()
     print("Ray environment initialized.")
 
 
@@ -267,6 +266,7 @@ def evaluate_model(filename: str):
     print(f"Accuracy: {accuracy*100:.2f}%")
     print(f"Avg Loss: {avg_loss:.4f}")
     print("=" * 30)
+    return {"accuracy": float(accuracy), "avg_loss": float(avg_loss)}
 
 
 def run_default_simulation():

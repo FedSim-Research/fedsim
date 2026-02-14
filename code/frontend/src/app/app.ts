@@ -34,6 +34,7 @@ export class App implements OnInit{
   private cdr = inject(ChangeDetectorRef);
   private messageService = inject(MessageService);
   public activeMode = signal<modes>('hierfl');
+  public simulationRunning = signal(false);
   public activeGraph = computed(() => {
     if (this.activeMode() === 'spyker') {
       return this.graphServiceSpyker;
@@ -521,7 +522,8 @@ export class App implements OnInit{
         return;
       }
       try {
-        await this.graphApi.startSimulation({
+        this.showInfoToast(`${architecture} simulation running...`);
+        const result = await this.graphApi.startSimulation({
           graph_id: graphId,
           training_config: payload.trainingConfig,
           simulation_settings: {
@@ -530,23 +532,41 @@ export class App implements OnInit{
             evaluate_model: payload.simulationSettings.evaluateModel,
           },
         });
-        this.showSuccessToast(`${architecture} run started.`);
+        this.showSuccessToast(this.formatSimulationResult(architecture, result));
       } catch {
         this.showErrorToast(`Failed to start ${architecture} simulation.`);
       }
     };
 
     if (payload.mode === 'both') {
-      await Promise.all([runFor('spyker'), runFor('hierfl')]);
+      this.simulationRunning.set(true);
+      try {
+        await Promise.all([runFor('spyker'), runFor('hierfl')]);
+      } finally {
+        this.simulationRunning.set(false);
+      }
     } else {
-      await runFor(payload.mode);
+      this.simulationRunning.set(true);
+      try {
+        await runFor(payload.mode);
+      } finally {
+        this.simulationRunning.set(false);
+      }
     }
   }
 
   private showSuccessToast(message: string) {
     this.messageService.add({
       severity: 'success',
-      summary: 'Simulation started',
+      summary: 'Simulation completed',
+      detail: message,
+    });
+  }
+
+  private showInfoToast(message: string) {
+    this.messageService.add({
+      severity: 'info',
+      summary: 'Simulation running',
       detail: message,
     });
   }
@@ -557,6 +577,25 @@ export class App implements OnInit{
       summary: 'Error',
       detail: message,
     });
+  }
+
+  private formatSimulationResult(
+    architecture: 'spyker' | 'hierfl',
+    result: { output_filename?: string | null; evaluation?: { accuracy: number; avg_loss: number } | null }
+  ): string {
+    const parts: string[] = [];
+    if (result.output_filename) {
+      parts.push(`Saved to ${result.output_filename}`);
+    } else {
+      parts.push('Completed');
+    }
+    if (result.evaluation) {
+      const accuracyPct = (result.evaluation.accuracy * 100).toFixed(2);
+      const loss = result.evaluation.avg_loss.toFixed(4);
+      parts.push(`Accuracy ${accuracyPct}%`);
+      parts.push(`Loss ${loss}`);
+    }
+    return `${architecture}: ${parts.join(' • ')}`;
   }
 
   public async handleGraphSelected(event: { graphId: number; architecture: 'spyker' | 'hierfl' }): Promise<void> {
