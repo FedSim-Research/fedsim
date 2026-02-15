@@ -321,6 +321,21 @@
   gap: 10px;
 }
 
+.field-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.field-divider {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--muted);
+  padding-bottom: 6px;
+  transform: translateY(-2px);
+}
+
 .field {
   display: flex;
   flex-direction: column;

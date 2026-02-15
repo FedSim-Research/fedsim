@@ -124,18 +124,23 @@
           </label>
           <div class="grid">
             <label class="field">
-              <span>Compute factor</span>
-              <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.superserver.computeFactor" />
-            </label>
-          </div>
-          <div class="grid">
-            <label class="field">
               <span>Upload (Mbps)</span>
               <input type="number" min="0" [(ngModel)]="configDraft.superserver.uploadMbps" />
             </label>
             <label class="field">
               <span>Download (Mbps)</span>
               <input type="number" min="0" [(ngModel)]="configDraft.superserver.downloadMbps" />
+            </label>
+          </div>
+          <div class="field-pair">
+            <label class="field">
+              <span>Compute factor</span>
+              <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.superserver.computeFactor" />
+            </label>
+            <span class="field-divider" aria-hidden="true">±</span>
+            <label class="field">
+              <span>Performance σ</span>
+              <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.superserver.performanceSigma" />
             </label>
           </div>
           <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'SuperServerNode')">
@@ -156,18 +161,23 @@
         </label>
         <div class="grid">
           <label class="field">
-            <span>Compute factor</span>
-            <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.server.computeFactor" />
-          </label>
-        </div>
-        <div class="grid">
-          <label class="field">
             <span>Upload (Mbps)</span>
             <input type="number" min="0" [(ngModel)]="configDraft.server.uploadMbps" />
           </label>
           <label class="field">
             <span>Download (Mbps)</span>
             <input type="number" min="0" [(ngModel)]="configDraft.server.downloadMbps" />
+          </label>
+        </div>
+        <div class="field-pair">
+          <label class="field">
+            <span>Compute factor</span>
+            <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.server.computeFactor" />
+          </label>
+          <span class="field-divider" aria-hidden="true">±</span>
+          <label class="field">
+            <span>Performance σ</span>
+            <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.server.performanceSigma" />
           </label>
         </div>
         <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'ServerNode')">
@@ -181,18 +191,14 @@
         <span>Client Nodes</span>
       </summary>
       <div class="disclosure__body">
-        <label class="field">
-          <span>Client type</span>
-          <select [(ngModel)]="configDraft.client.type">
-            <option value="laptop">Laptop</option>
-            <option value="workstation">Workingstation</option>
-            <option value="mobile">Mobile</option>
-          </select>
-        </label>
         <div class="grid">
           <label class="field">
-            <span>Compute factor</span>
-            <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.client.computeFactor" />
+            <span>Client type</span>
+            <select [(ngModel)]="configDraft.client.type">
+              <option value="laptop">Laptop</option>
+              <option value="workstation">Workstation</option>
+              <option value="mobile">Mobile</option>
+            </select>
           </label>
           <label class="field">
             <span>Number of clients</span>
@@ -207,6 +213,17 @@
           <label class="field">
             <span>Download (Mbps)</span>
             <input type="number" min="0" [(ngModel)]="configDraft.client.downloadMbps" />
+          </label>
+        </div>
+        <div class="field-pair">
+          <label class="field">
+            <span>Compute factor</span>
+            <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.client.computeFactor" />
+          </label>
+          <span class="field-divider" aria-hidden="true">±</span>
+          <label class="field">
+            <span>Performance σ</span>
+            <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.client.performanceSigma" />
           </label>
         </div>
         <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'ClientNode')">

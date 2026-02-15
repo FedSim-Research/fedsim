@@ -55,6 +55,7 @@ export class SidebarComponent implements OnInit {
     superserver: {
       name: 'Super Server',
       computeFactor: 2.0,
+      performanceSigma: 0.0,
       uploadMbps: 20,
       downloadMbps: 100,
     },
@@ -62,6 +63,7 @@ export class SidebarComponent implements OnInit {
       name: 'Server Node',
       environment: 'Spyker',
       computeFactor: 2.0,
+      performanceSigma: 0.0,
       uploadMbps: 20,
       downloadMbps: 100,
     },
@@ -69,6 +71,7 @@ export class SidebarComponent implements OnInit {
       count: 50,
       type: 'mobile',
       computeFactor: 0.8,
+      performanceSigma: 0.0,
       uploadMbps: 2,
       downloadMbps: 10,
     }
