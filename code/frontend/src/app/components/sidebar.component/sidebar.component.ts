@@ -1,31 +1,71 @@
 import { Component, Inject, Output, EventEmitter, ViewChild, ElementRef, Input, OnInit } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Node } from 'ngx-vflow';
 import { StartPopup } from '../start.popup/start.popup';
 import { ResetButton } from '../reset.button/reset.button';
 import { ViewGraphsDialog } from '../view-graphs.component/view-graphs.component';
 import { HelpDialog } from '../help-dialog/help-dialog.component';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
-import { ConfirmDialogModule } from 'primeng/confirmdialog';
-import { ConfirmationService } from 'primeng/api';
 import { Shortcuts } from '../../directives/shortcuts';
 import { GraphApiService } from '../../services/graph-api.service';
+import { GraphServiceSpyker } from '../../services/subservices/graph-service-spyker';
+import { GraphServiceHierach } from '../../services/subservices/graph-service-hierach';
+import { ClientNode } from '../nodes/client-node/client-node';
+import { ServerNode } from '../nodes/server-node/server-node';
+import { SuperServerNode } from '../nodes/super-server-node/super-server-node';
+
+type SuperServerConfig = {
+  name: string;
+  computeFactor: number;
+  performanceSigma: number;
+  uploadMbps: number;
+  downloadMbps: number;
+};
+
+type ServerConfig = {
+  name: string;
+  environment: string;
+  computeFactor: number;
+  performanceSigma: number;
+  uploadMbps: number;
+  downloadMbps: number;
+};
+
+type ClientConfig = {
+  count: number;
+  type: 'laptop' | 'workstation' | 'mobile';
+  computeFactor: number;
+  performanceSigma: number;
+  uploadMbps: number;
+  downloadMbps: number;
+};
+
+type BlueprintDraft<T> = {
+  presetName: string;
+  config: T;
+};
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
   templateUrl: './sidebar.component.html',
   styleUrls: ['./sidebar.component.css'],
-  imports: [FormsModule, CommonModule, StartPopup, ResetButton, ViewGraphsDialog, HelpDialog, ToastModule, ConfirmDialogModule],
-  providers: [ConfirmationService],
+  imports: [FormsModule, CommonModule, StartPopup, ResetButton, ViewGraphsDialog, HelpDialog, ToastModule],
 })
 export class SidebarComponent implements OnInit {
   public isOpen = true;
   public isDarkMode = true;
   public showSimulationpopup = false;
+  public showResetPopup = false;
   public showViewGraphsDialog = false;
   public showHelpDialog = false;
+  public showSuperServerBlueprintPopup = false;
+  public showServerBlueprintPopup = false;
+  public showClientBlueprintPopup = false;
+  public showDeletePresetPopup = false;
+  public deletePresetTarget: { kind: 'superserver' | 'server' | 'client'; index: number; name: string } | null = null;
   @ViewChild('supDetails') private supDetails?: ElementRef<HTMLDetailsElement>;
 
   @Input() shortcuts?: Shortcuts;
@@ -51,7 +91,11 @@ export class SidebarComponent implements OnInit {
     evaluateModel: false,
   };
 
-  public configDraft = {
+  public configDraft: {
+    superserver: SuperServerConfig;
+    server: ServerConfig;
+    client: ClientConfig;
+  } = {
     superserver: {
       name: 'Super Server',
       computeFactor: 2.0,
@@ -77,11 +121,35 @@ export class SidebarComponent implements OnInit {
     }
   };
 
+  public superServerBlueprints: Array<{ name: string; config: SuperServerConfig }> = [];
+  public serverBlueprints: Array<{ name: string; config: ServerConfig }> = [];
+  public clientBlueprints: Array<{ name: string; config: ClientConfig }> = [];
+
+  public selectedSuperServerBlueprintIndex: number | null = null;
+  public selectedServerBlueprintIndex: number | null = null;
+  public selectedClientBlueprintIndex: number | null = null;
+
+  public superServerBlueprintDraft: BlueprintDraft<SuperServerConfig> = {
+    presetName: '',
+    config: { ...this.configDraft.superserver },
+  };
+
+  public serverBlueprintDraft: BlueprintDraft<ServerConfig> = {
+    presetName: '',
+    config: { ...this.configDraft.server },
+  };
+
+  public clientBlueprintDraft: BlueprintDraft<ClientConfig> = {
+    presetName: '',
+    config: { ...this.configDraft.client },
+  };
+
   constructor(
     @Inject(DOCUMENT) private document: Document,
     private messageService: MessageService,
-    private confirmationService: ConfirmationService,
-    private graphApi: GraphApiService
+    private graphApi: GraphApiService,
+    private graphServiceSpyker: GraphServiceSpyker,
+    private graphServiceHierach: GraphServiceHierach
   ) {}
 
   public async ngOnInit(): Promise<void> {
@@ -97,21 +165,16 @@ export class SidebarComponent implements OnInit {
   }
 
   public onResetRequested(): void {
-    this.confirmationService.confirm({
-      header: 'Reset graph?',
-      message: 'Are you sure you want to delete all nodes and edges?',
-      icon: 'pi pi-exclamation-triangle',
-      acceptLabel: 'Yes, delete',
-      rejectLabel: 'Cancel',
-      rejectButtonStyleClass: 'p-button-text p-button-sm',
-      acceptButtonStyleClass: 'p-button-danger p-button-sm',
-      defaultFocus: 'accept',
-      closable: true,
-      closeOnEscape: true,
-      accept: () => {
-        this.resetGraph.emit();
-      },
-    });
+    this.showResetPopup = true;
+  }
+
+  public closeResetPopup(): void {
+    this.showResetPopup = false;
+  }
+
+  public confirmResetGraph(): void {
+    this.resetGraph.emit();
+    this.closeResetPopup();
   }
 
   @Output() undoRequested = new EventEmitter<void>();
@@ -202,6 +265,253 @@ export class SidebarComponent implements OnInit {
 
   public openSimulationpopup(): void { this.showSimulationpopup = true; }
   public closeSimulationpopup(): void { this.showSimulationpopup = false; }
+  public openSuperServerBlueprintPopup(): void {
+    this.superServerBlueprintDraft = {
+      presetName: '',
+      config: { ...this.configDraft.superserver },
+    };
+    this.selectedSuperServerBlueprintIndex = null;
+    this.showSuperServerBlueprintPopup = true;
+  }
+
+  public closeSuperServerBlueprintPopup(): void {
+    this.showSuperServerBlueprintPopup = false;
+  }
+
+  public saveSuperServerBlueprint(): void {
+    const name = this.superServerBlueprintDraft.presetName.trim()
+      || `Super Server Preset ${this.superServerBlueprints.length + 1}`;
+    this.superServerBlueprints.push({
+      name,
+      config: { ...this.superServerBlueprintDraft.config },
+    });
+  }
+
+  public openServerBlueprintPopup(): void {
+    this.serverBlueprintDraft = {
+      presetName: '',
+      config: { ...this.configDraft.server },
+    };
+    this.selectedServerBlueprintIndex = null;
+    this.showServerBlueprintPopup = true;
+  }
+
+  public closeServerBlueprintPopup(): void {
+    this.showServerBlueprintPopup = false;
+  }
+
+  public saveServerBlueprint(): void {
+    const name = this.serverBlueprintDraft.presetName.trim()
+      || `Server Node Preset ${this.serverBlueprints.length + 1}`;
+    this.serverBlueprints.push({
+      name,
+      config: { ...this.serverBlueprintDraft.config },
+    });
+  }
+
+  public openClientBlueprintPopup(): void {
+    this.clientBlueprintDraft = {
+      presetName: '',
+      config: { ...this.configDraft.client },
+    };
+    this.selectedClientBlueprintIndex = null;
+    this.showClientBlueprintPopup = true;
+  }
+
+  public closeClientBlueprintPopup(): void {
+    this.showClientBlueprintPopup = false;
+  }
+
+  public saveClientBlueprint(): void {
+    const name = this.clientBlueprintDraft.presetName.trim()
+      || `Client Node Preset ${this.clientBlueprints.length + 1}`;
+    this.clientBlueprints.push({
+      name,
+      config: { ...this.clientBlueprintDraft.config },
+    });
+  }
+
+  public selectSuperServerBlueprint(index: number): void {
+    this.selectedSuperServerBlueprintIndex = index;
+  }
+
+  public applySuperServerBlueprint(item: { name: string; config: SuperServerConfig }, index: number): void {
+    this.selectedSuperServerBlueprintIndex = index;
+    this.superServerBlueprintDraft = {
+      presetName: item.name,
+      config: { ...item.config },
+    };
+    this.configDraft.superserver = { ...item.config };
+  }
+
+  public selectServerBlueprint(index: number): void {
+    this.selectedServerBlueprintIndex = index;
+  }
+
+  public applyServerBlueprint(item: { name: string; config: ServerConfig }, index: number): void {
+    this.selectedServerBlueprintIndex = index;
+    this.serverBlueprintDraft = {
+      presetName: item.name,
+      config: { ...item.config },
+    };
+    this.configDraft.server = { ...item.config };
+  }
+
+  public selectClientBlueprint(index: number): void {
+    this.selectedClientBlueprintIndex = index;
+  }
+
+  public applyClientBlueprint(item: { name: string; config: ClientConfig }, index: number): void {
+    this.selectedClientBlueprintIndex = index;
+    this.clientBlueprintDraft = {
+      presetName: item.name,
+      config: { ...item.config },
+    };
+    this.configDraft.client = { ...item.config };
+  }
+
+  public deleteSuperServerBlueprint(index: number): void {
+    this.superServerBlueprints.splice(index, 1);
+    if (this.selectedSuperServerBlueprintIndex === index) {
+      this.selectedSuperServerBlueprintIndex = null;
+    } else if (this.selectedSuperServerBlueprintIndex !== null && this.selectedSuperServerBlueprintIndex > index) {
+      this.selectedSuperServerBlueprintIndex -= 1;
+    }
+  }
+
+  public deleteServerBlueprint(index: number): void {
+    this.serverBlueprints.splice(index, 1);
+    if (this.selectedServerBlueprintIndex === index) {
+      this.selectedServerBlueprintIndex = null;
+    } else if (this.selectedServerBlueprintIndex !== null && this.selectedServerBlueprintIndex > index) {
+      this.selectedServerBlueprintIndex -= 1;
+    }
+  }
+
+  public deleteClientBlueprint(index: number): void {
+    this.clientBlueprints.splice(index, 1);
+    if (this.selectedClientBlueprintIndex === index) {
+      this.selectedClientBlueprintIndex = null;
+    } else if (this.selectedClientBlueprintIndex !== null && this.selectedClientBlueprintIndex > index) {
+      this.selectedClientBlueprintIndex -= 1;
+    }
+  }
+
+  public requestDeletePreset(kind: 'superserver' | 'server' | 'client', index: number): void {
+    const name = kind === 'superserver'
+      ? this.superServerBlueprints[index]?.name
+      : kind === 'server'
+        ? this.serverBlueprints[index]?.name
+        : this.clientBlueprints[index]?.name;
+
+    if (!name) {
+      return;
+    }
+
+    this.deletePresetTarget = { kind, index, name };
+    this.showDeletePresetPopup = true;
+  }
+
+  public closeDeletePresetPopup(): void {
+    this.showDeletePresetPopup = false;
+    this.deletePresetTarget = null;
+  }
+
+  public confirmDeletePreset(): void {
+    if (!this.deletePresetTarget) {
+      return;
+    }
+
+    const { kind, index } = this.deletePresetTarget;
+    if (kind === 'superserver') {
+      this.deleteSuperServerBlueprint(index);
+    } else if (kind === 'server') {
+      this.deleteServerBlueprint(index);
+    } else {
+      this.deleteClientBlueprint(index);
+    }
+
+    this.closeDeletePresetPopup();
+  }
+
+  public initializeSuperServerPreset(): void {
+    if (this.selectedSuperServerBlueprintIndex === null) {
+      this.showErrorToast('Select a super server preset first.');
+      return;
+    }
+    const item = this.superServerBlueprints[this.selectedSuperServerBlueprintIndex];
+    if (!item) {
+      this.showErrorToast('Preset not found.');
+      return;
+    }
+    if (this.selectedArchitectures.spyker) {
+      this.showErrorToast('No super server is allowed to exist in the Spyker Environment');
+      return;
+    }
+    this.createNodeFromPreset('SuperServerNode', item.config);
+  }
+
+  public initializeServerPreset(): void {
+    if (this.selectedServerBlueprintIndex === null) {
+      this.showErrorToast('Select a server node preset first.');
+      return;
+    }
+    const item = this.serverBlueprints[this.selectedServerBlueprintIndex];
+    if (!item) {
+      this.showErrorToast('Preset not found.');
+      return;
+    }
+    this.createNodeFromPreset('ServerNode', item.config);
+  }
+
+  public initializeClientPreset(): void {
+    if (this.selectedClientBlueprintIndex === null) {
+      this.showErrorToast('Select a client node preset first.');
+      return;
+    }
+    const item = this.clientBlueprints[this.selectedClientBlueprintIndex];
+    if (!item) {
+      this.showErrorToast('Preset not found.');
+      return;
+    }
+    this.createNodeFromPreset('ClientNode', item.config);
+  }
+
+  private createNodeFromPreset(
+    kind: 'SuperServerNode' | 'ServerNode' | 'ClientNode',
+    config: SuperServerConfig | ServerConfig | ClientConfig
+  ): void {
+    const nodeType = kind === 'SuperServerNode'
+      ? SuperServerNode
+      : kind === 'ServerNode'
+        ? ServerNode
+        : ClientNode;
+
+    const service = this.selectedArchitectures.spyker
+      ? this.graphServiceSpyker
+      : this.graphServiceHierach;
+
+    const nodes = service.nodes();
+    const lastPoint = nodes.length ? nodes[nodes.length - 1].point : null;
+    const point = lastPoint
+      ? { x: lastPoint.x + 40, y: lastPoint.y + 40 }
+      : { x: 160, y: 160 };
+
+    const newNode: Node = {
+      id: crypto.randomUUID(),
+      point,
+      type: nodeType,
+      data: {
+        type: kind,
+        config,
+        environment: this.selectedArchitectures.spyker ? 'spyker' : 'hierfl',
+        fromJson: false,
+        selected: false,
+      },
+    };
+
+    service.addNode(newNode);
+  }
   public onSuperServerSummaryClick(event: Event): void {
     if (this.selectedArchitectures.spyker) {
       event.preventDefault();
