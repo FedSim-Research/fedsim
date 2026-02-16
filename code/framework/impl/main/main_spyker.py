@@ -308,19 +308,19 @@ def run_default_simulation():
             "decay_beta": 0.1,
             "min_learning_rate": 1e-6,
             "h_inter": 5,
-            "h_intra": 350,
-            "sigmoid_phi": 1.5,
-            "server_learning_rate": 0.6,
+            "h_intra": 50,
+            "sigmoid_phi": 1.0,
+            "server_learning_rate": 0.1,
             "tcp_rto_delay": 0.2
         },
         training_params={
             "local_epochs": 1,
-            "learning_rate": 0.05,
+            "learning_rate": 0.005,
             "model_complexity": 1.0
         },
         simulation_params={
-            "run_time_limit": 2000.0,
-            "idle_token_delay": 1.0
+            "run_time_limit": 5000.0,
+            "idle_token_delay": 0.5
         }
     )
 
@@ -349,14 +349,14 @@ def run_default_simulation():
     sim.add_server(s2, "Spyker Node B", perf, s2_edges, download_speed_server, upload_speed_server)
     sim.add_server(s3, "Spyker Node C", perf, s3_edges, download_speed_server, upload_speed_server)
 
-    total_clients = 6
+    total_clients = 20
     for i in range(total_clients):
         cid = f"client_{i}"
 
-        if i < 2:
+        if i < 16:
             assigned_server = s1
             s1_edges[cid] = net_client
-        elif i < 4:
+        elif i < 18:
             assigned_server = s2
             s2_edges[cid] = net_client
         else:
