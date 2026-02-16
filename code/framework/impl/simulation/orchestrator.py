@@ -25,24 +25,32 @@ class SimulationOrchestrator:
         actor_ref, method_name, payload = event.callback
 
         event_type = payload.get("event_type", "UNKNOWN")
-        log_message = f"[Orchestrator] t={self.global_virtual_time:.3f} | {event_type}"
+        
+        log_message = f"[Orchestrator] t={self.global_virtual_time:09.3f} | {event_type}"
 
         if event_type == "SERVER_MESSAGE":
             data = payload.get("data", {})
             sub_type = data.get("type", "RAW")
             sender = data.get("sender_id", "?")
-            log_message += f"({sub_type}) from {sender}"
+            
+            log_message += f" ({sub_type})".ljust(20) + f" from {sender}"
 
             if sub_type == "TOKEN":
-                pass
+                ages = data.get("server_ages", {})
+                # Format compact dict string: {A:10, B:11}
+                age_str = ", ".join([f"{k.replace('server_', '')}:{v}" for k, v in ages.items()])
+                log_message += f" [Knowledge: {age_str}]"
+                
             elif sub_type == "MODEL_BROADCAST":
                 age = data.get("age", -1)
-                log_message += f" [Age: {age}]"
+                bid = data.get("bid", "N/A")
+                log_message += f" [Age: {age} | BID: {bid}]"
 
         elif event_type == "CLIENT_UPDATE":
             data = payload.get("data", {})
             cid = data.get("client_id", "unknown")
-            log_message += f" from {cid}"
+            sid = data.get("server_id", "?")
+            log_message += f" from {cid} (on {sid})"
         
         print(log_message)
         

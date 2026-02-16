@@ -71,7 +71,7 @@ class SpykerServer(BaseAsyncServer):
         # The current broadcast ID
         self.current_bid: str = ""
 
-        self.total_servers = 1 # start at 1 for self reference
+        self.total_servers = 0
 
 
     def set_global_context_remote(self, context: SimulationContext):
@@ -91,7 +91,7 @@ class SpykerServer(BaseAsyncServer):
         self.peer_connections = peer_connections
         self.next_token_peer = next_token_peer
         self.assigned_clients = assigned_clients
-        self.total_servers += len(peer_connections)
+        self.total_servers = len(peer_connections) + 1 # self referenced + 1
         print(f"[{self.server_id}] Total Servers set to {self.total_servers}")
 
         for peer in peer_connections:
@@ -210,14 +210,18 @@ class SpykerServer(BaseAsyncServer):
         inter_drift = max_age - min_age
         intra_drift = self.model_age - self.age_at_last_sync
 
-        if inter_drift >= self.spyker_config.h_inter or intra_drift >= self.spyker_config.h_intra:
-            # Broadcast to all other servers
+        if inter_drift >= self.spyker_config.h_inter:
+            reason = f"Inter-Drift {inter_drift} >= {self.spyker_config.h_inter}"
             self.age_at_last_sync = self.model_age
-            self._broadcast_model_to_all()
+            self._broadcast_model_to_all(reason)
+        elif intra_drift >= self.spyker_config.h_intra:
+            reason = f"Intra-Drift {intra_drift} >= {self.spyker_config.h_intra}"
+            self.age_at_last_sync = self.model_age
+            self._broadcast_model_to_all(reason)
         else:
             self._pass_token()
     
-    def _broadcast_model_to_all(self):
+    def _broadcast_model_to_all(self, reason="Unknown"):
         # Unique Broadcast ID
         bid = f"{self.server_id}_{self.model_age}"
         self.current_bid = bid
@@ -226,7 +230,7 @@ class SpykerServer(BaseAsyncServer):
 
         self.sync_counts[bid] = 1
 
-        print(f"[{self.server_id}] Initiating SYNC {bid}. Holding Token.")
+        print(f"[{self.server_id}] Initiating SYNC {bid}. Reason: {reason}")
 
         self._perform_broadcast(bid)
 
@@ -261,7 +265,11 @@ class SpykerServer(BaseAsyncServer):
         
         # Update local age
         self.server_ages[sender_id] = sender_age
+        old_age = self.model_age
         self.model_age = max(self.model_age, sender_age)
+
+        if self.model_age > old_age:
+            print(f"[{self.server_id}] Aggregated model from {sender_id}. Age jumped {old_age} -> {self.model_age}")
 
         if self.has_token and bid == self.current_bid:
             self.sync_counts[bid] += 1
@@ -348,6 +356,7 @@ class SpykerServer(BaseAsyncServer):
             event_type = "CLIENT_UPDATE",
             data = {
                 "client_id": client_id,
+                "server_id": self.server_id,
                 "fit_res": fit_res
             }
         )
