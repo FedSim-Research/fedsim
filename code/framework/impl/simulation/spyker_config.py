@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 @dataclass
 class SpykerAlgorithmConfig:
@@ -38,6 +38,6 @@ class SimulationConfig:
 
 @dataclass
 class FullConfiguration:
-    spyker: SpykerAlgorithmConfig = SpykerAlgorithmConfig()
-    training: TrainingConfig = TrainingConfig()
-    simulation: SimulationConfig = SimulationConfig()
+    spyker: SpykerAlgorithmConfig = field(default_factory=SpykerAlgorithmConfig)
+    training: TrainingConfig = field(default_factory=TrainingConfig)
+    simulation: SimulationConfig = field(default_factory=SimulationConfig)
