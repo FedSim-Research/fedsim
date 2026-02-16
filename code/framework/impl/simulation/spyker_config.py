@@ -1,23 +1,43 @@
 from dataclasses import dataclass
 
 @dataclass
-class SpykerConfig:
+class SpykerAlgorithmConfig:
+    """Parameters specific to the Spyker algorithms."""
     # --- Algorithm 1: Client Learning Rate Decay ---
     decay_beta: float = 0.05
     min_learning_rate: float = 1e-6
     
     # --- Algorithm 2: Server Synchronization Triggers ---
-    # Max allowed age difference between any two servers
     h_inter: int = 5         
-    # Max allowed age difference on local server since last sync
     h_intra: int = 350       
     
     # --- Server Aggregation ---
-    # Controls the steepness of the sigmoid function for model weighting
     sigmoid_phi: float = 1.5 
-    # Learning rate for merging server models (eta_a)
     server_learning_rate: float = 0.6
     
     # --- TCP Simulation ---
-    # Estimated time to detect a lost packet and resend (RTO) in seconds
     tcp_rto_delay: float = 0.2
+
+@dataclass
+class TrainingConfig:
+    """Hyperparameters for the local model training on clients."""
+    local_epochs: int = 1
+    learning_rate: float = 0.01
+    batch_size: int = 32
+    # Used to calculate virtual training duration
+    model_complexity: float = 1.0 
+
+@dataclass
+class SimulationConfig:
+    """Global physics and limits for the simulation engine."""
+    # When to stop the simulation (Virtual Seconds)
+    run_time_limit: float = 5000.0
+    
+    # The 'Heartbeat' delay during token idle state (Virtual Seconds)
+    idle_token_delay: float = 1.0 
+
+@dataclass
+class FullConfiguration:
+    spyker: SpykerAlgorithmConfig = SpykerAlgorithmConfig()
+    training: TrainingConfig = TrainingConfig()
+    simulation: SimulationConfig = SimulationConfig()

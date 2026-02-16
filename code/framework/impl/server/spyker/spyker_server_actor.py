@@ -15,7 +15,7 @@ from flwr.common import (
 from flwr.client import Client
 from server.server_actor import BaseAsyncServer
 from simulation.context import SimulationContext, set_global_context
-from simulation.spyker_config import SpykerConfig
+from simulation.spyker_config import FullConfiguration
 from specs.network_metrics import Network
 from simulation.network_model import estimate_transmission_time
 from client.simulation_client import SimulationFlowerClient
@@ -25,7 +25,7 @@ from client.virtual_client import VirtualClient
 class SpykerServer(BaseAsyncServer):
     def __init__(self, 
                  server_id: str,
-                 config: SpykerConfig,
+                 config: FullConfiguration,
                  context: SimulationContext):
         
         set_global_context(context)
@@ -38,7 +38,8 @@ class SpykerServer(BaseAsyncServer):
         super().__init__(server_id)
         
         self.server_id = server_id
-        self.config = config
+        self.full_config = config
+        self.spyker_config = config.spyker
 
         # --- Machine Learning State ---
         self.global_model_weights: List[np.ndarray] = []
@@ -187,8 +188,8 @@ class SpykerServer(BaseAsyncServer):
             return 1.0
 
         # exp-decay for very active clients
-        val = math.exp(-self.config.decay_beta * (client_updates - avg_updates))
-        return max(self.config.min_learning_rate, val)
+        val = math.exp(-self.spyker_config.decay_beta * (client_updates - avg_updates))
+        return max(self.spyker_config.min_learning_rate, val)
     
     def _get_model_size_mb(self) -> float:
         """Calculates the size of the current global model in Megabytes."""
@@ -209,7 +210,7 @@ class SpykerServer(BaseAsyncServer):
         inter_drift = max_age - min_age
         intra_drift = self.model_age - self.age_at_last_sync
 
-        if inter_drift >= self.config.h_inter or intra_drift >= self.config.h_intra:
+        if inter_drift >= self.spyker_config.h_inter or intra_drift >= self.spyker_config.h_intra:
             # Broadcast to all other servers
             self.age_at_last_sync = self.model_age
             self._broadcast_model_to_all()
@@ -247,10 +248,10 @@ class SpykerServer(BaseAsyncServer):
 
         # Calculate Sigmoid Weight
         delta_age = sender_age - self.model_age
-        sigmoid_w = 1.0 / (1.0 + math.exp(-self.config.sigmoid_phi * (delta_age)))
+        sigmoid_w = 1.0 / (1.0 + math.exp(-self.spyker_config.sigmoid_phi * (delta_age)))
 
         # Aggregation as in SPYKER: W = W + eta_server * sigmoid * (W_peer - W)
-        effective_alpha = self.config.server_learning_rate * sigmoid_w
+        effective_alpha = self.spyker_config.server_learning_rate * sigmoid_w
         
         self.global_model_weights = self._aggregate_weights(
             base_weights=self.global_model_weights,
@@ -268,7 +269,7 @@ class SpykerServer(BaseAsyncServer):
             if self.sync_counts[bid] >= self.total_servers:
                 print(f"[{self.server_id}] Sync {bid} Complete. Releasing Token.")
                 self.current_bid = ""
-                self._pass_token()
+                self._pass_token(immediate_sync_after_release=True)
 
     def _handle_token_arrival(self, sender_id, payload):
         self.has_token = True
@@ -282,13 +283,13 @@ class SpykerServer(BaseAsyncServer):
 
         self._check_synchronization()
 
-    def _pass_token(self):
+    def _pass_token(self, immediate_sync_after_release: bool = False):
         if not self.next_token_peer:
             return # single server setup
         
         self.has_token = False
 
-        token_processing_delay = 1.0 # 100 ms processing delay for token check
+        token_processing_delay = 0.0 if immediate_sync_after_release else self.full_config.simulation.idle_token_delay
 
         self._send_server_message(
             target_id = self.next_token_peer,
@@ -319,10 +320,13 @@ class SpykerServer(BaseAsyncServer):
         """
         Interacts with the VirtualClient to perform training and simulation.
         """
+        train_config = self.full_config.training
+
         config = {
             "server_id": self.server_id,
-            "epochs": 1, # TODO:parametrize and pass from frontend
-            "model_complexity": 1.0,
+            "epochs": train_config.local_epochs,
+            "lr": train_config.learning_rate,
+            "model_complexity": train_config.model_complexity,
             "model_age": self.model_age
         }
         

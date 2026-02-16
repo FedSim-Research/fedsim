@@ -11,7 +11,7 @@ from flwr.common import parameters_to_ndarrays
 from main.task import Net, test
 from simulation.context import SimulationContext, set_global_context
 from simulation.orchestrator import SimulationOrchestrator
-from simulation.spyker_config import SpykerConfig
+from simulation.spyker_config import FullConfiguration
 from specs.server_spec import ServerSpec
 from specs.client_spec import ClientSpec
 from specs.network_metrics import Network
@@ -19,7 +19,6 @@ from specs.performance_metrics import Performance
 from server.spyker.spyker_server_actor import SpykerServer
 from client.simulation_client import SimulationFlowerClient
 
-RUNTIME_LIMIT = 5000.0
 SIM_NAME = "Spyker_CIFAR10"
 
 class DataLoaderAdapter:
@@ -36,9 +35,7 @@ class DataLoaderAdapter:
         return len(self.loader)
 
 class SpykerSimulation:
-    def __init__(self, run_time_limit: float = RUNTIME_LIMIT):
-        self.run_time_limit = run_time_limit
-
+    def __init__(self):
         self.server_ids = []
         self.client_ids = []
 
@@ -47,14 +44,45 @@ class SpykerSimulation:
 
         self.client_map: Dict[str, List[Tuple[str, SimulationFlowerClient]]] = {}
 
-        self.spyker_config: SpykerConfig = SpykerConfig()
+        self.config = FullConfiguration()
 
         self.context = None
         self.orchestrator = None
         self.spyker_actors_map: Dict[str, Any] = {}
 
-    def set_spyker_config(self, config: SpykerConfig):
-        self.spyker_config = config
+    def set_configurations(self, 
+                           spyker_params: Dict[str, Any],
+                           training_params: Dict[str, Any],
+                           simulation_params: Dict[str, Any]):
+        """
+        API Entry point to inject configurations before build/run.
+        Values not provided will fallback to defaults in spyker_config.py
+        """
+        
+        # 1. Update Spyker Algorithm Params
+        if spyker_params:
+            for k, v in spyker_params.items():
+                if hasattr(self.config.spyker, k):
+                    setattr(self.config.spyker, k, v)
+                else:
+                    print(f"[Warning] Unknown Spyker config key: {k}")
+
+        # 2. Update Training Params
+        if training_params:
+            for k, v in training_params.items():
+                if hasattr(self.config.training, k):
+                    setattr(self.config.training, k, v)
+
+        # 3. Update Simulation Physics Params
+        if simulation_params:
+            for k, v in simulation_params.items():
+                if hasattr(self.config.simulation, k):
+                    setattr(self.config.simulation, k, v)
+
+        print("Configuration Updated.")
+        print(f"  > Run Limit: {self.config.simulation.run_time_limit}s")
+        print(f"  > Epochs: {self.config.training.local_epochs}")
+        print(f"  > Token Heartbeat: {self.config.simulation.idle_token_delay}s")
 
     def add_server(
             self, 
@@ -128,7 +156,7 @@ class SpykerSimulation:
         for s_id in self.server_ids:
             actor = SpykerServer.remote(
                 server_id=s_id,
-                config=self.spyker_config,
+                config=self.config,
                 context=self.context
             )
             self.spyker_actors_map[s_id] = actor
@@ -216,8 +244,9 @@ class SpykerSimulation:
 
         print(f"Simulation queued with {len(all_initial_events)} initial events.")
         print("Running orchestration loop...")
+        limit = self.config.simulation.run_time_limit
 
-        ray.get(self.orchestrator.run_until.remote(self.run_time_limit))
+        ray.get(self.orchestrator.run_until.remote(limit))
 
         print("Simulation execution finished")
 
@@ -271,10 +300,29 @@ def evaluate_model(filename: str):
 
 def run_default_simulation():
     print("Initialising Simulation.")
-    sim = SpykerSimulation(run_time_limit=RUNTIME_LIMIT)
+    sim = SpykerSimulation()
 
-    config = SpykerConfig(decay_beta=0.1, h_inter=1)
-    sim.set_spyker_config(config)
+    # --- INJECT CONFIGURATIONS ---
+    sim.set_configurations(
+        spyker_params={
+            "decay_beta": 0.1,
+            "min_learning_rate": 1e-6,
+            "h_inter": 5,
+            "h_intra": 350,
+            "sigmoid_phi": 1.5,
+            "server_learning_rate": 0.6,
+            "tcp_rto_delay": 0.2
+        },
+        training_params={
+            "local_epochs": 1,
+            "learning_rate": 0.05,
+            "model_complexity": 1.0
+        },
+        simulation_params={
+            "run_time_limit": 2000.0,
+            "idle_token_delay": 1.0
+        }
+    )
 
     perf = Performance(compute_factor=10.0, performance_stddev=1.0)
 
