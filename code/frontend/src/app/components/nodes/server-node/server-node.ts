@@ -26,6 +26,7 @@ export class ServerNode extends CustomNodeComponent {
       name: config.name ?? '',
       id: config.id ?? '',
       computeFactor: config.computeFactor ?? 2.0,
+      performanceSigma: config.performanceSigma ?? 0.0,
       uploadMbps: config.uploadMbps ?? 20,
       downloadMbps: config.downloadMbps ?? 100,
       environment,
@@ -33,6 +34,14 @@ export class ServerNode extends CustomNodeComponent {
   });
 
   public environment = computed(() => (this.server().environment ?? 'spyker').toString().toLowerCase());
+
+  public formatNumber(value: number): string {
+    if (!Number.isFinite(value)) return '0';
+    return value.toLocaleString('en-US', {
+      useGrouping: false,
+      maximumFractionDigits: 6,
+    });
+  }
 
   public onNodeClick(event: MouseEvent): void {
     if (event.button !== 0) return;

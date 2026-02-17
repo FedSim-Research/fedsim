@@ -34,6 +34,7 @@ export class ClientNode extends CustomNodeComponent {
       count: config.count ?? 50,
       type,
       computeFactor: config.computeFactor ?? 0.8,
+      performanceSigma: config.performanceSigma ?? 0.0,
       uploadMbps: config.uploadMbps ?? 2,
       downloadMbps: config.downloadMbps ?? 10,
       environment,

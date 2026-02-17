@@ -25,6 +25,7 @@ export class SuperServerNode extends CustomNodeComponent {
       name: config.name ?? '',
       id: config.id ?? '',
       computeFactor: config.computeFactor ?? 2.0,
+      performanceSigma: config.performanceSigma ?? 0.0,
       uploadMbps: config.uploadMbps ?? 20,
       downloadMbps: config.downloadMbps ?? 100,
       environment,
@@ -40,6 +41,14 @@ export class SuperServerNode extends CustomNodeComponent {
     }
     event.stopPropagation();
     this.nodeDeleteUi.showFor(this.node().id);
+  }
+
+  public formatNumber(value: number): string {
+    if (!Number.isFinite(value)) return '0';
+    return value.toLocaleString('en-US', {
+      useGrouping: false,
+      maximumFractionDigits: 6,
+    });
   }
 
   public onDelete(event: MouseEvent): void {

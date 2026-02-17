@@ -90,3 +90,22 @@ class Edge(Base):
         "Node",
         foreign_keys=[target_node_id],
     )
+
+
+class NodePreset(Base):
+    """
+    Persisted node configuration preset by architecture and node type.
+    """
+
+    __tablename__ = "node_presets"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    architecture: Mapped[str] = mapped_column(String(20), nullable=False)
+    node_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    config_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[str] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
