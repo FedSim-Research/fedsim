@@ -351,11 +351,10 @@
 }
 
 .field-divider {
-  font-size: 1.05rem;
+  text-align: center;
   font-weight: 700;
   color: var(--muted);
-  padding-bottom: 6px;
-  transform: translateY(-2px);
+  padding-bottom: 10px;
 }
 
 .field {
