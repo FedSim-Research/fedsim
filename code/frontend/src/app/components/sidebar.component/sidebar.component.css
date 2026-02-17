@@ -351,11 +351,18 @@
 
 .field-with-plus .field-row {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 10px;
 }
 
+.field-with-plus .field-row .field-input--short {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
 .plus-btn {
+  flex: 0 0 0.7cm;
   width: 0.7cm;
   min-width: 0.7cm;
   height: 0.5cm;
@@ -374,6 +381,10 @@
 
 .plus-btn:hover {
   background: rgba(255, 255, 255, 0.12);
+}
+
+.plus-btn--save {
+  font-size: 0.85rem;
 }
 
 .field input,
@@ -396,7 +407,19 @@
 
 .field input.field-input--short,
 .field select.field-input--short {
-  width: calc(100% - 0.5cm);
+  width: 100%;
+}
+
+.selected-preset-info {
+  margin-top: -2px;
+  margin-bottom: 4px;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.selected-preset-info strong {
+  color: var(--text);
+  font-weight: 700;
 }
 
 .field.checkbox {

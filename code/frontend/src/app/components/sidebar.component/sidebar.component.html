@@ -122,9 +122,15 @@
             <span>Name</span>
             <div class="field-row">
               <input class="field-input--short" type="text" [(ngModel)]="configDraft.superserver.name" placeholder="Name" />
-              <button class="plus-btn" type="button" (click)="openSuperServerBlueprintPopup()" aria-label="Open Super Server blueprints" title="Presets">+</button>
+              <button class="plus-btn" type="button" (click)="openSuperServerBlueprintPopup()" aria-label="Inspect Super Server presets" title="Inspect presets">+</button>
+              <button class="plus-btn plus-btn--save" type="button" (click)="saveCurrentSuperServerPreset()" aria-label="Save Super Server preset" title="Save preset">
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                  <path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-8h8v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
             </div>
           </label>
+          <div class="selected-preset-info">Selected preset: {{ selectedSuperServerPresetName() }}</div>
           <div class="grid">
             <label class="field">
               <span>Upload (Mbps)</span>
@@ -162,9 +168,15 @@
           <span>Name</span>
           <div class="field-row">
             <input class="field-input--short" type="text" [(ngModel)]="configDraft.server.name" />
-            <button class="plus-btn" type="button" (click)="openServerBlueprintPopup()" aria-label="Open Server Node blueprints" title="Presets">+</button>
+            <button class="plus-btn" type="button" (click)="openServerBlueprintPopup()" aria-label="Inspect Server Node presets" title="Inspect presets">+</button>
+            <button class="plus-btn plus-btn--save" type="button" (click)="saveCurrentServerPreset()" aria-label="Save Server Node preset" title="Save preset">
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                <path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-8h8v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
           </div>
         </label>
+        <div class="selected-preset-info">Selected preset: {{ selectedServerPresetName() }}</div>
         <div class="grid">
           <label class="field">
             <span>Upload (Mbps)</span>
@@ -205,9 +217,15 @@
               <option value="workstation">Workstation</option>
               <option value="mobile">Mobile</option>
             </select>
-            <button class="plus-btn" type="button" (click)="openClientBlueprintPopup()" aria-label="Open Client Node blueprints" title="Presets">+</button>
+            <button class="plus-btn" type="button" (click)="openClientBlueprintPopup()" aria-label="Inspect Client Node presets" title="Inspect presets">+</button>
+            <button class="plus-btn plus-btn--save" type="button" (click)="saveCurrentClientPreset()" aria-label="Save Client Node preset" title="Save preset">
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                <path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-8h8v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
           </div>
         </label>
+        <div class="selected-preset-info">Selected preset: {{ selectedClientPresetName() }}</div>
         <label class="field">
           <span>Number of clients</span>
           <input type="number" min="1" [(ngModel)]="configDraft.client.count" />
@@ -347,10 +365,10 @@
     </div>
     <div class="popup-actions popup-actions--inline">
       <button class="cta-option cta-option--confirm" type="button" (click)="saveSuperServerBlueprint()">Save</button>
-      <button class="cta-option cta-option--cancel" type="button" (click)="closeSuperServerBlueprintPopup()">Cancel</button>
+      <button class="cta-option cta-option--cancel" type="button" (click)="createNewSuperServerPreset()">New</button>
     </div>
     <div class="popup-actions popup-actions--single">
-      <button class="cta-option cta-option--initialize" type="button" (click)="initializeSuperServerPreset()">Initialize</button>
+      <button class="cta-option cta-option--initialize" type="button" (click)="loadSuperServerPreset()">Load preset</button>
     </div>
   </div>
 </div>
@@ -434,10 +452,10 @@
     </div>
     <div class="popup-actions popup-actions--inline">
       <button class="cta-option cta-option--confirm" type="button" (click)="saveServerBlueprint()">Save</button>
-      <button class="cta-option cta-option--cancel" type="button" (click)="closeServerBlueprintPopup()">Cancel</button>
+      <button class="cta-option cta-option--cancel" type="button" (click)="createNewServerPreset()">New</button>
     </div>
     <div class="popup-actions popup-actions--single">
-      <button class="cta-option cta-option--initialize" type="button" (click)="initializeServerPreset()">Initialize</button>
+      <button class="cta-option cta-option--initialize" type="button" (click)="loadServerPreset()">Load preset</button>
     </div>
   </div>
 </div>
@@ -529,10 +547,10 @@
     </div>
     <div class="popup-actions popup-actions--inline">
       <button class="cta-option cta-option--confirm" type="button" (click)="saveClientBlueprint()">Save</button>
-      <button class="cta-option cta-option--cancel" type="button" (click)="closeClientBlueprintPopup()">Cancel</button>
+      <button class="cta-option cta-option--cancel" type="button" (click)="createNewClientPreset()">New</button>
     </div>
     <div class="popup-actions popup-actions--single">
-      <button class="cta-option cta-option--initialize" type="button" (click)="initializeClientPreset()">Initialize</button>
+      <button class="cta-option cta-option--initialize" type="button" (click)="loadClientPreset()">Load preset</button>
     </div>
   </div>
 </div>
@@ -549,7 +567,6 @@
       <p><strong>Are you sure you want to delete all nodes and edges?</strong></p>
       <div class="popup-actions popup-actions--inline">
         <button class="cta-option cta-option--confirm" (click)="confirmResetGraph()">Yes, delete</button>
-        <button class="cta-option cta-option--cancel" (click)="closeResetPopup()">Cancel</button>
       </div>
     </div>
   </div>
@@ -567,7 +584,24 @@
       <p><strong>Are you sure you want to delete preset "{{ deletePresetTarget?.name }}"?</strong></p>
       <div class="popup-actions popup-actions--inline">
         <button class="cta-option cta-option--confirm" (click)="confirmDeletePreset()">Yes, delete</button>
-        <button class="cta-option cta-option--cancel" (click)="closeDeletePresetPopup()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+}
+
+@if (showConfirmSavePresetPopup) {
+<div class="popup-backdrop" (click)="closeConfirmSavePresetPopup()">
+  <div class="popup-card" (click)="$event.stopPropagation()">
+    <div class="popup-header">
+      <h3>Update preset?</h3>
+      <button class="icon-btn-small" (click)="closeConfirmSavePresetPopup()">✕</button>
+    </div>
+    <div class="popup-body">
+      <p><strong>You are about to update preset "{{ savePresetTarget?.name }}".</strong></p>
+      <div class="popup-actions popup-actions--inline">
+        <button class="cta-option cta-option--confirm" (click)="confirmUpdateSelectedPreset()">Update</button>
+        <button class="cta-option cta-option--initialize" (click)="confirmCreateNewPresetFromSidebar()">New preset</button>
       </div>
     </div>
   </div>

@@ -113,3 +113,23 @@ class VflowEdge(BaseModel):
 class VflowGraph(BaseModel):
     nodes: List[VflowNode]
     edges: List[VflowEdge]
+
+
+class PresetCreate(BaseModel):
+    architecture: Literal["spyker", "hierfl"]
+    node_type: Literal["SuperServerNode", "ServerNode", "ClientNode"]
+    name: str
+    config: Dict[str, Any]
+
+
+class PresetUpdate(BaseModel):
+    name: str | None = None
+    config: Dict[str, Any] | None = None
+
+
+class PresetResponse(BaseModel):
+    preset_id: int
+    architecture: Literal["spyker", "hierfl"]
+    node_type: Literal["SuperServerNode", "ServerNode", "ClientNode"]
+    name: str
+    config: Dict[str, Any]

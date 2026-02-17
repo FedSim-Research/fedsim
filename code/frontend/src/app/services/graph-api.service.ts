@@ -125,6 +125,26 @@ export interface SimulationStartResponse {
   } | null;
 }
 
+export interface PresetResponse {
+  preset_id: number;
+  architecture: 'spyker' | 'hierfl';
+  node_type: 'SuperServerNode' | 'ServerNode' | 'ClientNode';
+  name: string;
+  config: Record<string, unknown>;
+}
+
+export interface PresetCreate {
+  architecture: 'spyker' | 'hierfl';
+  node_type: 'SuperServerNode' | 'ServerNode' | 'ClientNode';
+  name: string;
+  config: Record<string, unknown>;
+}
+
+export interface PresetUpdate {
+  name?: string;
+  config?: Record<string, unknown>;
+}
+
 @Injectable({ providedIn: 'root' })
 export class GraphApiService {
   private http = inject(HttpClient);
@@ -185,5 +205,28 @@ export class GraphApiService {
 
   public async replaceGraphState(graphId: number, payload: VflowGraph): Promise<GraphDetail> {
     return firstValueFrom(this.http.put<GraphDetail>(this.url(`/graphs/${graphId}/state`), payload));
+  }
+
+  public async listPresets(
+    architecture: 'spyker' | 'hierfl',
+    nodeType: 'SuperServerNode' | 'ServerNode' | 'ClientNode'
+  ): Promise<PresetResponse[]> {
+    return firstValueFrom(
+      this.http.get<PresetResponse[]>(
+        this.url(`/presets/?architecture=${architecture}&node_type=${nodeType}`)
+      )
+    );
+  }
+
+  public async createPreset(payload: PresetCreate): Promise<PresetResponse> {
+    return firstValueFrom(this.http.post<PresetResponse>(this.url('/presets/'), payload));
+  }
+
+  public async updatePreset(presetId: number, payload: PresetUpdate): Promise<PresetResponse> {
+    return firstValueFrom(this.http.put<PresetResponse>(this.url(`/presets/${presetId}`), payload));
+  }
+
+  public async deletePreset(presetId: number): Promise<void> {
+    await firstValueFrom(this.http.delete(this.url(`/presets/${presetId}`)));
   }
 }
