@@ -87,27 +87,77 @@
         <span>Simulation Settings</span>
       </summary>
       <div class="disclosure__body">
-        <div class="grid">
-          <label class="field">
-            <span>Epochs</span>
-            <input type="number" min="1" [(ngModel)]="simulationSettings.epochs" />
-          </label>
-          <label class="field">
-            <span>Learning rate</span>
-            <input type="number" step="0.0001" min="0" [(ngModel)]="simulationSettings.lr" />
-          </label>
-          <label class="field">
-            <span>Time limit (s)</span>
-            <input type="number" min="1" step="1" [(ngModel)]="simulationSettings.runTimeLimit" />
-          </label>
+        <div class="sim-settings-section">
+          @if (selectedArchitectures.spyker) {
+          <div class="sim-settings-title">Training & Simulation</div>
+          }
+          <div class="grid">
+            <label class="field">
+              <span class="field-label">Epochs <span class="help-dot" title="Number of local training passes per client before aggregation.">?</span></span>
+              <input type="number" min="1" [(ngModel)]="simulationSettings.epochs" />
+            </label>
+            <label class="field">
+              <span class="field-label">Learning rate <span class="help-dot" title="Step size used by the optimizer during local training.">?</span></span>
+              <input type="number" step="0.0001" min="0" [(ngModel)]="simulationSettings.lr" />
+            </label>
+            <label class="field">
+              <span class="field-label">Model complexity <span class="help-dot" title="Scaling factor for simulated compute effort per training step.">?</span></span>
+              <input type="number" step="0.1" min="0.1" [(ngModel)]="simulationSettings.modelComplexity" />
+            </label>
+            <label class="field">
+              <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>
+              <input type="number" min="1" step="1" [(ngModel)]="simulationSettings.runTimeLimit" />
+            </label>
+            @if (selectedArchitectures.spyker) {
+            <label class="field">
+              <span class="field-label">Idle token delay (s) <span class="help-dot" title="Delay before token forwarding when no immediate sync is triggered.">?</span></span>
+              <input type="number" min="0" step="0.1" [(ngModel)]="simulationSettings.idleTokenDelay" />
+            </label>
+            }
+          </div>
         </div>
+        @if (selectedArchitectures.spyker) {
+        <div class="sim-settings-section sim-settings-section--separated">
+          <div class="sim-settings-title">Spyker Algorithm</div>
+          <div class="grid">
+            <label class="field">
+              <span class="field-label">Decay beta <span class="help-dot" title="Decay factor for reducing contribution of frequently-updating clients.">?</span></span>
+              <input type="number" min="0" step="0.01" [(ngModel)]="simulationSettings.decayBeta" />
+            </label>
+            <label class="field">
+              <span class="field-label">Min learning rate <span class="help-dot" title="Lower bound for client contribution scaling during decay.">?</span></span>
+              <input type="number" min="0.0000001" step="0.000001" [(ngModel)]="simulationSettings.minLearningRate" />
+            </label>
+            <label class="field">
+              <span class="field-label">h_inter <span class="help-dot" title="Inter-server drift threshold to trigger synchronization.">?</span></span>
+              <input type="number" min="1" step="1" [(ngModel)]="simulationSettings.hInter" />
+            </label>
+            <label class="field">
+              <span class="field-label">h_intra <span class="help-dot" title="Intra-server drift threshold to trigger synchronization.">?</span></span>
+              <input type="number" min="1" step="1" [(ngModel)]="simulationSettings.hIntra" />
+            </label>
+            <label class="field">
+              <span class="field-label">Sigmoid phi <span class="help-dot" title="Sharpness parameter for weighting server-side aggregation.">?</span></span>
+              <input type="number" min="0.01" step="0.1" [(ngModel)]="simulationSettings.sigmoidPhi" />
+            </label>
+            <label class="field">
+              <span class="field-label">Server learning rate <span class="help-dot" title="Server-side aggregation learning rate.">?</span></span>
+              <input type="number" min="0.0001" step="0.01" [(ngModel)]="simulationSettings.serverLearningRate" />
+            </label>
+            <label class="field">
+              <span class="field-label">TCP RTO delay <span class="help-dot" title="Simulated TCP retransmission timeout delay.">?</span></span>
+              <input type="number" min="0" step="0.05" [(ngModel)]="simulationSettings.tcpRtoDelay" />
+            </label>
+          </div>
+        </div>
+        }
         <label class="field">
-          <span>Output filename</span>
+          <span class="field-label">Output filename <span class="help-dot" title="Target file path/name used to store the final model checkpoint.">?</span></span>
           <input type="text" [(ngModel)]="simulationSettings.outputFilename" />
         </label>
         <label class="field checkbox">
           <input type="checkbox" [(ngModel)]="simulationSettings.evaluateModel" />
-          <span>Evaluate after run</span>
+          <span class="field-label">Evaluate after run <span class="help-dot" title="Runs post-training evaluation and returns accuracy/loss.">?</span></span>
         </label>
       </div>
     </details>

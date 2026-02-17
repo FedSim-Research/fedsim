@@ -511,8 +511,17 @@ export class App implements OnInit{
 
   public async handleSimulation(payload: {
     mode: 'spyker' | 'hierfl' | 'both';
-    trainingConfig: { epochs: number; lr: number };
-    simulationSettings: { runTimeLimit: number; outputFilename: string; evaluateModel: boolean };
+    trainingConfig: { epochs: number; lr: number; modelComplexity: number };
+    simulationSettings: { runTimeLimit: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
+    spykerConfig: {
+      decayBeta: number;
+      minLearningRate: number;
+      hInter: number;
+      hIntra: number;
+      sigmoidPhi: number;
+      serverLearningRate: number;
+      tcpRtoDelay: number;
+    };
   }): Promise<void> {
     const runFor = async (architecture: 'spyker' | 'hierfl'): Promise<void> => {
       const service = architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierach;
@@ -525,12 +534,28 @@ export class App implements OnInit{
         this.showInfoToast(`${architecture} simulation running...`);
         const result = await this.graphApi.startSimulation({
           graph_id: graphId,
-          training_config: payload.trainingConfig,
+          training_config: {
+            epochs: payload.trainingConfig.epochs,
+            lr: payload.trainingConfig.lr,
+            model_complexity: payload.trainingConfig.modelComplexity,
+          },
           simulation_settings: {
             run_time_limit: payload.simulationSettings.runTimeLimit,
+            idle_token_delay: payload.simulationSettings.idleTokenDelay,
             output_filename: payload.simulationSettings.outputFilename || null,
             evaluate_model: payload.simulationSettings.evaluateModel,
           },
+          spyker_config: architecture === 'spyker' || payload.mode === 'both'
+            ? {
+                decay_beta: payload.spykerConfig.decayBeta,
+                min_learning_rate: payload.spykerConfig.minLearningRate,
+                h_inter: payload.spykerConfig.hInter,
+                h_intra: payload.spykerConfig.hIntra,
+                sigmoid_phi: payload.spykerConfig.sigmoidPhi,
+                server_learning_rate: payload.spykerConfig.serverLearningRate,
+                tcp_rto_delay: payload.spykerConfig.tcpRtoDelay,
+              }
+            : undefined,
         });
         this.showSuccessToast(this.formatSimulationResult(architecture, result));
       } catch {

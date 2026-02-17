@@ -106,11 +106,22 @@ export interface SimulationStartRequest {
   training_config?: {
     epochs: number;
     lr: number;
+    model_complexity?: number;
   };
   simulation_settings?: {
     run_time_limit?: number;
+    idle_token_delay?: number;
     output_filename?: string | null;
     evaluate_model?: boolean;
+  };
+  spyker_config?: {
+    decay_beta?: number;
+    min_learning_rate?: number;
+    h_inter?: number;
+    h_intra?: number;
+    sigmoid_phi?: number;
+    server_learning_rate?: number;
+    tcp_rto_delay?: number;
   };
 }
 

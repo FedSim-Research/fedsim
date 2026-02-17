@@ -21,11 +21,11 @@ def _import_spyker():
         sys.path.append(impl_path)
 
     from main.main_spyker import SpykerSimulation, evaluate_model  # type: ignore
-    from simulation.spyker_config import SpykerConfig  # type: ignore
+    from simulation.spyker_config import FullConfiguration  # type: ignore
     from specs.performance_metrics import Performance  # type: ignore
     from specs.network_metrics import Network  # type: ignore
 
-    return SpykerSimulation, SpykerConfig, Performance, Network, evaluate_model
+    return SpykerSimulation, FullConfiguration, Performance, Network, evaluate_model
 
 
 def _node_config(node: Node) -> dict[str, Any]:
@@ -147,12 +147,74 @@ def validate_spyker_graph(graph: Graph) -> None:
     for edge in edges:
         _network_for_edge(edge)
 
+def _require_training_config(training_config: dict[str, Any] | None) -> dict[str, Any]:
+    if training_config is None:
+        raise ValueError("spyker_missing_training_config")
+    if "epochs" not in training_config or training_config["epochs"] is None:
+        raise ValueError("spyker_missing_training_epochs")
+    if "lr" not in training_config or training_config["lr"] is None:
+        raise ValueError("spyker_missing_training_lr")
+    try:
+        epochs = int(training_config["epochs"])
+    except (TypeError, ValueError):
+        raise ValueError("spyker_invalid_training_epochs")
+    try:
+        lr = float(training_config["lr"])
+    except (TypeError, ValueError):
+        raise ValueError("spyker_invalid_training_lr")
+    if epochs < 1:
+        raise ValueError("spyker_invalid_training_epochs")
+    if lr <= 0:
+        raise ValueError("spyker_invalid_training_lr")
+    result = {"local_epochs": epochs, "learning_rate": lr}
+    if "model_complexity" in training_config and training_config["model_complexity"] is not None:
+        try:
+            model_complexity = float(training_config["model_complexity"])
+        except (TypeError, ValueError):
+            raise ValueError("spyker_invalid_model_complexity")
+        if model_complexity <= 0:
+            raise ValueError("spyker_invalid_model_complexity")
+        result["model_complexity"] = model_complexity
+    return result
+
+
+def _require_spyker_config(spyker_config: dict[str, Any] | None) -> dict[str, Any]:
+    if not spyker_config:
+        return {}
+    result: dict[str, Any] = {}
+    float_positive = {"min_learning_rate", "sigmoid_phi", "server_learning_rate"}
+    float_non_negative = {"decay_beta", "tcp_rto_delay"}
+    int_min_one = {"h_inter", "h_intra"}
+
+    for key, value in spyker_config.items():
+        if value is None:
+            continue
+        if key in float_positive:
+            val = float(value)
+            if val <= 0:
+                raise ValueError(f"spyker_invalid_{key}")
+            result[key] = val
+        elif key in float_non_negative:
+            val = float(value)
+            if val < 0:
+                raise ValueError(f"spyker_invalid_{key}")
+            result[key] = val
+        elif key in int_min_one:
+            val = int(value)
+            if val < 1:
+                raise ValueError(f"spyker_invalid_{key}")
+            result[key] = val
+    return result
+
 
 def build_spyker_simulation(
     graph: Graph,
+    training_config: dict[str, Any] | None = None,
+    spyker_config: dict[str, Any] | None = None,
     run_time_limit: float | None = None,
+    idle_token_delay: float | None = None,
 ):
-    SpykerSimulation, SpykerConfig, _, _, _ = _import_spyker()
+    SpykerSimulation, _, _, _, _ = _import_spyker()
     validate_spyker_graph(graph)
 
     nodes = list(graph.nodes)
@@ -165,8 +227,20 @@ def build_spyker_simulation(
     limit = DEFAULT_RUN_TIME_LIMIT if run_time_limit is None else float(run_time_limit)
     if limit <= 0:
         raise ValueError("spyker_invalid_run_time_limit")
-    sim = SpykerSimulation(run_time_limit=limit)
-    sim.set_spyker_config(SpykerConfig())
+    spyker_training_config = _require_training_config(training_config)
+    algorithm_config = _require_spyker_config(spyker_config)
+    simulation_config: dict[str, Any] = {"run_time_limit": limit}
+    if idle_token_delay is not None:
+        idle = float(idle_token_delay)
+        if idle < 0:
+            raise ValueError("spyker_invalid_idle_token_delay")
+        simulation_config["idle_token_delay"] = idle
+    sim = SpykerSimulation()
+    sim.set_configurations(
+        spyker_params=algorithm_config,
+        training_params=spyker_training_config,
+        simulation_params=simulation_config,
+    )
 
     edge_networks: dict[tuple[str, str], Any] = {}
     for edge in edges:

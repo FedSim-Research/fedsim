@@ -108,8 +108,17 @@ export class SidebarComponent implements OnInit {
   @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
   @Output() simulationRequested = new EventEmitter<{
     mode: 'spyker' | 'hierfl' | 'both';
-    trainingConfig: { epochs: number; lr: number };
-    simulationSettings: { runTimeLimit: number; outputFilename: string; evaluateModel: boolean };
+    trainingConfig: { epochs: number; lr: number; modelComplexity: number };
+    simulationSettings: { runTimeLimit: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
+    spykerConfig: {
+      decayBeta: number;
+      minLearningRate: number;
+      hInter: number;
+      hIntra: number;
+      sigmoidPhi: number;
+      serverLearningRate: number;
+      tcpRtoDelay: number;
+    };
   }>();
 
   public selectedArchitectures = {
@@ -120,7 +129,16 @@ export class SidebarComponent implements OnInit {
   public simulationSettings = {
     epochs: 1,
     lr: 0.01,
+    modelComplexity: 1.0,
     runTimeLimit: 5000,
+    idleTokenDelay: 1.0,
+    decayBeta: 0.05,
+    minLearningRate: 0.000001,
+    hInter: 5,
+    hIntra: 350,
+    sigmoidPhi: 1.5,
+    serverLearningRate: 0.6,
+    tcpRtoDelay: 0.2,
     outputFilename: 'final_model_hierfl.pth',
     evaluateModel: false,
   };
@@ -939,11 +957,22 @@ export class SidebarComponent implements OnInit {
       trainingConfig: {
         epochs: this.simulationSettings.epochs,
         lr: this.simulationSettings.lr,
+        modelComplexity: this.simulationSettings.modelComplexity,
       },
       simulationSettings: {
         runTimeLimit: this.simulationSettings.runTimeLimit,
+        idleTokenDelay: this.simulationSettings.idleTokenDelay,
         outputFilename: this.simulationSettings.outputFilename,
         evaluateModel: this.simulationSettings.evaluateModel,
+      },
+      spykerConfig: {
+        decayBeta: this.simulationSettings.decayBeta,
+        minLearningRate: this.simulationSettings.minLearningRate,
+        hInter: this.simulationSettings.hInter,
+        hIntra: this.simulationSettings.hIntra,
+        sigmoidPhi: this.simulationSettings.sigmoidPhi,
+        serverLearningRate: this.simulationSettings.serverLearningRate,
+        tcpRtoDelay: this.simulationSettings.tcpRtoDelay,
       },
     });
     this.closeSimulationpopup();
