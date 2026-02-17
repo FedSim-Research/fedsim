@@ -15,7 +15,7 @@ from flwr.common import (
 from flwr.client import Client
 from server.server_actor import BaseAsyncServer
 from simulation.context import SimulationContext, set_global_context
-from simulation.spyker_config import SpykerConfig
+from simulation.spyker_config import FullConfiguration
 from specs.network_metrics import Network
 from simulation.network_model import estimate_transmission_time
 from client.simulation_client import SimulationFlowerClient
@@ -25,7 +25,7 @@ from client.virtual_client import VirtualClient
 class SpykerServer(BaseAsyncServer):
     def __init__(self, 
                  server_id: str,
-                 config: SpykerConfig,
+                 config: FullConfiguration,
                  context: SimulationContext):
         
         set_global_context(context)
@@ -38,7 +38,8 @@ class SpykerServer(BaseAsyncServer):
         super().__init__(server_id)
         
         self.server_id = server_id
-        self.config = config
+        self.full_config = config
+        self.spyker_config = config.spyker
 
         # --- Machine Learning State ---
         self.global_model_weights: List[np.ndarray] = []
@@ -61,6 +62,18 @@ class SpykerServer(BaseAsyncServer):
         # Self-Reference for scheduling events back to this actor
         self.self_ref = None
 
+        # Maps a sync_id (bid) to the number of models received for that sync
+        self.sync_counts: Dict[str, int] = {}
+
+        # Set of sync_ids that we have already broadcasted our model for
+        self.did_broadcast_ids: set = set()
+
+        # The current broadcast ID
+        self.current_bid: str = ""
+
+        self.total_servers = 0
+
+
     def set_global_context_remote(self, context: SimulationContext):
         """Sets the simulation context for this worker."""
         set_global_context(context)
@@ -78,6 +91,8 @@ class SpykerServer(BaseAsyncServer):
         self.peer_connections = peer_connections
         self.next_token_peer = next_token_peer
         self.assigned_clients = assigned_clients
+        self.total_servers = len(peer_connections) + 1 # self referenced + 1
+        print(f"[{self.server_id}] Total Servers set to {self.total_servers}")
 
         for peer in peer_connections:
             self.server_ages[peer] = 0
@@ -173,8 +188,8 @@ class SpykerServer(BaseAsyncServer):
             return 1.0
 
         # exp-decay for very active clients
-        val = math.exp(-self.config.decay_beta * (client_updates - avg_updates))
-        return max(self.config.min_learning_rate, val)
+        val = math.exp(-self.spyker_config.decay_beta * (client_updates - avg_updates))
+        return max(self.spyker_config.min_learning_rate, val)
     
     def _get_model_size_mb(self) -> float:
         """Calculates the size of the current global model in Megabytes."""
@@ -195,32 +210,39 @@ class SpykerServer(BaseAsyncServer):
         inter_drift = max_age - min_age
         intra_drift = self.model_age - self.age_at_last_sync
 
-        if inter_drift >= self.config.h_inter or intra_drift >= self.config.h_intra:
-            # Broadcast to all other servers
+        if inter_drift >= self.spyker_config.h_inter:
+            reason = f"Inter-Drift {inter_drift} >= {self.spyker_config.h_inter}"
             self.age_at_last_sync = self.model_age
-            self._broadcast_model_to_all()
+            self._broadcast_model_to_all(reason)
+        elif intra_drift >= self.spyker_config.h_intra:
+            reason = f"Intra-Drift {intra_drift} >= {self.spyker_config.h_intra}"
+            self.age_at_last_sync = self.model_age
+            self._broadcast_model_to_all(reason)
         else:
             self._pass_token()
     
-    def _broadcast_model_to_all(self):
-        weights_ref = ray.put(self.global_model_weights)
-        
-        for peer_id in self.peer_connections.keys():
-            self._send_server_message(
-                target_id = peer_id,
-                msg_type = "MODEL_BROADCAST",
-                payload = {
-                    "weights_ref": weights_ref,
-                    "age": self.model_age
-                }
-            )
-        
-        # After broadcasting, we pass the token
-        self._pass_token()
+    def _broadcast_model_to_all(self, reason="Unknown"):
+        # Unique Broadcast ID
+        bid = f"{self.server_id}_{self.model_age}"
+        self.current_bid = bid
+
+        self.did_broadcast_ids.add(bid)
+
+        self.sync_counts[bid] = 1
+
+        print(f"[{self.server_id}] Initiating SYNC {bid}. Reason: {reason}")
+
+        self._perform_broadcast(bid)
 
     def _handle_model_broadcast(self, sender_id, payload):
+        bid = payload['bid']
         sender_age = payload['age']
         weights_ref = payload['weights_ref']
+
+        if bid not in self.did_broadcast_ids:
+            print(f"[{self.server_id}] Joining Sync {bid} (Reflex Broadcast)")
+            self.did_broadcast_ids.add(bid)
+            self._perform_broadcast(bid)
         
         # Fetch the actual numpy arrays from Ray Object Store
         peer_weights = ray.get(weights_ref)
@@ -230,10 +252,10 @@ class SpykerServer(BaseAsyncServer):
 
         # Calculate Sigmoid Weight
         delta_age = sender_age - self.model_age
-        sigmoid_w = 1.0 / (1.0 + math.exp(-self.config.sigmoid_phi * (delta_age)))
+        sigmoid_w = 1.0 / (1.0 + math.exp(-self.spyker_config.sigmoid_phi * (delta_age)))
 
         # Aggregation as in SPYKER: W = W + eta_server * sigmoid * (W_peer - W)
-        effective_alpha = self.config.server_learning_rate * sigmoid_w
+        effective_alpha = self.spyker_config.server_learning_rate * sigmoid_w
         
         self.global_model_weights = self._aggregate_weights(
             base_weights=self.global_model_weights,
@@ -242,7 +264,20 @@ class SpykerServer(BaseAsyncServer):
         )
         
         # Update local age
+        self.server_ages[sender_id] = sender_age
+        old_age = self.model_age
         self.model_age = max(self.model_age, sender_age)
+
+        if self.model_age > old_age:
+            print(f"[{self.server_id}] Aggregated model from {sender_id}. Age jumped {old_age} -> {self.model_age}")
+
+        if self.has_token and bid == self.current_bid:
+            self.sync_counts[bid] += 1
+
+            if self.sync_counts[bid] >= self.total_servers:
+                print(f"[{self.server_id}] Sync {bid} Complete. Releasing Token.")
+                self.current_bid = ""
+                self._pass_token(immediate_sync_after_release=True)
 
     def _handle_token_arrival(self, sender_id, payload):
         self.has_token = True
@@ -256,19 +291,36 @@ class SpykerServer(BaseAsyncServer):
 
         self._check_synchronization()
 
-    def _pass_token(self):
+    def _pass_token(self, immediate_sync_after_release: bool = False):
         if not self.next_token_peer:
             return # single server setup
         
         self.has_token = False
+
+        token_processing_delay = 0.0 if immediate_sync_after_release else self.full_config.simulation.idle_token_delay
 
         self._send_server_message(
             target_id = self.next_token_peer,
             msg_type = "TOKEN",
             payload = {
                 "server_ages": self.server_ages.copy()
-            }
+            },
+            added_delay=token_processing_delay
         )
+
+    def _perform_broadcast(self, bid):
+        weights_ref = ray.put(self.global_model_weights)
+
+        for peer_id in self.peer_connections.keys():
+            self._send_server_message(
+                target_id=peer_id,
+                msg_type="MODEL_BROADCAST",
+                payload= {
+                    "weights_ref": weights_ref,
+                    "age": self.model_age,
+                    "bid": bid
+                }
+            )
 
     # =====================================================================
 
@@ -276,10 +328,13 @@ class SpykerServer(BaseAsyncServer):
         """
         Interacts with the VirtualClient to perform training and simulation.
         """
+        train_config = self.full_config.training
+
         config = {
             "server_id": self.server_id,
-            "epochs": 1, # TODO:parametrize and pass from frontend
-            "model_complexity": 1.0,
+            "epochs": train_config.local_epochs,
+            "lr": train_config.learning_rate,
+            "model_complexity": train_config.model_complexity,
             "model_age": self.model_age
         }
         
@@ -301,11 +356,12 @@ class SpykerServer(BaseAsyncServer):
             event_type = "CLIENT_UPDATE",
             data = {
                 "client_id": client_id,
+                "server_id": self.server_id,
                 "fit_res": fit_res
             }
         )
 
-    def _send_server_message(self, target_id: str, msg_type: str, payload: Any):
+    def _send_server_message(self, target_id: str, msg_type: str, payload: Any, added_delay: float = 0.0):
         """
         Calculates network delay for Server-to-Server comms and schedules the event.
         """
@@ -326,13 +382,15 @@ class SpykerServer(BaseAsyncServer):
             payload_size_mb=payload_size_mb
         )
 
+        final_delay = delay + added_delay
+
         payload['sender_id'] = self.server_id
         payload['type'] = msg_type
 
         target_actor = self.context.server_actor_handles[target_id]
 
         self._schedule_event(
-            delay=delay,
+            delay=final_delay,
             target_actor=target_actor,
             event_type="SERVER_MESSAGE",
             data=payload
