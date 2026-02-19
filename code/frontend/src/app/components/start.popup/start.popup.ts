@@ -1,22 +1,168 @@
 import { Component, EventEmitter, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { StepperModule } from 'primeng/stepper';
+
+type StartMode = 'spyker' | 'hierfl' | 'both';
+
+type CommonTrainingConfig = {
+  epochs: number;
+  lr: number;
+  modelComplexity: number;
+};
+
+type CommonSimulationConfig = {
+  runTimeLimit: number;
+  outputFilename: string;
+  evaluateModel: boolean;
+};
+
+type RunPayload = {
+  mode: StartMode;
+  hierfl: {
+    trainingConfig: CommonTrainingConfig;
+    simulationSettings: CommonSimulationConfig;
+  };
+  spyker: {
+    trainingConfig: CommonTrainingConfig;
+    simulationSettings: CommonSimulationConfig & { idleTokenDelay: number };
+    spykerConfig: {
+      decayBeta: number;
+      minLearningRate: number;
+      hInter: number;
+      hIntra: number;
+      sigmoidPhi: number;
+      serverLearningRate: number;
+      tcpRtoDelay: number;
+    };
+  };
+};
 
 @Component({
-  selector: 'app-start-popup', 
+  selector: 'app-start-popup',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule, StepperModule],
   templateUrl: './start.popup.html',
   styleUrl: './start.popup.css',
 })
 export class StartPopup {
   @Output() close = new EventEmitter<void>();
-  @Output() run = new EventEmitter<'spyker' | 'hierarchical' | 'both'>();
+  @Output() run = new EventEmitter<RunPayload>();
 
-  public onClose() {
+  public activeStep = 1;
+  public selectedMode: StartMode | null = null;
+  public evaluateAfterRun = false;
+
+  public hierflSettings = {
+    epochs: 1,
+    lr: 0.01,
+    modelComplexity: 1.0,
+    runTimeLimit: 5000,
+    outputFilename: 'final_model_hierfl.pth',
+    evaluateModel: false,
+  };
+
+  public spykerSettings = {
+    epochs: 1,
+    lr: 0.01,
+    modelComplexity: 1.0,
+    runTimeLimit: 5000,
+    idleTokenDelay: 1.0,
+    outputFilename: 'final_model_spyker.pth',
+    evaluateModel: false,
+    decayBeta: 0.05,
+    minLearningRate: 0.000001,
+    hInter: 5,
+    hIntra: 350,
+    sigmoidPhi: 1.5,
+    serverLearningRate: 0.6,
+    tcpRtoDelay: 0.2,
+  };
+
+  public onClose(): void {
     this.close.emit();
   }
 
-  public onRun(type: 'spyker' | 'hierarchical' | 'both') {
-    this.run.emit(type);
+  public selectMode(mode: StartMode): void {
+    this.selectedMode = mode;
+    this.activeStep = 1;
+  }
+
+  public nextStep(): void {
+    if (!this.selectedMode) {
+      return;
+    }
+    this.activeStep = this.isHierflIncluded() ? 2 : 3;
+  }
+
+  public nextFromHierfl(): void {
+    if (!this.isHierflIncluded()) {
+      return;
+    }
+    this.activeStep = 3;
+  }
+
+  public previousStep(): void {
+    this.activeStep = 1;
+  }
+
+  public previousFromSpyker(): void {
+    this.activeStep = this.isHierflIncluded() ? 2 : 1;
+  }
+
+  public isHierflIncluded(): boolean {
+    return this.selectedMode === 'hierfl' || this.selectedMode === 'both';
+  }
+
+  public isSpykerIncluded(): boolean {
+    return this.selectedMode === 'spyker' || this.selectedMode === 'both';
+  }
+
+  public canStartFromHierflStep(): boolean {
+    return this.selectedMode === 'hierfl';
+  }
+
+  public onRun(): void {
+    if (!this.selectedMode) {
+      return;
+    }
+
+    this.run.emit({
+      mode: this.selectedMode,
+      hierfl: {
+        trainingConfig: {
+          epochs: this.hierflSettings.epochs,
+          lr: this.hierflSettings.lr,
+          modelComplexity: this.hierflSettings.modelComplexity,
+        },
+        simulationSettings: {
+          runTimeLimit: this.hierflSettings.runTimeLimit,
+          outputFilename: this.hierflSettings.outputFilename,
+          evaluateModel: this.evaluateAfterRun,
+        },
+      },
+      spyker: {
+        trainingConfig: {
+          epochs: this.spykerSettings.epochs,
+          lr: this.spykerSettings.lr,
+          modelComplexity: this.spykerSettings.modelComplexity,
+        },
+        simulationSettings: {
+          runTimeLimit: this.spykerSettings.runTimeLimit,
+          idleTokenDelay: this.spykerSettings.idleTokenDelay,
+          outputFilename: this.spykerSettings.outputFilename,
+          evaluateModel: this.evaluateAfterRun,
+        },
+        spykerConfig: {
+          decayBeta: this.spykerSettings.decayBeta,
+          minLearningRate: this.spykerSettings.minLearningRate,
+          hInter: this.spykerSettings.hInter,
+          hIntra: this.spykerSettings.hIntra,
+          sigmoidPhi: this.spykerSettings.sigmoidPhi,
+          serverLearningRate: this.spykerSettings.serverLearningRate,
+          tcpRtoDelay: this.spykerSettings.tcpRtoDelay,
+        },
+      },
+    });
   }
 }

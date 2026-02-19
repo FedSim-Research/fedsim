@@ -511,16 +511,22 @@ export class App implements OnInit{
 
   public async handleSimulation(payload: {
     mode: 'spyker' | 'hierfl' | 'both';
-    trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-    simulationSettings: { runTimeLimit: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
-    spykerConfig: {
-      decayBeta: number;
-      minLearningRate: number;
-      hInter: number;
-      hIntra: number;
-      sigmoidPhi: number;
-      serverLearningRate: number;
-      tcpRtoDelay: number;
+    hierfl: {
+      trainingConfig: { epochs: number; lr: number; modelComplexity: number };
+      simulationSettings: { runTimeLimit: number; outputFilename: string; evaluateModel: boolean };
+    };
+    spyker: {
+      trainingConfig: { epochs: number; lr: number; modelComplexity: number };
+      simulationSettings: { runTimeLimit: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
+      spykerConfig: {
+        decayBeta: number;
+        minLearningRate: number;
+        hInter: number;
+        hIntra: number;
+        sigmoidPhi: number;
+        serverLearningRate: number;
+        tcpRtoDelay: number;
+      };
     };
   }): Promise<void> {
     const runFor = async (architecture: 'spyker' | 'hierfl'): Promise<void> => {
@@ -532,28 +538,29 @@ export class App implements OnInit{
       }
       try {
         this.showInfoToast(`${architecture} simulation running...`);
+        const archConfig = architecture === 'hierfl' ? payload.hierfl : payload.spyker;
         const result = await this.graphApi.startSimulation({
           graph_id: graphId,
           training_config: {
-            epochs: payload.trainingConfig.epochs,
-            lr: payload.trainingConfig.lr,
-            model_complexity: payload.trainingConfig.modelComplexity,
+            epochs: archConfig.trainingConfig.epochs,
+            lr: archConfig.trainingConfig.lr,
+            model_complexity: archConfig.trainingConfig.modelComplexity,
           },
           simulation_settings: {
-            run_time_limit: payload.simulationSettings.runTimeLimit,
-            idle_token_delay: payload.simulationSettings.idleTokenDelay,
-            output_filename: payload.simulationSettings.outputFilename || null,
-            evaluate_model: payload.simulationSettings.evaluateModel,
+            run_time_limit: archConfig.simulationSettings.runTimeLimit,
+            idle_token_delay: architecture === 'spyker' ? payload.spyker.simulationSettings.idleTokenDelay : undefined,
+            output_filename: archConfig.simulationSettings.outputFilename || null,
+            evaluate_model: archConfig.simulationSettings.evaluateModel,
           },
-          spyker_config: architecture === 'spyker' || payload.mode === 'both'
+          spyker_config: architecture === 'spyker'
             ? {
-                decay_beta: payload.spykerConfig.decayBeta,
-                min_learning_rate: payload.spykerConfig.minLearningRate,
-                h_inter: payload.spykerConfig.hInter,
-                h_intra: payload.spykerConfig.hIntra,
-                sigmoid_phi: payload.spykerConfig.sigmoidPhi,
-                server_learning_rate: payload.spykerConfig.serverLearningRate,
-                tcp_rto_delay: payload.spykerConfig.tcpRtoDelay,
+                decay_beta: payload.spyker.spykerConfig.decayBeta,
+                min_learning_rate: payload.spyker.spykerConfig.minLearningRate,
+                h_inter: payload.spyker.spykerConfig.hInter,
+                h_intra: payload.spyker.spykerConfig.hIntra,
+                sigmoid_phi: payload.spyker.spykerConfig.sigmoidPhi,
+                server_learning_rate: payload.spyker.spykerConfig.serverLearningRate,
+                tcp_rto_delay: payload.spyker.spykerConfig.tcpRtoDelay,
               }
             : undefined,
         });
