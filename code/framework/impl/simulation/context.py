@@ -1,3 +1,4 @@
+from contextvars import ContextVar
 from typing import Dict, Any
 import ray
 from specs.client_spec import ClientSpec
@@ -36,16 +37,19 @@ class SimulationContext:
         self.server_actor_handles = handles
 
 
-# Global singleton pattern (optional, but useful for Ray workers to grab context)
-_global_context: SimulationContext | None = None
+# Context-local singleton to avoid cross-request overwrites in concurrent runs.
+_global_context: ContextVar[SimulationContext | None] = ContextVar(
+    "simulation_global_context",
+    default=None,
+)
 
 
 def set_global_context(ctx: SimulationContext):
-    global _global_context
-    _global_context = ctx
+    _global_context.set(ctx)
 
 
 def get_global_context() -> SimulationContext:
-    if _global_context is None:
+    ctx = _global_context.get()
+    if ctx is None:
         raise RuntimeError("Global SimulationContext has not been set.")
-    return _global_context
+    return ctx

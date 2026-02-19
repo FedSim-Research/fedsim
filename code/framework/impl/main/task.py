@@ -3,6 +3,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from threading import Lock
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner
 from torch.utils.data import DataLoader
@@ -30,7 +31,8 @@ class Net(nn.Module):
         return self.fc3(x)
 
 
-fds = None  # Cache FederatedDataset
+_fds_cache: dict[int, FederatedDataset] = {}
+_fds_lock = Lock()
 
 pytorch_transforms = Compose([ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
@@ -43,14 +45,21 @@ def apply_transforms(batch):
 
 def load_data(partition_id: int, num_partitions: int):
     """Load partition CIFAR10 data."""
-    # Only initialize `FederatedDataset` once
-    global fds
-    if fds is None:
-        partitioner = IidPartitioner(num_partitions=num_partitions)
-        fds = FederatedDataset(
-            dataset="uoft-cs/cifar10",
-            partitioners={"train": partitioner},
+    if partition_id < 0 or partition_id >= num_partitions:
+        raise ValueError(
+            f"partition_id={partition_id} out of range for num_partitions={num_partitions}"
         )
+
+    # Cache one dataset instance per partition count.
+    with _fds_lock:
+        fds = _fds_cache.get(num_partitions)
+        if fds is None:
+            partitioner = IidPartitioner(num_partitions=num_partitions)
+            fds = FederatedDataset(
+                dataset="uoft-cs/cifar10",
+                partitioners={"train": partitioner},
+            )
+            _fds_cache[num_partitions] = fds
     partition = fds.load_partition(partition_id)
     # Divide data on each node: 80% train, 20% test
     partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
