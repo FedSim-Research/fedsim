@@ -1,32 +1,178 @@
 <div class="popup-backdrop" (click)="onClose()">
   <div class="popup-card" (click)="$event.stopPropagation()">
-
     <div class="popup-header">
       <h3>Start simulation</h3>
       <button class="icon-btn-small" (click)="onClose()">✕</button>
     </div>
 
     <div class="popup-body">
-      <p>Which environment do you want to calculate?</p>
+      <p-stepper [value]="activeStep" [linear]="true">
+        <p-step-list>
+          <p-step [value]="1">Architecture</p-step>
+          <p-step [value]="2" [disabled]="!isHierflIncluded()">Hierarchical</p-step>
+          <p-step [value]="3" [disabled]="!isSpykerIncluded()">Spyker</p-step>
+        </p-step-list>
 
-      <div class="popup-actions">
-        <button class="cta-option" (click)="onRun('spyker')">
-          <span class="dot spyker-dot"></span>
-          1. Spyker
-        </button>
+        <p-step-panels>
+          <p-step-panel [value]="1">
+            <ng-template #content>
+              <p class="section-hint">Choose which architecture to run.</p>
+              <div class="popup-actions">
+                <button class="cta-option" [class.active]="selectedMode === 'hierfl'" (click)="selectMode('hierfl')">
+                  <span class="dot hier-dot"></span>
+                  Hierarchical
+                </button>
+                <button class="cta-option" [class.active]="selectedMode === 'spyker'" (click)="selectMode('spyker')">
+                  <span class="dot spyker-dot"></span>
+                  Spyker
+                </button>
+                <button class="cta-option both" [class.active]="selectedMode === 'both'" (click)="selectMode('both')">
+                  <span class="dot both-dot"></span>
+                  Spyker & Hierarchical
+                </button>
+              </div>
+              <div class="step-actions step-actions--end">
+                <button class="nav-btn nav-btn--primary" [disabled]="!selectedMode" (click)="nextStep()">Next</button>
+              </div>
+            </ng-template>
+          </p-step-panel>
 
-        <button class="cta-option" (click)="onRun('hierarchical')">
-          <span class="dot hier-dot"></span>
-          2. Hierarchical
-        </button>
+          <p-step-panel [value]="2">
+            <ng-template #content>
+              @if (isHierflIncluded()) {
+              <div class="config-stack">
+                <section class="config-card">
+                  <div class="sim-settings-title">Hierarchical</div>
+                  <div class="grid">
+                    <label class="field">
+                      <span class="field-label">Epochs <span class="help-dot" title="Number of local training passes per client before aggregation.">?</span></span>
+                      <input type="number" min="1" [(ngModel)]="hierflSettings.epochs" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Learning rate <span class="help-dot" title="Step size used by the optimizer during local training.">?</span></span>
+                      <input type="number" step="0.0001" min="0" [(ngModel)]="hierflSettings.lr" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Model complexity <span class="help-dot" title="Scaling factor for simulated compute effort per training step.">?</span></span>
+                      <input type="number" step="0.1" min="0.1" [(ngModel)]="hierflSettings.modelComplexity" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>
+                      <input type="number" min="1" step="1" [(ngModel)]="hierflSettings.runTimeLimit" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Output filename <span class="help-dot" title="Target file path/name used to store the final model checkpoint.">?</span></span>
+                      <input type="text" [(ngModel)]="hierflSettings.outputFilename" />
+                    </label>
+                  </div>
+                </section>
+              </div>
 
-        <button class="cta-option both" (click)="onRun('both')">
-          <div class="dots-wrapper">
-            <span class="dot both-dot"></span>
-          </div>
-          3. Spyker & Hierarchical
-        </button>
-      </div>
+              <div class="step-actions">
+                <button class="nav-btn" (click)="previousStep()">Back</button>
+                @if (canStartFromHierflStep()) {
+                <div class="step-actions-right">
+                  <label class="field checkbox field-checkbox-inline">
+                    <input type="checkbox" [(ngModel)]="evaluateAfterRun" />
+                    <span class="field-label">Evaluate after run <span class="help-dot" title="Runs post-training evaluation and returns accuracy/loss.">?</span></span>
+                  </label>
+                  <button class="nav-btn nav-btn--primary" (click)="onRun()">Start</button>
+                </div>
+                } @else {
+                <button class="nav-btn nav-btn--primary" (click)="nextFromHierfl()">Next</button>
+                }
+              </div>
+              } @else {
+              <p class="section-hint">Hierarchical is disabled for the selected run mode.</p>
+              }
+            </ng-template>
+          </p-step-panel>
+
+          <p-step-panel [value]="3">
+            <ng-template #content>
+              @if (isSpykerIncluded()) {
+              <div class="config-stack">
+                <section class="config-card">
+                  <div class="sim-settings-title">Spyker</div>
+                  <div class="grid">
+                    <label class="field">
+                      <span class="field-label">Epochs <span class="help-dot" title="Number of local training passes per client before aggregation.">?</span></span>
+                      <input type="number" min="1" [(ngModel)]="spykerSettings.epochs" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Learning rate <span class="help-dot" title="Step size used by the optimizer during local training.">?</span></span>
+                      <input type="number" step="0.0001" min="0" [(ngModel)]="spykerSettings.lr" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Model complexity <span class="help-dot" title="Scaling factor for simulated compute effort per training step.">?</span></span>
+                      <input type="number" step="0.1" min="0.1" [(ngModel)]="spykerSettings.modelComplexity" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>
+                      <input type="number" min="1" step="1" [(ngModel)]="spykerSettings.runTimeLimit" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Idle token delay (s) <span class="help-dot" title="Delay before token forwarding when no immediate sync is triggered.">?</span></span>
+                      <input type="number" min="0" step="0.1" [(ngModel)]="spykerSettings.idleTokenDelay" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Output filename <span class="help-dot" title="Target file path/name used to store the final model checkpoint.">?</span></span>
+                      <input type="text" [(ngModel)]="spykerSettings.outputFilename" />
+                    </label>
+                  </div>
+                  <div class="sim-settings-section sim-settings-section--separated">
+                    <div class="sim-settings-subtitle">Algorithm</div>
+                    <div class="grid">
+                      <label class="field">
+                        <span class="field-label">Decay beta <span class="help-dot" title="Decay factor for reducing contribution of frequently-updating clients.">?</span></span>
+                        <input type="number" min="0" step="0.01" [(ngModel)]="spykerSettings.decayBeta" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Min learning rate <span class="help-dot" title="Lower bound for client contribution scaling during decay.">?</span></span>
+                        <input type="number" min="0.0000001" step="0.000001" [(ngModel)]="spykerSettings.minLearningRate" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">h_inter <span class="help-dot" title="Inter-server drift threshold to trigger synchronization.">?</span></span>
+                        <input type="number" min="1" step="1" [(ngModel)]="spykerSettings.hInter" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">h_intra <span class="help-dot" title="Intra-server drift threshold to trigger synchronization.">?</span></span>
+                        <input type="number" min="1" step="1" [(ngModel)]="spykerSettings.hIntra" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Sigmoid phi <span class="help-dot" title="Sharpness parameter for weighting server-side aggregation.">?</span></span>
+                        <input type="number" min="0.01" step="0.1" [(ngModel)]="spykerSettings.sigmoidPhi" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Server learning rate <span class="help-dot" title="Server-side aggregation learning rate.">?</span></span>
+                        <input type="number" min="0.0001" step="0.01" [(ngModel)]="spykerSettings.serverLearningRate" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">TCP RTO delay <span class="help-dot" title="Simulated TCP retransmission timeout delay.">?</span></span>
+                        <input type="number" min="0" step="0.05" [(ngModel)]="spykerSettings.tcpRtoDelay" />
+                      </label>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <div class="step-actions">
+                <button class="nav-btn" (click)="previousFromSpyker()">Back</button>
+                <div class="step-actions-right">
+                  <label class="field checkbox field-checkbox-inline">
+                    <input type="checkbox" [(ngModel)]="evaluateAfterRun" />
+                    <span class="field-label">Evaluate after run <span class="help-dot" title="Runs post-training evaluation and returns accuracy/loss.">?</span></span>
+                  </label>
+                  <button class="nav-btn nav-btn--primary" (click)="onRun()">Start</button>
+                </div>
+              </div>
+              } @else {
+              <p class="section-hint">Spyker is disabled for the selected run mode.</p>
+              }
+            </ng-template>
+          </p-step-panel>
+        </p-step-panels>
+      </p-stepper>
     </div>
   </div>
 </div>

@@ -17,8 +17,10 @@
 }
 
 .popup-card {
-  width: 90%;
-  max-width: 400px;
+  width: 94%;
+  max-width: 760px;
+  max-height: 90vh;
+  overflow: auto;
   background: #0f0f0f;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 16px;
@@ -53,18 +55,36 @@
   cursor: pointer;
   font-size: 1.2rem;
   padding: 4px;
-  transition: color 0.2s;
 }
 
 .icon-btn-small:hover {
   color: #fff;
 }
 
-.popup-body p {
+.popup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.config-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.config-card {
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.section-hint {
   margin: 0 0 12px 0;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.95rem;
-  text-align: center;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.92rem;
 }
 
 .popup-actions {
@@ -77,27 +97,23 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px;
+  padding: 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.05);
   color: #fff;
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
-  text-align: left;
 }
 
 .cta-option:hover {
   background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.3);
-  transform: translateY(-1px);
 }
 
-.cta-option.both {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+.cta-option.active {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .dot {
@@ -106,13 +122,148 @@
   border-radius: 50%;
 }
 
-.spyker-dot { background-color: #3b82f6; box-shadow: 0 0 8px rgba(59, 130, 246, 0.5); }
-.hier-dot { background-color: #10b981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.5); }
-.both-dot { background-color: #f59e0b; box-shadow: 0 0 8px rgba(245, 158, 11, 0.5); }
+.spyker-dot { background-color: #3b82f6; }
+.hier-dot { background-color: #10b981; }
+.both-dot { background-color: #f59e0b; }
 
-.dots-wrapper {
+.step-actions {
+  margin-top: 12px;
   display: flex;
-  gap: 4px;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.step-actions--end {
+  justify-content: flex-end;
+}
+
+.step-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-btn {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.nav-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.nav-btn--primary {
+  border-color: rgba(16, 185, 129, 0.85);
+  background: rgba(16, 185, 129, 0.22);
+  color: #dffdf3;
+}
+
+.nav-btn--primary:hover {
+  background: rgba(16, 185, 129, 0.34);
+}
+
+.sim-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sim-settings-section--separated {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  padding-top: 12px;
+  margin-top: 8px;
+}
+
+.sim-settings-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.sim-settings-subtitle {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.field input,
+.field select {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #000000;
+  color: #fff;
+  padding: 10px;
+  font-size: 0.9rem;
+}
+
+.field.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.field-checkbox-inline {
+  margin: 0;
+  min-height: 40px;
+  justify-content: center;
+}
+
+.field.checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.help-dot {
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  background: rgba(255, 255, 255, 0.06);
+  text-align: center;
+  transform: translateY(-0.5px);
+}
+
+:host ::ng-deep .p-step-disabled {
+  opacity: 0.45;
+}
+
+:host ::ng-deep .p-step-number {
+  display: none;
 }
 
 @keyframes fadeIn {
