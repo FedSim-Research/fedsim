@@ -1,0 +1,26 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: fedsim-prometheus
+    ports:
+      - "9010:9090"
+    volumes:
+      - ../frontend/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:latest
+    container_name: fedsim-loki
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ../frontend/loki.yml:/etc/loki/local-config.yaml:ro
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: fedsim-grafana
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
