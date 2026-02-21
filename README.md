@@ -1,34 +1,64 @@
 # RP_FedSim
 
-## Backend setup
+## Backend & Frontend Setup
+
+### 1. Install Python Dependencies
 
 From the project root:
 
 ```bash
 cd code
 
-python -m venv .venv
-# If `python` is not available, use: python3 -m venv .venv
-source .venv/bin/activate # Linux/macOS
-# Windows PowerShell:
-# .\\.venv\\Scripts\\Activate.ps1
+python3 -m venv .venv
+source .venv/bin/activate
 
 pip install -r requirements.txt
-uvicorn backend.main:app --reload
 ```
 
-The API is available at `http://127.0.0.1:8000`, and Swagger UI at
-`http://127.0.0.1:8000/docs`.
+The API will be available at `http://127.0.0.1:8000` with Swagger UI at `http://127.0.0.1:8000/docs`.
 
-## Frontend setup
+### 2. Install System Dependencies (Ubuntu)
 
 ```bash
-cd code/frontend
-npm install
-npm run start
+sudo apt update
+sudo apt install -y grafana prometheus loki npm nodejs
 ```
 
-The frontend is available at `http://localhost:4200`.
+### 3. Install PM2
+
+```bash
+sudo npm install -g pm2
+```
+
+### 4. Start Services
+
+From the project root:
+
+```bash
+cd code
+pm2 start ecosystem.config.js
+```
+
+Services will be available at:
+- **Backend (FastAPI)** - `http://localhost:8000`
+- **Frontend (Angular)** - `http://localhost:4200`
+- **Prometheus** - `http://localhost:9010`
+- **Grafana** - `http://localhost:3000`
+- **Loki** - Log aggregation
+
+### 6. Setup Grafana Dashboard (One-time)
+
+1. Open Grafana: `http://localhost:3000` (default credentials: `admin` / `admin`)
+2. Add Prometheus data source:
+   - Click gear icon (⚙️) → **Data Sources** → **Add data source**
+   - Select **Prometheus** and set URL to `http://localhost:9010`
+   - Click **Save & test**
+3. Import Ray dashboard:
+   - Go to **Dashboards** → **Import**
+   - Upload `code/frontend/dashboards/ray-monitoring.json`
+   - Select Prometheus as datasource
+
+
 
 ## Flower simulation setup
 Currently, the Flower simulation (explicitly ray) only supports Linux. To run simulations on a Windows machine, use WSL2 and follow this guide using the Linux commands.

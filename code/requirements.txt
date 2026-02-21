@@ -3,5 +3,5 @@ uvicorn==0.38.0
 pydantic==2.12.5
 ray==2.51.1
 requests==2.32.5
-sqlalchemy==2.0.30
+sqlalchemy==2.0.45
 -e ./framework/impl

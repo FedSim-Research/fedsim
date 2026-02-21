@@ -1,5 +1,7 @@
 from typing import Any, Callable
 
+import ray
+
 from backend.services.hierfl_simulation_builder import build_hierfl_simulation, get_hierfl_evaluate_model
 from backend.services.spyker_simulation_builder import build_spyker_simulation, get_spyker_evaluate_model
 
@@ -58,4 +60,6 @@ class SimulationController:
         result = {"output_filename": output_filename}
         if evaluation is not None:
             result["evaluation"] = evaluation
+        
+        ray.shutdown()
         return result

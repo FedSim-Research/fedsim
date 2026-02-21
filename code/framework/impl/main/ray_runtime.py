@@ -17,7 +17,7 @@ def ensure_ray_initialized() -> None:
             _initialized = True
             return
         try:
-            ray.init(address="auto", ignore_reinit_error=True, include_dashboard=False)
+            ray.init(address="192.168.178.50:6379", ignore_reinit_error=True, include_dashboard=True)
         except Exception:
-            ray.init(ignore_reinit_error=True, include_dashboard=False)
+            ray.init(ignore_reinit_error=True, include_dashboard=True)
         _initialized = True

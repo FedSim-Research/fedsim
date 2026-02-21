@@ -1,6 +1,6 @@
 # Prometheus example config file
 
-# my global config
+# global config
 global:
   scrape_interval: 2s
   evaluation_interval: 2s
@@ -8,6 +8,7 @@ global:
 # Scrape from Ray.
 scrape_configs:
   - job_name: 'ray'
-    file_sd_configs:
-      - files:
-          - '/tmp/ray/prom_metrics_service_discovery.json'
+    static_configs:
+      - targets:
+          - '192.168.178.50:8080'
+    metrics_path: '/metrics'
