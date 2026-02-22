@@ -10,5 +10,5 @@ scrape_configs:
   - job_name: 'ray'
     static_configs:
       - targets:
-          - '192.168.178.50:8080'
+          - 'ray:8080'
     metrics_path: '/metrics'

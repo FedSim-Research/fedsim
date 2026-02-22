@@ -153,6 +153,32 @@ export abstract class GraphService<T extends GraphHistoryService> {
   void this.persistPositionUpdates(posChanges);
   }
 
+  public updateNodeConfig(nodeId: string, configPatch: Record<string, unknown>): void {
+    let backendId: string | undefined;
+    this.nodes.update((nodes) =>
+      nodes.map((node) => {
+        if (node.id !== nodeId) return node;
+        const nodeData = (node as NodeWithData).data ?? {};
+        const currentConfig = (nodeData['config'] as Record<string, unknown>) ?? {};
+        backendId = nodeData['backendId'] as string | undefined;
+        return {
+          ...node,
+          data: {
+            ...nodeData,
+            config: { ...currentConfig, ...configPatch },
+          },
+        } as NodeWithData;
+      })
+    );
+    this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
+
+    if (backendId === undefined) return;
+    const updatedNode = this.nodes().find((n) => n.id === nodeId) as NodeWithData | undefined;
+    const updatedConfig =
+      ((updatedNode?.data?.['config'] as Record<string, unknown>) ?? configPatch);
+    void this.api.updateNode(backendId, { config: updatedConfig }).catch(() => undefined);
+  }
+
   private normalizeEdge(edge: Edge): EdgeWithData {
     return this.withEdgeLabel(this.withEdgeMetrics(edge));
   }

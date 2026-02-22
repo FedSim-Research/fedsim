@@ -13,6 +13,8 @@ import { GraphServiceHierach } from './services/subservices/graph-service-hierac
 import { GraphPersistenceService } from './services/graph-persistence.service';
 import { GraphApiService } from './services/graph-api.service';
 import { MessageService } from 'primeng/api';
+import { FrameworkJobsPopupComponent } from './components/framework-jobs-popup/framework-jobs-popup.component';
+import { FrameworkJobsService } from './services/framework-jobs.service';
 
 export type modes = 'spyker' | 'hierfl';
 
@@ -21,7 +23,15 @@ export type modes = 'spyker' | 'hierfl';
   standalone: true,
   templateUrl: './app.html',
   styleUrls: ['./app.css'],
-  imports: [Vflow, SidebarComponent, CommonModule, Shortcuts, NgxSelectoModule, EdgeMetricsBoxComponent],
+  imports: [
+    Vflow,
+    SidebarComponent,
+    CommonModule,
+    Shortcuts,
+    NgxSelectoModule,
+    EdgeMetricsBoxComponent,
+    FrameworkJobsPopupComponent,
+  ],
 })
 export class App implements OnInit{
   @ViewChild(VflowComponent) public flow?: VflowComponent;
@@ -33,6 +43,7 @@ export class App implements OnInit{
   private graphApi = inject(GraphApiService);
   private cdr = inject(ChangeDetectorRef);
   private messageService = inject(MessageService);
+  private frameworkJobs = inject(FrameworkJobsService);
   public activeMode = signal<modes>('hierfl');
   public simulationRunning = signal(false);
   public activeGraph = computed(() => {
@@ -87,6 +98,11 @@ export class App implements OnInit{
     if (!rawData) return;
     try {
       const payload = JSON.parse(rawData);
+      const payloadType = payload?.type?.toString();
+      if (this.activeMode() === 'spyker' && payloadType === 'SuperServerNode') {
+        this.showErrorToast('No super server is allowed to exist in the Spyker Environment');
+        return;
+      }
       const isFromJson = payload?.origin === 'json' || payload?.fromJson === true;
       const flowPoint = this.flow?.documentPointToFlowPoint({
         x: event.clientX,
@@ -97,7 +113,7 @@ export class App implements OnInit{
         y: event.clientY,
       };
       let nodeType;
-      switch (payload.type.toString()) {
+      switch (payloadType) {
         case 'ClientNode':
           nodeType = ClientNode;
           break;
@@ -515,10 +531,12 @@ export class App implements OnInit{
     simulationSettings: { runTimeLimit: number; outputFilename: string; evaluateModel: boolean };
   }): Promise<void> {
     const runFor = async (architecture: 'spyker' | 'hierfl'): Promise<void> => {
+      const jobId = this.frameworkJobs.startJob(`${architecture.toUpperCase()} simulation`);
       const service = architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierach;
       const graphId = service.getGraphId() ?? service.loadGraphIdFromStorage();
       if (graphId === null) {
         this.showErrorToast(`No graph available for ${architecture}. Please check if the backend is running.`);
+        this.frameworkJobs.markCompleted(jobId);
         return;
       }
       try {
@@ -533,8 +551,10 @@ export class App implements OnInit{
           },
         });
         this.showSuccessToast(this.formatSimulationResult(architecture, result));
+        this.frameworkJobs.markCompleted(jobId);
       } catch {
         this.showErrorToast(`Failed to start ${architecture} simulation.`);
+        this.frameworkJobs.markFailed(jobId);
       }
     };
 

@@ -43,6 +43,7 @@
   border: none;
   background: transparent;
   color: #ef4444;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;

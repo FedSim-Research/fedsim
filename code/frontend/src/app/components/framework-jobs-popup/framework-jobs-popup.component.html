@@ -1,0 +1,32 @@
+<div class="jobs-popup" [class.jobs-popup--open]="isOpen()">
+  <button class="jobs-toggle" type="button" (click)="toggle()" aria-label="Framework jobs anzeigen">
+    <span>Jobs</span>
+    <span class="jobs-count">{{ runningCount() }}/{{ jobs().length }}</span>
+  </button>
+
+  <div class="jobs-panel" *ngIf="isOpen()">
+    <div class="jobs-header">
+      <span>Running: {{ runningCount() }}</span>
+      <span>Completed: {{ completedCount() }}</span>
+    </div>
+
+    <div class="jobs-empty" *ngIf="!jobs().length">
+      No jobs yet.
+    </div>
+
+    <ul class="jobs-list" *ngIf="jobs().length">
+      <li class="jobs-item" *ngFor="let job of jobs()">
+        <span
+          class="status-icon"
+          [class.status-icon--completed]="job.status === 'completed'"
+          [class.status-icon--failed]="job.status === 'failed'"
+        >
+          <i *ngIf="job.status === 'completed'" class="pi pi-check-circle"></i>
+          <i *ngIf="job.status === 'failed'" class="pi pi-times-circle"></i>
+          <i *ngIf="job.status === 'running'" class="pi pi-spinner pi-spin"></i>
+        </span>
+        <span class="jobs-title">{{ job.title }}</span>
+      </li>
+    </ul>
+  </div>
+</div>

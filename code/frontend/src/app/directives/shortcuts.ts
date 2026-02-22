@@ -286,9 +286,16 @@ export class Shortcuts{
       ClientNode, ServerNode, SuperServerNode
     } as const;
 
-    const newNodeIds = this.clipboard.map((node) => {
+    const isSpyker = this.activeService() instanceof GraphServiceSpyker;
+    let blockedSuperServer = false;
+
+    const newNodeIds = this.clipboard.flatMap((node) => {
       const newId = crypto.randomUUID();
       const typeString = ((node as any).data as any)?.type;
+      if (isSpyker && typeString === 'SuperServerNode') {
+        blockedSuperServer = true;
+        return [];
+      }
       const newNode: Node = {
         ...JSON.parse(JSON.stringify(node)),
         id: newId,
@@ -296,10 +303,20 @@ export class Shortcuts{
         point: { x: (node.point?.x ?? 0) + 50, y: (node.point?.y ?? 0) + 50 },
       };
       this.activeService().addNode(newNode);
-      return newId;
+      return [newId];
     });
 
-    this.applySelection(new Set(newNodeIds));
+    if (blockedSuperServer) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'No super server is allowed to exist in the Spyker Environment',
+      });
+    }
+
+    if (newNodeIds.length) {
+      this.applySelection(new Set(newNodeIds));
+    }
   }
 
   private async applyHistoryAction(action: 'undo' | 'redo'): Promise<void> {
