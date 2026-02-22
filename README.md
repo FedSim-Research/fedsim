@@ -54,7 +54,7 @@ npm run start
 Frontend URL:
 - `http://localhost:4200`
 
-## Service Start with PM2 (optional)
+## Service Start with PM2
 
 Use this if you want one command to manage backend/frontend/ray processes.
 
@@ -68,12 +68,8 @@ Start backend + frontend + Ray:
 
 ```bash
 cd code
-pm2 start ecosystem.config.js --only backend,frontend,ray
+pm2 start ecosystem.config.js
 ```
-
-Note:
-- Ray can also auto-initialize when simulations start from backend-only mode.
-- The dedicated `ray` PM2 process is mainly useful for stable dashboard/metrics availability.
 
 Useful PM2 commands:
 
@@ -106,7 +102,7 @@ Monitoring URLs:
 - Loki: `http://localhost:3100`
 - Grafana: `http://localhost:3000`
 
-### Grafana Dashboard Setup (one-time)
+### Grafana Dashboard Setup (one-time) - Should not be necessary
 
 1. Open Grafana: `http://localhost:3000` (`admin` / `admin`)
 2. Add Prometheus datasource with URL `http://localhost:9010`
