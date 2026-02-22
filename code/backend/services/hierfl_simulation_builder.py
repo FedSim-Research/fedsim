@@ -174,7 +174,16 @@ def _require_training_config(training_config: dict[str, Any] | None) -> dict[str
         raise ValueError("hierfl_invalid_training_epochs")
     if lr <= 0:
         raise ValueError("hierfl_invalid_training_lr")
-    return {"epochs": epochs, "lr": lr}
+    result = {"epochs": epochs, "lr": lr}
+    if "model_complexity" in training_config and training_config["model_complexity"] is not None:
+        try:
+            model_complexity = float(training_config["model_complexity"])
+        except (TypeError, ValueError):
+            raise ValueError("hierfl_invalid_model_complexity")
+        if model_complexity <= 0:
+            raise ValueError("hierfl_invalid_model_complexity")
+        result["model_complexity"] = model_complexity
+    return result
 
 
 def build_hierfl_simulation(

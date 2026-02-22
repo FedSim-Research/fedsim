@@ -7,11 +7,12 @@ from backend.services.spyker_simulation_builder import build_spyker_simulation, 
 
 class SimulationController:
 
-    def __init__(self, architecture: str, graph=None, training_config=None, simulation_settings=None):
+    def __init__(self, architecture: str, graph=None, training_config=None, simulation_settings=None, spyker_config=None):
         self.architecture = architecture
         self.graph = graph
         self.training_config = training_config
         self.simulation_settings = simulation_settings or {}
+        self.spyker_config = spyker_config
 
     def start(self):
         graph_info = f" graph_id={self.graph.id}" if self.graph is not None else ""
@@ -34,7 +35,10 @@ class SimulationController:
             return self._run_simulation(
                 builder=lambda: build_spyker_simulation(
                     self.graph,
+                    training_config=self.training_config,
+                    spyker_config=self.spyker_config,
                     run_time_limit=self.simulation_settings.get("run_time_limit"),
+                    idle_token_delay=self.simulation_settings.get("idle_token_delay"),
                 ),
                 evaluator=get_spyker_evaluate_model,
             )

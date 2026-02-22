@@ -108,21 +108,28 @@ export class SidebarComponent implements OnInit {
   @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
   @Output() simulationRequested = new EventEmitter<{
     mode: 'spyker' | 'hierfl' | 'both';
-    trainingConfig: { epochs: number; lr: number };
-    simulationSettings: { runTimeLimit: number; outputFilename: string; evaluateModel: boolean };
+    hierfl: {
+      trainingConfig: { epochs: number; lr: number; modelComplexity: number };
+      simulationSettings: { runTimeLimit: number; outputFilename: string; evaluateModel: boolean };
+    };
+    spyker: {
+      trainingConfig: { epochs: number; lr: number; modelComplexity: number };
+      simulationSettings: { runTimeLimit: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
+      spykerConfig: {
+        decayBeta: number;
+        minLearningRate: number;
+        hInter: number;
+        hIntra: number;
+        sigmoidPhi: number;
+        serverLearningRate: number;
+        tcpRtoDelay: number;
+      };
+    };
   }>();
 
   public selectedArchitectures = {
     spyker: false,
     hierfl: true,
-  };
-
-  public simulationSettings = {
-    epochs: 1,
-    lr: 0.01,
-    runTimeLimit: 5000,
-    outputFilename: 'final_model_hierfl.pth',
-    evaluateModel: false,
   };
 
   public configDraft: {
@@ -932,20 +939,27 @@ export class SidebarComponent implements OnInit {
     this.closeViewGraphsDialog();
   }
   
-  public runSimulation(type: 'spyker' | 'hierarchical' | 'both'): void { 
-    const normalized = type === 'hierarchical' ? 'hierfl' : type;
-    this.simulationRequested.emit({
-      mode: normalized,
-      trainingConfig: {
-        epochs: this.simulationSettings.epochs,
-        lr: this.simulationSettings.lr,
-      },
-      simulationSettings: {
-        runTimeLimit: this.simulationSettings.runTimeLimit,
-        outputFilename: this.simulationSettings.outputFilename,
-        evaluateModel: this.simulationSettings.evaluateModel,
-      },
-    });
+  public runSimulation(payload: {
+    mode: 'spyker' | 'hierfl' | 'both';
+    hierfl: {
+      trainingConfig: { epochs: number; lr: number; modelComplexity: number };
+      simulationSettings: { runTimeLimit: number; outputFilename: string; evaluateModel: boolean };
+    };
+    spyker: {
+      trainingConfig: { epochs: number; lr: number; modelComplexity: number };
+      simulationSettings: { runTimeLimit: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
+      spykerConfig: {
+        decayBeta: number;
+        minLearningRate: number;
+        hInter: number;
+        hIntra: number;
+        sigmoidPhi: number;
+        serverLearningRate: number;
+        tcpRtoDelay: number;
+      };
+    };
+  }): void {
+    this.simulationRequested.emit(payload);
     this.closeSimulationpopup();
   }
 
