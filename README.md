@@ -17,35 +17,11 @@ RP_FedSim is a graph-based federated learning simulation platform with a FastAPI
 
 See `code/README.md` for a compact code directory overview.
 
-## Backend Setup & Start
-
-From project root:
-
-```bash
-cd code
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-## Frontend Setup & Start
-
-From project root:
-
-```bash
-cd code/frontend
-npm install
-npm run start
-```
-
-Frontend URL:
-- `http://localhost:4200`
-
 ## One-Command Docker Startup
 
 ```bash
 cd code
-docker compose up -d --build
+sudo docker compose -f docker-compose.yml up -d
 ```
 
 Stop everything:
@@ -55,7 +31,8 @@ cd code
 docker compose down
 ```
 
-Key URLs:
+URLs:
+
 - Frontend: `http://localhost:4200`
 - Backend: `http://localhost:8000`
 - Ray Dashboard: `http://localhost:8265`
