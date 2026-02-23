@@ -1,0 +1,120 @@
+services:
+  ray:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: fedsim-ray
+    command: >
+      bash -lc "ray start --head --port=6379 --ray-client-server-port=10001 --metrics-export-port=8080 --include-dashboard=true --dashboard-host=0.0.0.0 --dashboard-port=8265 --disable-usage-stats --block"
+    ports:
+      - "8080:8080"
+      - "8265:8265"
+      - "10001:10001"
+    environment:
+      - HF_HOME=/hf-cache
+      - HF_DATASETS_CACHE=/hf-cache/datasets
+      - TRANSFORMERS_CACHE=/hf-cache/transformers
+    volumes:
+      - hf_cache:/hf-cache
+    restart: unless-stopped
+    networks:
+      - fedsim-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: fedsim-backend
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      - RAY_ADDRESS=ray://ray:10001
+      - PYTHONUNBUFFERED=1
+      - HF_HOME=/hf-cache
+      - HF_DATASETS_CACHE=/hf-cache/datasets
+      - TRANSFORMERS_CACHE=/hf-cache/transformers
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend
+      - ./framework/impl:/app/framework/impl
+      - ./data:/app/data
+      - hf_cache:/hf-cache
+    depends_on:
+      - ray
+    restart: unless-stopped
+    networks:
+      - fedsim-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fedsim-frontend
+    command: npm run start -- --host 0.0.0.0 --port 4200 --poll 2000
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - fedsim-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: fedsim-prometheus
+    ports:
+      - "9010:9010"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.listen-address=:9010'
+    volumes:
+      - ./monitoring-configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - ray
+    restart: unless-stopped
+    networks:
+      - fedsim-network
+
+  loki:
+    image: grafana/loki:latest
+    container_name: fedsim-loki
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring-configs/loki.yml:/etc/loki/local-config.yaml:ro
+    restart: unless-stopped
+    networks:
+      - fedsim-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: fedsim-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ALLOW_EMBED_INIT_STATE_TOKEN=true
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - ./monitoring-configs/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./frontend/grafana-dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+    networks:
+      - fedsim-network
+
+networks:
+  fedsim-network:
+    driver: bridge
+
+volumes:
+  frontend_node_modules:
+  hf_cache:

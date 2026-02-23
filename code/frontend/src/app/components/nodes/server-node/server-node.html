@@ -10,9 +10,41 @@
         <span>Server</span>
       </div>
       <button
+        *ngIf="!isEditing()"
+        class="action-button edit-button"
+        type="button"
+        [class.action-button--visible]="showDelete()"
+        (mousedown)="$event.stopPropagation()"
+        (click)="onStartEdit($event)"
+        aria-label="Knoten bearbeiten"
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path
+            d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zm17.71-10.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.96 1.96 3.75 3.75 2.13-1.79z"
+            fill="currentColor"
+          />
+        </svg>
+      </button>
+      <button
+        *ngIf="isEditing()"
+        class="action-button save-button action-button--visible"
+        type="button"
+        (mousedown)="$event.stopPropagation()"
+        (click)="onSaveEdit($event)"
+        aria-label="Knoten speichern"
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path
+            d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zM7 5h8v4H7V5zm5 14H8v-6h4v6z"
+            fill="currentColor"
+          />
+        </svg>
+      </button>
+      <button
         class="delete-button"
         type="button"
         [class.delete-button--visible]="showDelete()"
+        (mousedown)="$event.stopPropagation()"
         (click)="onDelete($event)"
         aria-label="Knoten loeschen"
       >
@@ -34,28 +66,72 @@
   <div class="node-body">
     <div class="spec-row">
       <span>Name</span>
-      <span class="spec-value">{{ server().name || '—' }}</span>
+      <span *ngIf="!isEditing()" class="spec-value">{{ server().name || '—' }}</span>
+      <input
+        *ngIf="isEditing()"
+        class="spec-input"
+        [value]="editDraft().name"
+        (mousedown)="$event.stopPropagation()"
+        (click)="$event.stopPropagation()"
+        (input)="updateTextField('name', $event)"
+      />
     </div>
 
     <div class="spec-row">
       <span>Compute factor</span>
-      <span class="spec-value">{{ server().computeFactor }}</span>
+      <span *ngIf="!isEditing()" class="spec-value">{{ server().computeFactor }}</span>
+      <input
+        *ngIf="isEditing()"
+        class="spec-input"
+        type="number"
+        [value]="editDraft().computeFactor"
+        (mousedown)="$event.stopPropagation()"
+        (click)="$event.stopPropagation()"
+        (input)="updateNumberField('computeFactor', $event)"
+      />
     </div>
 
     <div class="spec-row">
       <span>Performance σ</span>
-      <span class="spec-value">{{ formatNumber(server().performanceSigma) }}</span>
+      <span *ngIf="!isEditing()" class="spec-value">{{ formatNumber(server().performanceSigma) }}</span>
+      <input
+        *ngIf="isEditing()"
+        class="spec-input"
+        type="number"
+        [value]="editDraft().performanceSigma"
+        (mousedown)="$event.stopPropagation()"
+        (click)="$event.stopPropagation()"
+        (input)="updateNumberField('performanceSigma', $event)"
+      />
     </div>
 
 
     <div class="spec-row">
       <span>Upload</span>
-      <span class="spec-value">{{ server().uploadMbps }} Mbps</span>
+      <span *ngIf="!isEditing()" class="spec-value">{{ server().uploadMbps }} Mbps</span>
+      <input
+        *ngIf="isEditing()"
+        class="spec-input"
+        type="number"
+        [value]="editDraft().uploadMbps"
+        (mousedown)="$event.stopPropagation()"
+        (click)="$event.stopPropagation()"
+        (input)="updateNumberField('uploadMbps', $event)"
+      />
     </div>
 
     <div class="spec-row">
       <span>Download</span>
-      <span class="spec-value">{{ server().downloadMbps }} Mbps</span>
+      <span *ngIf="!isEditing()" class="spec-value">{{ server().downloadMbps }} Mbps</span>
+      <input
+        *ngIf="isEditing()"
+        class="spec-input"
+        type="number"
+        [value]="editDraft().downloadMbps"
+        (mousedown)="$event.stopPropagation()"
+        (click)="$event.stopPropagation()"
+        (input)="updateNumberField('downloadMbps', $event)"
+      />
     </div>
   </div>
     <div class="node-footer">

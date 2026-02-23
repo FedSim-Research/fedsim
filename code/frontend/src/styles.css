@@ -35,6 +35,22 @@ html, body {
   overflow: visible;
 }
 
+.vflow-node .node-card,
+.vflow-node .node-card button,
+.vflow-node .delete-button,
+.vflow-node .action-button,
+.vflow-node handle,
+.vflow-node handle *,
+.vflow-node .vflow-handle,
+.vflow-node .vflow-handle *,
+.vflow-node .default-handle {
+  cursor: pointer !important;
+}
+
+.vflow-node .spec-input {
+  cursor: text !important;
+}
+
 
 body.light-mode .edge {
   stroke: #000;
@@ -59,6 +75,11 @@ body.light-mode g[alignmentHelper] line {
 
 /* Larger connection sockets */
 .default-handle {
-  r: 6px;
+  r: 8px;
   stroke-width: 2.5px;
+}
+
+.vflow-handle {
+  width: 16px !important;
+  height: 16px !important;
 }
