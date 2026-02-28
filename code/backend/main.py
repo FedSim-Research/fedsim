@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import ray
 from backend.api.api import router
 from backend.db import database
 
@@ -9,6 +10,8 @@ from backend.db import database
 async def lifespan(app: FastAPI):
     database.init_db()
     yield
+    if ray.is_initialized():
+        ray.shutdown()
 
 # This initializes the main backend server.
 # Start the backend from the code root with: uvicorn backend.main:app --reload
