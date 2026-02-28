@@ -43,7 +43,7 @@ def apply_transforms(batch):
     return batch
 
 
-def load_data(partition_id: int, num_partitions: int):
+def load_data(partition_id: int, num_partitions: int, seed: int | None = None):
     """Load partition CIFAR10 data."""
     if partition_id < 0 or partition_id >= num_partitions:
         raise ValueError(
@@ -62,10 +62,20 @@ def load_data(partition_id: int, num_partitions: int):
             _fds_cache[num_partitions] = fds
     partition = fds.load_partition(partition_id)
     # Divide data on each node: 80% train, 20% test
-    partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
+    split_seed = 42 if seed is None else int(seed)
+    partition_train_test = partition.train_test_split(test_size=0.2, seed=split_seed)
     # Construct dataloaders
     partition_train_test = partition_train_test.with_transform(apply_transforms)
-    trainloader = DataLoader(partition_train_test["train"], batch_size=32, shuffle=True)
+    generator = None
+    if seed is not None:
+        generator = torch.Generator()
+        generator.manual_seed(int(seed))
+    trainloader = DataLoader(
+        partition_train_test["train"],
+        batch_size=32,
+        shuffle=True,
+        generator=generator,
+    )
     testloader = DataLoader(partition_train_test["test"], batch_size=32)
     return trainloader, testloader
 

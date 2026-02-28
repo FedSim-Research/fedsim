@@ -40,6 +40,9 @@ def _validate_hierfl_payload(
         run_time_limit = simulation_settings.get("run_time_limit")
         if run_time_limit is not None:
             _parse_float_gt_zero(run_time_limit, "hierfl_invalid_run_time_limit")
+        seed = simulation_settings.get("seed")
+        if seed is not None:
+            _parse_int_ge_zero(seed, "hierfl_invalid_seed")
 
 
 def _validate_spyker_payload(
@@ -63,6 +66,9 @@ def _validate_spyker_payload(
         idle_token_delay = simulation_settings.get("idle_token_delay")
         if idle_token_delay is not None:
             _parse_float_ge_zero(idle_token_delay, "spyker_invalid_idle_token_delay")
+        seed = simulation_settings.get("seed")
+        if seed is not None:
+            _parse_int_ge_zero(seed, "spyker_invalid_seed")
 
     if not spyker_config:
         return
@@ -115,5 +121,17 @@ def _parse_int_min_one(value: object, error_code: str) -> int:
     except (TypeError, ValueError):
         raise ValueError(error_code)
     if parsed < 1:
+        raise ValueError(error_code)
+    return parsed
+
+
+def _parse_int_ge_zero(value: object, error_code: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(error_code)
+    if parsed < 0:
+        raise ValueError(error_code)
+    if isinstance(value, float) and not value.is_integer():
         raise ValueError(error_code)
     return parsed

@@ -530,11 +530,11 @@ export class App implements OnInit{
     mode: 'spyker' | 'hierfl' | 'both';
     hierfl: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; seed: number; outputFilename: string; evaluateModel: boolean };
     };
     spyker: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; seed: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
       spykerConfig: {
         decayBeta: number;
         minLearningRate: number;
@@ -585,6 +585,7 @@ export class App implements OnInit{
           simulation_settings: {
             run_time_limit: archConfig.simulationSettings.runTimeLimit,
             idle_token_delay: architecture === 'spyker' ? payload.spyker.simulationSettings.idleTokenDelay : undefined,
+            seed: archConfig.simulationSettings.seed,
             output_filename: archConfig.simulationSettings.outputFilename || null,
             evaluate_model: archConfig.simulationSettings.evaluateModel,
           },

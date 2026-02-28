@@ -120,6 +120,7 @@ class HierarchicalSimulation:
         download_speed: float,
         dataset_partition_id: int,
         total_partitions: int,
+        seed: int | None = None,
     ):
         """Registers a client configuration and assigns it to an edge server."""
         if edge_id not in self.edge_ids:
@@ -136,7 +137,7 @@ class HierarchicalSimulation:
             download_speed=download_speed,
         )
 
-        sim_client = SimulationFlowerClient(dataset_partition_id, total_partitions)
+        sim_client = SimulationFlowerClient(dataset_partition_id, total_partitions, seed=seed)
         self.client_map[edge_id].append((client_id, sim_client))
 
     def _spawn_actors(self):

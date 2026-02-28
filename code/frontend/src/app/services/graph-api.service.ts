@@ -111,6 +111,7 @@ export interface SimulationStartRequest {
   simulation_settings?: {
     run_time_limit?: number;
     idle_token_delay?: number;
+    seed?: number;
     output_filename?: string | null;
     evaluate_model?: boolean;
   };
@@ -129,6 +130,7 @@ export interface SimulationStartResponse {
   status: 'completed';
   graph_id: number;
   architecture: 'spyker' | 'hierfl';
+  seed?: number | null;
   output_filename?: string | null;
   evaluation?: {
     accuracy: number;

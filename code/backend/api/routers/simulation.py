@@ -15,6 +15,7 @@ class SimulationTrainingConfig(BaseModel):
 class SimulationSettings(BaseModel):
     run_time_limit: float | None = None
     idle_token_delay: float | None = None
+    seed: int | None = None
     output_filename: str | None = None
     evaluate_model: bool = False
 
@@ -42,6 +43,7 @@ class SimulationStartResponse(BaseModel):
     status: str
     graph_id: int
     architecture: str
+    seed: int | None = None
     output_filename: str | None = None
     evaluation: SimulationEvaluationResult | None = None
 

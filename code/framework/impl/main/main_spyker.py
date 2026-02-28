@@ -118,7 +118,8 @@ class SpykerSimulation:
         dataset_partition_id: int,
         total_partitions: int,
         download_speed: float, 
-        upload_speed: float
+        upload_speed: float,
+        seed: int | None = None,
     ):
         """Registers a client configuration and assigns it to a spyker server."""
         if server_id not in self.server_ids:
@@ -135,7 +136,7 @@ class SpykerSimulation:
             upload_speed=upload_speed
         )
 
-        sim_client = SimulationFlowerClient(dataset_partition_id, total_partitions)
+        sim_client = SimulationFlowerClient(dataset_partition_id, total_partitions, seed=seed)
         self.client_map[server_id].append((client_id, sim_client))
 
     def _spawn_actors(self):

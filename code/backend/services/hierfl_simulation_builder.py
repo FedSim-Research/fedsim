@@ -190,6 +190,7 @@ def build_hierfl_simulation(
     graph: Graph,
     training_config: dict[str, Any] | None = None,
     run_time_limit: float | None = None,
+    seed: int | None = None,
 ):
     HierarchicalSimulation, _, _, _ = _import_hierfl()
     validate_hierfl_graph(graph)
@@ -311,6 +312,7 @@ def build_hierfl_simulation(
                 download_speed=client_download,
                 dataset_partition_id=client_index,
                 total_partitions=total_clients,
+                seed=None if seed is None else seed + client_index,
             )
             client_index += 1
 

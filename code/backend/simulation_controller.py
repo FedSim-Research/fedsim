@@ -1,6 +1,8 @@
 from typing import Any, Callable
 
-import ray
+import random
+import numpy as np
+import torch
 
 from backend.services.hierfl_simulation_builder import build_hierfl_simulation, get_hierfl_evaluate_model
 from backend.services.spyker_simulation_builder import build_spyker_simulation, get_spyker_evaluate_model
@@ -27,6 +29,7 @@ class SimulationController:
                     self.graph,
                     training_config=self.training_config,
                     run_time_limit=self.simulation_settings.get("run_time_limit"),
+                    seed=self.simulation_settings.get("seed"),
                 ),
                 evaluator=get_hierfl_evaluate_model,
             )
@@ -39,6 +42,7 @@ class SimulationController:
                     spyker_config=self.spyker_config,
                     run_time_limit=self.simulation_settings.get("run_time_limit"),
                     idle_token_delay=self.simulation_settings.get("idle_token_delay"),
+                    seed=self.simulation_settings.get("seed"),
                 ),
                 evaluator=get_spyker_evaluate_model,
             )
@@ -50,6 +54,8 @@ class SimulationController:
         builder: Callable[[], Any],
         evaluator: Callable[[], Callable[[str], dict[str, float]]],
     ) -> dict[str, Any]:
+        seed = self.simulation_settings.get("seed")
+        self._apply_seed(seed)
         simulation = builder()
         simulation.build()
         simulation.run()
@@ -61,9 +67,15 @@ class SimulationController:
             if self.simulation_settings.get("evaluate_model"):
                 evaluate_model = evaluator()
                 evaluation = evaluate_model(output_filename)
-        result = {"output_filename": output_filename}
+        result = {"output_filename": output_filename, "seed": seed}
         if evaluation is not None:
             result["evaluation"] = evaluation
         
-        ray.shutdown()
         return result
+
+    def _apply_seed(self, seed: int | None) -> None:
+        if seed is None:
+            return
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
