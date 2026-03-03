@@ -61,6 +61,10 @@
                       <input type="number" min="1" step="1" [(ngModel)]="hierflSettings.runTimeLimit" />
                     </label>
                     <label class="field">
+                      <span class="field-label">Seed <span class="help-dot" title="Controls random operations for reproducible runs.">?</span></span>
+                      <input type="number" min="0" step="1" [(ngModel)]="hierflSettings.seed" />
+                    </label>
+                    <label class="field">
                       <span class="field-label">Output filename <span class="help-dot" title="Target file path/name used to store the final model checkpoint.">?</span></span>
                       <input type="text" [(ngModel)]="hierflSettings.outputFilename" />
                     </label>
@@ -110,6 +114,10 @@
                     <label class="field">
                       <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>
                       <input type="number" min="1" step="1" [(ngModel)]="spykerSettings.runTimeLimit" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Seed <span class="help-dot" title="Controls random operations for reproducible runs.">?</span></span>
+                      <input type="number" min="0" step="1" [(ngModel)]="spykerSettings.seed" />
                     </label>
                     <label class="field">
                       <span class="field-label">Idle token delay (s) <span class="help-dot" title="Delay before token forwarding when no immediate sync is triggered.">?</span></span>

@@ -1,4 +1,4 @@
-import { Component, inject, ViewChild, computed, signal, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, ViewChild, computed, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Vflow, VflowComponent, Node, Edge, NodePositionChange, Connection, ɵConnectionModel as ConnectionModel } from 'ngx-vflow';
 import { NgxSelectoModule } from 'ngx-selecto';
@@ -12,6 +12,7 @@ import { GraphServiceSpyker } from './services/subservices/graph-service-spyker'
 import { GraphServiceHierach } from './services/subservices/graph-service-hierach';
 import { GraphPersistenceService } from './services/graph-persistence.service';
 import { GraphApiService } from './services/graph-api.service';
+import { GraphValidatorService } from './services/graph-validator-service';
 import { MessageService } from 'primeng/api';
 import { FrameworkJobsPopupComponent } from './components/framework-jobs-popup/framework-jobs-popup.component';
 import { FrameworkJobsService } from './services/framework-jobs.service';
@@ -41,7 +42,7 @@ export class App implements OnInit{
   protected graphServiceHierach = inject(GraphServiceHierach);
   private graphPersistence = inject(GraphPersistenceService);
   private graphApi = inject(GraphApiService);
-  private cdr = inject(ChangeDetectorRef);
+  private graphValidator = inject(GraphValidatorService);
   private messageService = inject(MessageService);
   private frameworkJobs = inject(FrameworkJobsService);
   public activeMode = signal<modes>('hierfl');
@@ -529,11 +530,11 @@ export class App implements OnInit{
     mode: 'spyker' | 'hierfl' | 'both';
     hierfl: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; seed: number; outputFilename: string; evaluateModel: boolean };
     };
     spyker: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; seed: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
       spykerConfig: {
         decayBeta: number;
         minLearningRate: number;
@@ -546,17 +547,34 @@ export class App implements OnInit{
     };
   }): Promise<void> {
     const runFor = async (architecture: 'spyker' | 'hierfl'): Promise<void> => {
-      const jobId = this.frameworkJobs.startJob(`${architecture.toUpperCase()} simulation`);
       const service = architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierach;
       const graphId = service.getGraphId() ?? service.loadGraphIdFromStorage();
       if (graphId === null) {
         this.showErrorToast(`No graph available for ${architecture}. Please check if the backend is running.`);
-        this.frameworkJobs.markCompleted(jobId);
         return;
       }
+      const archConfig = architecture === 'hierfl' ? payload.hierfl : payload.spyker;
+      const validationErrors = this.graphValidator.validateSimulationRequest(
+        architecture,
+        service.nodes(),
+        service.edges(),
+        {
+          trainingConfig: archConfig.trainingConfig,
+          simulationSettings: {
+            ...archConfig.simulationSettings,
+            idleTokenDelay: architecture === 'spyker' ? payload.spyker.simulationSettings.idleTokenDelay : undefined,
+          },
+          spykerConfig: architecture === 'spyker' ? payload.spyker.spykerConfig : undefined,
+        },
+      );
+      if (validationErrors.length > 0) {
+        this.showValidationErrors(architecture, validationErrors);
+        return;
+      }
+
+      const jobId = this.frameworkJobs.startJob(`${architecture.toUpperCase()} simulation`);
       try {
         this.showInfoToast(`${architecture} simulation running...`);
-        const archConfig = architecture === 'hierfl' ? payload.hierfl : payload.spyker;
         const result = await this.graphApi.startSimulation({
           graph_id: graphId,
           training_config: {
@@ -567,6 +585,7 @@ export class App implements OnInit{
           simulation_settings: {
             run_time_limit: archConfig.simulationSettings.runTimeLimit,
             idle_token_delay: architecture === 'spyker' ? payload.spyker.simulationSettings.idleTokenDelay : undefined,
+            seed: archConfig.simulationSettings.seed,
             output_filename: archConfig.simulationSettings.outputFilename || null,
             evaluate_model: archConfig.simulationSettings.evaluateModel,
           },
@@ -628,6 +647,18 @@ export class App implements OnInit{
       severity: 'error',
       summary: 'Error',
       detail: message,
+    });
+  }
+
+  private showValidationErrors(architecture: 'spyker' | 'hierfl', errors: string[]): void {
+    const maxErrors = 5;
+    const shown = errors.slice(0, maxErrors).map((err) => `- ${err}`).join('\n');
+    const remaining = errors.length > maxErrors ? `\n...and ${errors.length - maxErrors} more` : '';
+    this.messageService.add({
+      severity: 'error',
+      summary: `${architecture} validation failed`,
+      detail: `${shown}${remaining}`,
+      life: 8000,
     });
   }
 

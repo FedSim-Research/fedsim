@@ -13,6 +13,7 @@ type CommonTrainingConfig = {
 
 type CommonSimulationConfig = {
   runTimeLimit: number;
+  seed: number;
   outputFilename: string;
   evaluateModel: boolean;
 };
@@ -58,6 +59,7 @@ export class StartPopup {
     lr: 0.01,
     modelComplexity: 1.0,
     runTimeLimit: 5000,
+    seed: 42,
     outputFilename: 'final_model_hierfl.pth',
     evaluateModel: false,
   };
@@ -67,6 +69,7 @@ export class StartPopup {
     lr: 0.01,
     modelComplexity: 1.0,
     runTimeLimit: 5000,
+    seed: 42,
     idleTokenDelay: 1.0,
     outputFilename: 'final_model_spyker.pth',
     evaluateModel: false,
@@ -137,6 +140,7 @@ export class StartPopup {
         },
         simulationSettings: {
           runTimeLimit: this.hierflSettings.runTimeLimit,
+          seed: this.hierflSettings.seed,
           outputFilename: this.hierflSettings.outputFilename,
           evaluateModel: this.evaluateAfterRun,
         },
@@ -149,6 +153,7 @@ export class StartPopup {
         },
         simulationSettings: {
           runTimeLimit: this.spykerSettings.runTimeLimit,
+          seed: this.spykerSettings.seed,
           idleTokenDelay: this.spykerSettings.idleTokenDelay,
           outputFilename: this.spykerSettings.outputFilename,
           evaluateModel: this.evaluateAfterRun,

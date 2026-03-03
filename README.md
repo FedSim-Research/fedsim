@@ -31,6 +31,22 @@ cd code
 docker compose down
 ```
 
+View logs:
+
+- Single service (example: backend):
+
+```bash
+cd code
+docker compose logs -f backend
+```
+
+- All services:
+
+```bash
+cd code
+docker compose logs -f
+```
+
 URLs:
 
 - Frontend: `http://localhost:4200`

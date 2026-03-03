@@ -213,6 +213,7 @@ def build_spyker_simulation(
     spyker_config: dict[str, Any] | None = None,
     run_time_limit: float | None = None,
     idle_token_delay: float | None = None,
+    seed: int | None = None,
 ):
     SpykerSimulation, _, _, _, _ = _import_spyker()
     validate_spyker_graph(graph)
@@ -307,6 +308,7 @@ def build_spyker_simulation(
                 total_partitions=total_clients,
                 download_speed=client_download,
                 upload_speed=client_upload,
+                seed=None if seed is None else seed + client_index,
             )
             instance_ids.append(client_id)
             client_index += 1

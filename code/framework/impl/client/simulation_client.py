@@ -1,5 +1,7 @@
 import torch
 import flwr
+import random
+import numpy as np
 from typing import Dict
 from collections import OrderedDict
 from flwr.common import (
@@ -19,17 +21,21 @@ from main.task import Net, load_data, train, test
 
 
 class SimulationFlowerClient(flwr.client.Client):
-    def __init__(self, partition_id: int, num_partitions: int):
+    def __init__(self, partition_id: int, num_partitions: int, seed: int | None = None):
         self.partition_id = partition_id
         self.num_partitions = num_partitions
         self.device = torch.device("cpu")
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
+            torch.manual_seed(seed)
 
         # 1. Initialize Model
         self.net = Net().to(self.device)
 
         # 2. Load Data (Using the FederatedDataset logic from task.py)
         # This will download/cache CIFAR-10 on the first run
-        self.trainloader, self.testloader = load_data(partition_id, num_partitions)
+        self.trainloader, self.testloader = load_data(partition_id, num_partitions, seed=seed)
 
     def get_parameters(self, config: Dict[str, Scalar]) -> Parameters:
         # Convert PyTorch parameters to Flower Parameters
