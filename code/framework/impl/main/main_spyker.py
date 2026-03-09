@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from typing import Dict, List, Any, Tuple
+import uuid
 
 import ray
 import torch
@@ -80,6 +81,11 @@ class SpykerSimulation:
         )
         return {"num_gpus": gpu_per_actor}
 
+        self.run_id = f"run_{uuid.uuid4().hex[:6]}"
+        self.graph_id = "default_graph"
+        self.eval_interval = 0.0 # disabled
+        self.evaluator_actor = None
+
     def set_configurations(self, 
                            spyker_params: Dict[str, Any],
                            training_params: Dict[str, Any],
@@ -113,6 +119,12 @@ class SpykerSimulation:
         print(f"  > Run Limit: {self.config.simulation.run_time_limit}s")
         print(f"  > Epochs: {self.config.training.local_epochs}")
         print(f"  > Token Heartbeat: {self.config.simulation.idle_token_delay}s")
+
+    def set_metadata(self, run_id: str, graph_id: str):
+        """Configure telemetry settings."""
+        if run_id: self.run_id = run_id
+        if graph_id: self.graph_id = graph_id
+        self.eval_interval = self.config.simulation.eval_time_delay
 
     def add_server(
             self, 
@@ -264,6 +276,24 @@ class SpykerSimulation:
             raise RuntimeError("Simulation not built. Call build() first.")
         
         print("Initializing Spyker simulation...")
+
+        # Telemetry
+        if self.eval_interval > 0:
+            from telemetry.evaluator_actor import PeriodicEvaluator
+            
+            # Use Server 0 as the representative model to evaluate
+            target_srv = self.spyker_actors_map[self.server_ids[0]]
+            
+            self.evaluator_actor = PeriodicEvaluator.remote(
+                run_id=self.run_id,
+                graph_id=self.graph_id,
+                architecture="spyker",
+                target_server_ref=target_srv,
+                orchestrator_ref=self.orchestrator,
+                evaluation_interval=self.eval_interval
+            )
+            
+            ray.get(self.evaluator_actor.start.remote())
 
         all_initial_events = []
         for s_id, actor in self.spyker_actors_map.items():
