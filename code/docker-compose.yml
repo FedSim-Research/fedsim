@@ -37,6 +37,7 @@ services:
     volumes:
       - ./backend:/app/backend
       - ./framework/impl:/app/framework/impl
+      - ./config.yaml:/app/config.yaml
       - ./data:/app/data
       - hf_cache:/hf-cache
     depends_on:
