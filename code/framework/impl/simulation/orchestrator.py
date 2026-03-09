@@ -1,10 +1,16 @@
 import heapq
 import ray
+import yaml
 from typing import List
 from simulation.event import Event
 
 
-@ray.remote
+with open("config.yaml", "r") as config_file:
+    global doc
+    doc = yaml.load(config_file, Loader=yaml.SafeLoader)
+
+
+@ray.remote(num_gpus=doc["num_gpus"])
 class SimulationOrchestrator:
     def __init__(self):
         self._event_heap: List[Event] = []
@@ -25,22 +31,26 @@ class SimulationOrchestrator:
         actor_ref, method_name, payload = event.callback
 
         event_type = payload.get("event_type", "UNKNOWN")
-        
-        log_message = f"[Orchestrator] t={self.global_virtual_time:09.3f} | {event_type}"
+
+        log_message = (
+            f"[Orchestrator] t={self.global_virtual_time:09.3f} | {event_type}"
+        )
 
         if event_type == "SERVER_MESSAGE":
             data = payload.get("data", {})
             sub_type = data.get("type", "RAW")
             sender = data.get("sender_id", "?")
-            
+
             log_message += f" ({sub_type})".ljust(20) + f" from {sender}"
 
             if sub_type == "TOKEN":
                 ages = data.get("server_ages", {})
                 # Format compact dict string: {A:10, B:11}
-                age_str = ", ".join([f"{k.replace('server_', '')}:{v}" for k, v in ages.items()])
+                age_str = ", ".join(
+                    [f"{k.replace('server_', '')}:{v}" for k, v in ages.items()]
+                )
                 log_message += f" [Knowledge: {age_str}]"
-                
+
             elif sub_type == "MODEL_BROADCAST":
                 age = data.get("age", -1)
                 bid = data.get("bid", "N/A")
@@ -51,9 +61,9 @@ class SimulationOrchestrator:
             cid = data.get("client_id", "unknown")
             sid = data.get("server_id", "?")
             log_message += f" from {cid} (on {sid})"
-        
+
         print(log_message)
-        
+
         return getattr(actor_ref, method_name).remote(payload)
 
     def run_until(self, target_time: float):

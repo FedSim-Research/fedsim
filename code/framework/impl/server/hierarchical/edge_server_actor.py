@@ -1,5 +1,6 @@
 import ray
 import numpy as np
+import yaml
 from typing import List, Dict, Tuple, Any
 
 from flwr.common import (
@@ -23,7 +24,12 @@ MODEL_SYNC = "MODEL_SYNC"
 SERVER_MESSAGE = "SERVER_MESSAGE"
 
 
-@ray.remote
+with open("config.yaml", "r") as config_file:
+    global doc
+    doc = yaml.load(config_file, Loader=yaml.SafeLoader)
+
+
+@ray.remote(num_gpus=doc["num_gpus"])
 class EdgeServer(BaseAsyncServer):
     def __init__(
         self,

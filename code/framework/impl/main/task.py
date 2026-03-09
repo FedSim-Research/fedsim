@@ -82,6 +82,7 @@ def load_data(partition_id: int, num_partitions: int, seed: int | None = None):
 
 def train(net, trainloader, epochs, lr, device):
     """Train the model on the training set."""
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
     net.to(device)  # move model to GPU if available
     criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=lr)
@@ -102,6 +103,7 @@ def train(net, trainloader, epochs, lr, device):
 
 def test(net, testloader, device):
     """Validate the model on the test set."""
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
     net.to(device)
     net.eval()
     criterion = torch.nn.CrossEntropyLoss()
