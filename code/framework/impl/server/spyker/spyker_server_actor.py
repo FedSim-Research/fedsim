@@ -114,6 +114,14 @@ class SpykerServer(BaseAsyncServer):
     def set_token_holder(self, is_holder: bool):
         self.has_token = is_holder
 
+    def get_metrics(self) -> Dict[str, Any]:
+        """Returns Spyker specific metrics for telemetry."""
+        return {
+            "model_age": self.model_age,
+            "total_client_updates": sum(self.client_update_counts.values()),
+            "has_token": int(self.has_token)
+        }
+
     # ==============================================================
 
     def start_simulation(self):

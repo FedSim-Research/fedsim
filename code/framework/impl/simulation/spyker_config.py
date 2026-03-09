@@ -32,6 +32,9 @@ class SimulationConfig:
     """Global physics and limits for the simulation engine."""
     # When to stop the simulation (Virtual Seconds)
     run_time_limit: float = 5000.0
+
+    # Cadence for model evaluation during training, 0.0 means disabled logging.
+    eval_time_delay: float = 0.0
     
     # The 'Heartbeat' delay during token idle state (Virtual Seconds)
     idle_token_delay: float = 1.0 
