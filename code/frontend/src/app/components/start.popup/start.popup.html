@@ -1,5 +1,5 @@
 <div class="popup-backdrop" (click)="onClose()">
-  <div class="popup-card" (click)="$event.stopPropagation()">
+  <div class="popup-card" (click)="$event.stopPropagation()" lang="en-US">
     <div class="popup-header">
       <h3>Start simulation</h3>
       <button class="icon-btn-small" (click)="onClose()">✕</button>
@@ -50,11 +50,11 @@
                     </label>
                     <label class="field">
                       <span class="field-label">Learning rate <span class="help-dot" title="Step size used by the optimizer during local training.">?</span></span>
-                      <input type="number" step="0.0001" min="0" [(ngModel)]="hierflSettings.lr" />
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(hierflSettings.lr)" (ngModelChange)="hierflSettings.lr = parseDecimalInput($event, hierflSettings.lr)" />
                     </label>
                     <label class="field">
                       <span class="field-label">Model complexity <span class="help-dot" title="Scaling factor for simulated compute effort per training step.">?</span></span>
-                      <input type="number" step="0.1" min="0.1" [(ngModel)]="hierflSettings.modelComplexity" />
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(hierflSettings.modelComplexity)" (ngModelChange)="hierflSettings.modelComplexity = parseDecimalInput($event, hierflSettings.modelComplexity)" />
                     </label>
                     <label class="field">
                       <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>
@@ -105,11 +105,11 @@
                     </label>
                     <label class="field">
                       <span class="field-label">Learning rate <span class="help-dot" title="Step size used by the optimizer during local training.">?</span></span>
-                      <input type="number" step="0.0001" min="0" [(ngModel)]="spykerSettings.lr" />
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.lr)" (ngModelChange)="spykerSettings.lr = parseDecimalInput($event, spykerSettings.lr)" />
                     </label>
                     <label class="field">
                       <span class="field-label">Model complexity <span class="help-dot" title="Scaling factor for simulated compute effort per training step.">?</span></span>
-                      <input type="number" step="0.1" min="0.1" [(ngModel)]="spykerSettings.modelComplexity" />
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.modelComplexity)" (ngModelChange)="spykerSettings.modelComplexity = parseDecimalInput($event, spykerSettings.modelComplexity)" />
                     </label>
                     <label class="field">
                       <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>
@@ -121,7 +121,7 @@
                     </label>
                     <label class="field">
                       <span class="field-label">Idle token delay (s) <span class="help-dot" title="Delay before token forwarding when no immediate sync is triggered.">?</span></span>
-                      <input type="number" min="0" step="0.1" [(ngModel)]="spykerSettings.idleTokenDelay" />
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.idleTokenDelay)" (ngModelChange)="spykerSettings.idleTokenDelay = parseDecimalInput($event, spykerSettings.idleTokenDelay)" />
                     </label>
                     <label class="field">
                       <span class="field-label">Output filename <span class="help-dot" title="Target file path/name used to store the final model checkpoint.">?</span></span>
@@ -133,11 +133,11 @@
                     <div class="grid">
                       <label class="field">
                         <span class="field-label">Decay beta <span class="help-dot" title="Decay factor for reducing contribution of frequently-updating clients.">?</span></span>
-                        <input type="number" min="0" step="0.01" [(ngModel)]="spykerSettings.decayBeta" />
+                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.decayBeta)" (ngModelChange)="spykerSettings.decayBeta = parseDecimalInput($event, spykerSettings.decayBeta)" />
                       </label>
                       <label class="field">
                         <span class="field-label">Min learning rate <span class="help-dot" title="Lower bound for client contribution scaling during decay.">?</span></span>
-                        <input type="number" min="0.0000001" step="0.000001" [(ngModel)]="spykerSettings.minLearningRate" />
+                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.minLearningRate)" (ngModelChange)="spykerSettings.minLearningRate = parseDecimalInput($event, spykerSettings.minLearningRate)" />
                       </label>
                       <label class="field">
                         <span class="field-label">h_inter <span class="help-dot" title="Inter-server drift threshold to trigger synchronization.">?</span></span>
@@ -149,15 +149,15 @@
                       </label>
                       <label class="field">
                         <span class="field-label">Sigmoid phi <span class="help-dot" title="Sharpness parameter for weighting server-side aggregation.">?</span></span>
-                        <input type="number" min="0.01" step="0.1" [(ngModel)]="spykerSettings.sigmoidPhi" />
+                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.sigmoidPhi)" (ngModelChange)="spykerSettings.sigmoidPhi = parseDecimalInput($event, spykerSettings.sigmoidPhi)" />
                       </label>
                       <label class="field">
                         <span class="field-label">Server learning rate <span class="help-dot" title="Server-side aggregation learning rate.">?</span></span>
-                        <input type="number" min="0.0001" step="0.01" [(ngModel)]="spykerSettings.serverLearningRate" />
+                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.serverLearningRate)" (ngModelChange)="spykerSettings.serverLearningRate = parseDecimalInput($event, spykerSettings.serverLearningRate)" />
                       </label>
                       <label class="field">
                         <span class="field-label">TCP RTO delay <span class="help-dot" title="Simulated TCP retransmission timeout delay.">?</span></span>
-                        <input type="number" min="0" step="0.05" [(ngModel)]="spykerSettings.tcpRtoDelay" />
+                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.tcpRtoDelay)" (ngModelChange)="spykerSettings.tcpRtoDelay = parseDecimalInput($event, spykerSettings.tcpRtoDelay)" />
                       </label>
                     </div>
                   </div>

@@ -21,3 +21,11 @@ def ensure_ray_initialized() -> None:
         except Exception:
             ray.init(ignore_reinit_error=True, include_dashboard=True)
         _initialized = True
+
+
+def shutdown_ray() -> None:
+    global _initialized
+    with _init_lock:
+        if ray.is_initialized():
+            ray.shutdown()
+        _initialized = False
