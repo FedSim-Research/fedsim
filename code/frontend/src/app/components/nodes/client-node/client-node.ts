@@ -133,7 +133,7 @@ export class ClientNode extends CustomNodeComponent {
   }
 
   public updateTextField(field: 'type', event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
+    const value = (event.target as HTMLInputElement | HTMLSelectElement).value;
     this.nodeEditUi.updateDraft(this.node().id, { [field]: value });
   }
 

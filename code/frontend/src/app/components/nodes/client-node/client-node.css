@@ -30,7 +30,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 0.5mm;
+  margin-right: 0;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease, transform 0.15s ease;
@@ -45,7 +45,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 0.5mm;
+  margin-right: 0;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease, transform 0.15s ease;
@@ -102,7 +102,13 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 6px;
+}
+
+.action-button svg,
+.node-header > svg {
+  width: 18px;
+  height: 18px;
 }
 
 .node-title {
@@ -155,6 +161,11 @@
   color: rgba(255, 255, 255, 0.95);
   padding: 2px 6px;
   font-size: 0.78rem;
+}
+
+.spec-select {
+  height: 24px;
+  appearance: auto;
 }
 
 .node-footer {
