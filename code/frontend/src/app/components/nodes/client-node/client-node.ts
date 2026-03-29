@@ -1,5 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 import { NgIf } from '@angular/common';
+import { ButtonModule } from 'primeng/button';
 import { CustomNodeComponent, HandleComponent } from 'ngx-vflow';
 import { NodeDeleteUiService } from '../../../services/node-delete-ui.service';
 import { GraphServiceHierach } from '../../../services/subservices/graph-service-hierach';
@@ -10,7 +11,7 @@ import { MessageService } from 'primeng/api';
 @Component({
   selector: 'app-client-node',
   standalone: true,
-  imports: [NgIf, HandleComponent],
+  imports: [NgIf, HandleComponent, ButtonModule],
   templateUrl: './client-node.html',
   styleUrl: './client-node.css',
 })
@@ -88,6 +89,20 @@ export class ClientNode extends CustomNodeComponent {
       this.graphServiceHierach.removeNodeById(this.node().id);
       console.log("Removed client node from hierfl");
     }
+  }
+
+  public onForwardNode(event: MouseEvent): void {
+    event.stopPropagation();
+    const current = this.client();
+    window.dispatchEvent(new CustomEvent('node-forward', {
+      detail: {
+        kind: 'client',
+        config: {
+          ...current,
+          type: String(current.type ?? '').toLowerCase(),
+        },
+      },
+    }));
   }
 
   public onStartEdit(event: MouseEvent): void {

@@ -1,5 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 import { NgIf } from '@angular/common';
+import { ButtonModule } from 'primeng/button';
 import { CustomNodeComponent, HandleComponent } from 'ngx-vflow';
 import { NodeDeleteUiService } from '../../../services/node-delete-ui.service';
 import { GraphServiceSpyker } from '../../../services/subservices/graph-service-spyker';
@@ -10,7 +11,7 @@ import { MessageService } from 'primeng/api';
 @Component({
   selector: 'app-server-node',
   standalone: true,
-  imports: [NgIf, HandleComponent],
+  imports: [NgIf, HandleComponent, ButtonModule],
   templateUrl: './server-node.html',
   styleUrl: './server-node.css',
 })
@@ -87,6 +88,16 @@ export class ServerNode extends CustomNodeComponent {
       this.graphServiceHierach.removeNodeById(this.node().id);
       console.log("Removed server node from hierfl");
     }
+  }
+
+  public onForwardNode(event: MouseEvent): void {
+    event.stopPropagation();
+    window.dispatchEvent(new CustomEvent('node-forward', {
+      detail: {
+        kind: 'server',
+        config: this.server(),
+      },
+    }));
   }
 
   public onStartEdit(event: MouseEvent): void {

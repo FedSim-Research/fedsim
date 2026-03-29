@@ -31,10 +31,10 @@
   align-items: center;
   justify-content: center;
   margin-right: 0.5mm;
-  opacity: 0;
-  pointer-events: none;
+  opacity: 1;
+  pointer-events: auto;
   transition: opacity 0.15s ease, transform 0.15s ease;
-  transform: translateY(-2px);
+  transform: translateY(0);
 }
 
 .action-button {
@@ -46,10 +46,10 @@
   align-items: center;
   justify-content: center;
   margin-right: 0.5;
-  opacity: 0;
-  pointer-events: none;
+  opacity: 1;
+  pointer-events: auto;
   transition: opacity 0.15s ease, transform 0.15s ease;
-  transform: translateY(-2px);
+  transform: translateY(0);
 }
 
 .action-button--visible {
@@ -58,14 +58,13 @@
   transform: translateY(0);
 }
 
-.node-card:hover .action-button {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
 .edit-button {
   color: #60a5fa;
+}
+
+.forward-button,
+.forward-button .pi {
+  color: #ffffff !important;
 }
 
 .edit-button:hover {
@@ -81,12 +80,6 @@
 }
 
 .delete-button--visible {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
-.node-card:hover .delete-button {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);

@@ -1,4 +1,4 @@
-import { Component, HostListener, Inject, Output, EventEmitter, ViewChild, ElementRef, Input, OnInit } from '@angular/core';
+import { Component, HostListener, Inject, Output, EventEmitter, ViewChild, ElementRef, Input, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StartPopup } from '../start.popup/start.popup';
@@ -86,7 +86,7 @@ const DEFAULT_CLIENT_CONFIG: ClientConfig = {
   styleUrls: ['./sidebar.component.css'],
   imports: [FormsModule, CommonModule, StartPopup, ResetButton, ViewGraphsDialog, HelpDialog, ToastModule],
 })
-export class SidebarComponent implements OnInit {
+export class SidebarComponent implements OnInit, OnDestroy {
   public isOpen = true;
   public isDarkMode = true;
   public showSimulationpopup = false;
@@ -150,6 +150,24 @@ export class SidebarComponent implements OnInit {
   public selectedServerBlueprintIndex: number | null = null;
   public selectedClientBlueprintIndex: number | null = null;
 
+  private readonly nodeForwardListener = (event: Event): void => {
+    const customEvent = event as CustomEvent<{ kind: 'superserver' | 'server' | 'client'; config: Record<string, unknown> }>;
+    const detail = customEvent.detail;
+    if (!detail) {
+      return;
+    }
+
+    if (detail.kind === 'superserver') {
+      this.configDraft.superserver = this.toSuperServerConfig(detail.config);
+    } else if (detail.kind === 'server') {
+      this.configDraft.server = this.toServerConfig(detail.config);
+    } else if (detail.kind === 'client') {
+      this.configDraft.client = this.toClientConfig(detail.config);
+    }
+
+    this.openSidebar();
+  };
+
   public superServerBlueprintDraft: BlueprintDraft<SuperServerConfig> = {
     presetName: '',
     config: { ...this.configDraft.superserver },
@@ -172,8 +190,13 @@ export class SidebarComponent implements OnInit {
   ) {}
 
   public async ngOnInit(): Promise<void> {
+    window.addEventListener('node-forward', this.nodeForwardListener as EventListener);
     await this.ensureGraphForMode(this.currentArchitecture());
     await this.loadPresetsForCurrentArchitecture();
+  }
+
+  public ngOnDestroy(): void {
+    window.removeEventListener('node-forward', this.nodeForwardListener as EventListener);
   }
 
   private showErrorToast(message: string) {
