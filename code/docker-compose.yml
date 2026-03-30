@@ -14,8 +14,12 @@ services:
       - HF_HOME=/hf-cache
       - HF_DATASETS_CACHE=/hf-cache/datasets
       - TRANSFORMERS_CACHE=/hf-cache/transformers
+      - PYTHONPATH=/app/framework/impl:/app
     volumes:
-      - hf_cache:/hf-cache
+      - ./backend:/app/backend
+      - ./framework/impl:/app/framework/impl
+      - ./config.yaml:/app/config.yaml
+      - ./data:/app/data
     restart: unless-stopped
     networks:
       - fedsim-network

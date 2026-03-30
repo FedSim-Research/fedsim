@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from typing import Dict, List, Any, Tuple
+import uuid
 
 import ray
 import torch
@@ -43,13 +44,18 @@ class SpykerSimulation:
         self.client_registry: Dict[str, ClientSpec] = {}
         self.server_registry: Dict[str, ServerSpec] = {}
 
-        self.client_map: Dict[str, List[Tuple[str, SimulationFlowerClient]]] = {}
+        self.client_map: Dict[str, List[Tuple[str, Any]]] = {}
 
         self.config = FullConfiguration()
 
         self.context = None
         self.orchestrator = None
         self.spyker_actors_map: Dict[str, Any] = {}
+
+        self.run_id = f"run_{uuid.uuid4().hex[:6]}"
+        self.graph_id = "default_graph"
+        self.eval_interval = 0.0 # disabled
+        self.evaluator_actor = None
 
     def set_configurations(self, 
                            spyker_params: Dict[str, Any],
@@ -84,6 +90,12 @@ class SpykerSimulation:
         print(f"  > Run Limit: {self.config.simulation.run_time_limit}s")
         print(f"  > Epochs: {self.config.training.local_epochs}")
         print(f"  > Token Heartbeat: {self.config.simulation.idle_token_delay}s")
+
+    def set_metadata(self, run_id: str, graph_id: str):
+        """Configure telemetry settings."""
+        if run_id: self.run_id = run_id
+        if graph_id: self.graph_id = graph_id
+        self.eval_interval = self.config.simulation.eval_time_delay
 
     def add_server(
             self, 
@@ -136,8 +148,12 @@ class SpykerSimulation:
             upload_speed=upload_speed
         )
 
-        sim_client = SimulationFlowerClient(dataset_partition_id, total_partitions, seed=seed)
-        self.client_map[server_id].append((client_id, sim_client))
+        client_config = {
+        "dataset_partition_id": dataset_partition_id,
+        "total_partitions": total_partitions,
+        "seed": seed
+    }
+        self.client_map[server_id].append((client_id, client_config))
 
     def _spawn_actors(self):
         if not self.server_ids:
@@ -149,9 +165,9 @@ class SpykerSimulation:
                 "First spyker server must have at least one client to initialize global model."
             )
         
-        first_client_sim = self.client_map[first_server][0][1]
-        initial_params = first_client_sim.get_parameters(config={})
-        initial_weights_np = parameters_to_ndarrays(initial_params)
+        from main.task import Net
+        dummy_model = Net()
+        initial_weights_np = [val.cpu().numpy() for _, val in dummy_model.state_dict().items()]
 
         print(f"Spawning {len(self.server_ids)} Spyker Servers...")
 
@@ -176,11 +192,11 @@ class SpykerSimulation:
             ray.get(actor.set_initial_weights.remote(initial_weights_np))
 
             # Register Clients
-            assigned_clients = {
-                c_id: sim_client
-                for c_id, sim_client in self.client_map[s_id]
+            assigned_client_configs = {
+                c_id: client_config 
+                for c_id, client_config in self.client_map[s_id]
             }
-            ray.get(actor.register_clients.remote(assigned_clients))
+            ray.get(actor.register_clients.remote(assigned_client_configs))
     
     def _configure_network(self):
         print("Wiring Spyker Mesh and Token Ring...")
@@ -234,6 +250,24 @@ class SpykerSimulation:
             raise RuntimeError("Simulation not built. Call build() first.")
         
         print("Initializing Spyker simulation...")
+
+        # Telemetry
+        if self.eval_interval > 0:
+            from telemetry.evaluator_actor import PeriodicEvaluator
+            
+            # Use Server 0 as the representative model to evaluate
+            target_srv = self.spyker_actors_map[self.server_ids[0]]
+            
+            self.evaluator_actor = PeriodicEvaluator.remote(
+                run_id=self.run_id,
+                graph_id=self.graph_id,
+                architecture="spyker",
+                target_server_ref=target_srv,
+                orchestrator_ref=self.orchestrator,
+                evaluation_interval=self.eval_interval
+            )
+            
+            ray.get(self.evaluator_actor.start.remote())
 
         all_initial_events = []
         for s_id, actor in self.spyker_actors_map.items():
