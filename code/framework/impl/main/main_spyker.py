@@ -280,6 +280,7 @@ class SpykerSimulation:
             raise RuntimeError("Simulation not built. Call build() first.")
         
         print("Initializing Spyker simulation...")
+        all_initial_events =[]
 
         # Telemetry
         if self.eval_interval > 0:
@@ -296,10 +297,11 @@ class SpykerSimulation:
                 orchestrator_ref=self.orchestrator,
                 evaluation_interval=self.eval_interval
             )
-            
-            ray.get(self.evaluator_actor.start.remote())
 
-        all_initial_events = []
+            eval_events = ray.get(self.evaluator_actor.start.remote())
+            if eval_events:
+                all_initial_events.extend(eval_events)
+
         for s_id, actor in self.spyker_actors_map.items():
             events = ray.get(actor.start_simulation.remote())
             if events:
@@ -313,7 +315,6 @@ class SpykerSimulation:
         limit = self.config.simulation.run_time_limit
 
         ray.get(self.orchestrator.run_until.remote(limit))
-
         print("Simulation execution finished")
 
     def save_model(self, filename: str):

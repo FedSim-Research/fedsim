@@ -94,6 +94,11 @@ class HierarchicalSimulation:
         )
         return {"num_gpus": gpu_per_actor}
 
+        self.evaluator_actor = None
+        self.eval_interval = 500 #TODO SET FROM OUTSIDE (stubs)
+        self.run_id = 0 #TODO SET FROM OUTSIDE (stubs)
+        self.graph_id = 0 #TODO SET FROM OUTSIDE (stubs)
+
     def set_super_server(
         self,
         server_id: str,
@@ -239,14 +244,40 @@ class HierarchicalSimulation:
             raise RuntimeError("Simulation not built. Call build() first.")
 
         print("Initializing simulation...")
-        initial_events = ray.get(self.super_actor.start_simulation.remote())
+        all_initial_events =[]
 
-        for delay, target, method, payload in initial_events:
+        # --- EVALUATOR INITIALIZATION ---
+        if getattr(self, 'eval_interval', 0.0) > 0:
+            from telemetry.evaluator_actor import PeriodicEvaluator
+            
+            print(f"Spawning Periodic Evaluator (Interval: {self.eval_interval}s)...")
+            self.evaluator_actor = PeriodicEvaluator.remote(
+                run_id=self.run_id,
+                graph_id=self.graph_id,
+                architecture="hierarchical",
+                target_server_ref=self.super_actor,
+                orchestrator_ref=self.orchestrator,
+                evaluation_interval=self.eval_interval
+            )
+            
+            # Fetch the first event (T=0 evaluation + scheduling the next)
+            eval_events = ray.get(self.evaluator_actor.start.remote())
+            if eval_events:
+                all_initial_events.extend(eval_events)
+        # ---------------------------------
+
+        server_events = ray.get(self.super_actor.start_simulation.remote())
+        if server_events:
+            all_initial_events.extend(server_events)
+
+        for delay, target, method, payload in all_initial_events:
             ray.get(self.orchestrator.add_event.remote(delay, target, method, payload))
 
-        print(f"Simulation started with {len(initial_events)} initial events.")
+        print(f"Simulation started with {len(all_initial_events)} initial events.")
         print("Running simulation loop...")
+        
         ray.get(self.orchestrator.run_until.remote(self.run_time_limit))
+        
         print("Simulation execution finished.")
 
     def save_model(self, filename: str):

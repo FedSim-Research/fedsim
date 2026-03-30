@@ -46,6 +46,12 @@ class SuperServer(BaseAsyncServer):
         self.edge_server_refs = edge_server_refs
         print(f"[SuperServer] Registered {len(edge_server_refs)} edge servers.")
 
+    def get_metrics(self) -> Dict[str, Any]:
+        return {
+            "model_age": self.model_age,
+            "pending_updates": len(self.updates_buffer)
+        }
+
     def start_simulation(self):
         """
         Kickstart the simulation by sending the Initial Model (Age 0)
