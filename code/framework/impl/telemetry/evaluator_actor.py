@@ -100,12 +100,12 @@ class PeriodicEvaluator:
         print(f"[{self.architecture} Eval] T={current_virtual_time:>6.1f}s | Acc: {accuracy*100:>5.2f}% | Loss: {avg_loss:.4f} | Age: {server_metrics.get('model_age', 'N/A')}")
 
         # Schedule Next Evaluation in the Orchestrator
-        if self.self_ref and self.orchestrator:
+        if self.self_ref:
             next_payload = {"event_type": "EVALUATE", "trigger_time": current_virtual_time + self.interval}
             
-            ray.get(self.orchestrator.add_event.remote(
-                delay=self.interval,
-                actor_ref=self.self_ref,
-                method_name="evaluate",
-                payload=next_payload
-            ))
+            # Format: (delay, target_actor, method_name, payload)
+            return[
+                (self.interval, self.self_ref, "evaluate", next_payload)
+            ]
+        
+        return
