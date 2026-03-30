@@ -52,7 +52,7 @@ class HierarchicalSimulation:
         self.super_id = None
         self.edge_ids = []
         self.client_ids = []
-        self.client_map: Dict[str, List[Tuple[str, SimulationFlowerClient]]] = {}
+        self.client_map: Dict[str, List[Tuple[str, Dict[str, Any]]]] = {}
 
         self.client_registry: Dict[str, ClientSpec] = {}
         self.server_registry: Dict[str, ServerSpec] = {}
@@ -64,6 +64,11 @@ class HierarchicalSimulation:
         self.orchestrator = None
         self.super_actor = None
         self.edge_actors_map = {}
+
+        self.evaluator_actor = None
+        self.eval_interval = 500 #TODO SET FROM OUTSIDE (stubs)
+        self.run_id = 0 #TODO SET FROM OUTSIDE (stubs)
+        self.graph_id = 0 #TODO SET FROM OUTSIDE (stubs)
 
     def set_super_server(
         self,
@@ -137,8 +142,12 @@ class HierarchicalSimulation:
             download_speed=download_speed,
         )
 
-        sim_client = SimulationFlowerClient(dataset_partition_id, total_partitions, seed=seed)
-        self.client_map[edge_id].append((client_id, sim_client))
+        client_config = {
+            "dataset_partition_id": dataset_partition_id,
+            "total_partitions": total_partitions,
+            "seed": seed
+        }
+        self.client_map[edge_id].append((client_id, client_config))
 
     def _spawn_actors(self):
         """Spawns the SuperServer and EdgeServer actors on the Ray cluster."""
@@ -148,9 +157,9 @@ class HierarchicalSimulation:
                 "First edge server must have at least one client to initialize global model."
             )
 
-        first_client = self.client_map[first_edge][0][1]
-        initial_params = first_client.get_parameters(config={})
-        initial_weights = parameters_to_ndarrays(initial_params)
+        from main.task import Net
+        dummy_model = Net()
+        initial_weights = [val.cpu().numpy() for _, val in dummy_model.state_dict().items()]
 
         print(f"Spawning Super Server ({self.super_id})...")
         self.super_actor = SuperServer.remote(
@@ -163,16 +172,29 @@ class HierarchicalSimulation:
 
         print("Spawning Edge Servers...")
         for eid in self.edge_ids:
-            assigned_clients = self.client_map[eid]
             edge_actor = EdgeServer.remote(
                 server_id=eid,
                 super_server_id=self.super_id,
                 super_server_ref=self.super_actor,
-                assigned_clients=assigned_clients,
-                min_clients_per_round=len(assigned_clients),
+                min_clients_per_round=len(self.client_map[eid]),
                 context=self.context,
             )
             self.edge_actors_map[eid] = edge_actor
+
+        # Update context locally
+        all_actors = {self.super_id: self.super_actor}
+        all_actors.update(self.edge_actors_map)
+        self.context.set_server_actor_handles(all_actors)
+
+        # Distribute context and register clients safely on the edge workers
+        for eid in self.edge_ids:
+            actor = self.edge_actors_map[eid]
+            ray.get(actor.set_global_context_remote.remote(self.context))
+            
+            assigned_client_configs = {
+                c_id: config for c_id, config in self.client_map[eid]
+            }
+            ray.get(actor.register_clients.remote(assigned_client_configs))
 
     def _configure_network(self):
         """Wiring server connections."""
@@ -209,14 +231,40 @@ class HierarchicalSimulation:
             raise RuntimeError("Simulation not built. Call build() first.")
 
         print("Initializing simulation...")
-        initial_events = ray.get(self.super_actor.start_simulation.remote())
+        all_initial_events =[]
 
-        for delay, target, method, payload in initial_events:
+        # --- EVALUATOR INITIALIZATION ---
+        if getattr(self, 'eval_interval', 0.0) > 0:
+            from telemetry.evaluator_actor import PeriodicEvaluator
+            
+            print(f"Spawning Periodic Evaluator (Interval: {self.eval_interval}s)...")
+            self.evaluator_actor = PeriodicEvaluator.remote(
+                run_id=self.run_id,
+                graph_id=self.graph_id,
+                architecture="hierarchical",
+                target_server_ref=self.super_actor,
+                orchestrator_ref=self.orchestrator,
+                evaluation_interval=self.eval_interval
+            )
+            
+            # Fetch the first event (T=0 evaluation + scheduling the next)
+            eval_events = ray.get(self.evaluator_actor.start.remote())
+            if eval_events:
+                all_initial_events.extend(eval_events)
+        # ---------------------------------
+
+        server_events = ray.get(self.super_actor.start_simulation.remote())
+        if server_events:
+            all_initial_events.extend(server_events)
+
+        for delay, target, method, payload in all_initial_events:
             ray.get(self.orchestrator.add_event.remote(delay, target, method, payload))
 
-        print(f"Simulation started with {len(initial_events)} initial events.")
+        print(f"Simulation started with {len(all_initial_events)} initial events.")
         print("Running simulation loop...")
+        
         ray.get(self.orchestrator.run_until.remote(self.run_time_limit))
+        
         print("Simulation execution finished.")
 
     def save_model(self, filename: str):
