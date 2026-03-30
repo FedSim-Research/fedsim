@@ -232,9 +232,18 @@ class SimulationRunQueue:
         if hier_budget is not None and spyker_budget is not None:
             available_gpu = float(ray.available_resources().get("GPU", 0.0))
             combined_budget = float(hier_budget) + float(spyker_budget)
-            if combined_budget > available_gpu + 1e-9:
-                raise ValueError(
-                    f"combined_gpu_budget_exceeds_available (requested={combined_budget}, available={available_gpu})"
+            if combined_budget > available_gpu + 1e-9 and combined_budget > 0.0:
+                scale = max(0.0, available_gpu) / combined_budget
+                hier_scaled = float(hier_budget) * scale
+                spyker_scaled = float(spyker_budget) * scale
+                (hier_cfg.setdefault("simulation_settings", {}))["gpu_budget"] = hier_scaled
+                (spyker_cfg.setdefault("simulation_settings", {}))["gpu_budget"] = spyker_scaled
+                logger.warning(
+                    "combined_gpu_budget_scaled requested=%s available=%s hier_scaled=%s spyker_scaled=%s",
+                    combined_budget,
+                    available_gpu,
+                    hier_scaled,
+                    spyker_scaled,
                 )
 
         hier_graph = graph_service.get_graph(int(hier_cfg["graph_id"]))

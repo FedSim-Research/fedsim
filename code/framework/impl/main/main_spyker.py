@@ -57,11 +57,19 @@ class SpykerSimulation:
         if self.gpu_budget is None:
             return {}
         available_gpu = float(ray.available_resources().get("GPU", 0.0))
-        requested_gpu = float(self.gpu_budget)
-        if requested_gpu > available_gpu + 1e-9:
-            raise ValueError(
-                f"spyker_gpu_budget_exceeds_available (requested={requested_gpu}, available={available_gpu})"
+        requested_gpu = max(0.0, float(self.gpu_budget))
+        if available_gpu <= 1e-3 and requested_gpu > 0.0:
+            print(
+                "Spyker GPU budget requested but effective cluster GPU capacity is near zero; "
+                "falling back to CPU actor placement."
             )
+            requested_gpu = 0.0
+        elif requested_gpu > available_gpu + 1e-9:
+            print(
+                f"Spyker GPU budget exceeds available resources; capping budget "
+                f"from {requested_gpu} to {available_gpu}."
+            )
+            requested_gpu = available_gpu
         actor_count = len(self.server_ids)
         if actor_count < 1:
             return {}

@@ -1,5 +1,8 @@
 from typing import Any, Callable
 import logging
+import importlib
+import threading
+
 
 import random
 import numpy as np
@@ -11,6 +14,8 @@ from backend.services.spyker_simulation_builder import build_spyker_simulation, 
 logger = logging.getLogger(__name__)
 
 class SimulationController:
+    _active_runs = 0
+    _active_runs_lock = threading.Lock()
     def __init__(self, architecture: str, graph=None, training_config=None, simulation_settings=None, spyker_config=None):
         self.architecture = architecture
         self.graph = graph
@@ -63,7 +68,12 @@ class SimulationController:
         builder: Callable[[], Any],
         evaluator: Callable[[], Callable[[str], dict[str, float]]],
     ) -> dict[str, Any]:
-        return self._run_simulation(builder=builder, evaluator=evaluator)
+        self._retain_runtime()
+        try:
+            return self._run_simulation(builder=builder, evaluator=evaluator)
+        finally:
+            self._release_runtime()
+
 
     def _run_simulation(
         self,
@@ -105,3 +115,27 @@ class SimulationController:
         np.random.seed(seed)
         torch.manual_seed(seed)
         logger.info("simulation_seed_applied architecture=%s seed=%s", self.architecture, seed)
+
+    @classmethod
+    def _retain_runtime(cls) -> None:
+        with cls._active_runs_lock:
+            cls._active_runs += 1
+
+    @classmethod
+    def _release_runtime(cls) -> None:
+        should_shutdown = False
+        with cls._active_runs_lock:
+            cls._active_runs = max(0, cls._active_runs - 1)
+            should_shutdown = cls._active_runs == 0
+        if should_shutdown:
+            cls._shutdown_runtime()
+
+    @staticmethod
+    def _shutdown_runtime() -> None:
+        try:
+            ray_runtime = importlib.import_module("main.ray_runtime")
+        except ModuleNotFoundError:
+            if ray.is_initialized():
+                ray.shutdown()
+            return
+        ray_runtime.shutdown_ray()
