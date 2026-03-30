@@ -36,7 +36,8 @@ class DataLoaderAdapter:
         return len(self.loader)
 
 class SpykerSimulation:
-    def __init__(self):
+    def __init__(self, gpu_budget: float | None = None):
+        self.gpu_budget = gpu_budget
         self.server_ids = []
         self.client_ids = []
 
@@ -50,6 +51,26 @@ class SpykerSimulation:
         self.context = None
         self.orchestrator = None
         self.spyker_actors_map: Dict[str, Any] = {}
+        self._server_actor_options: dict[str, float] = {}
+
+    def _resolve_server_actor_options(self) -> dict[str, float]:
+        if self.gpu_budget is None:
+            return {}
+        available_gpu = float(ray.available_resources().get("GPU", 0.0))
+        requested_gpu = float(self.gpu_budget)
+        if requested_gpu > available_gpu + 1e-9:
+            raise ValueError(
+                f"spyker_gpu_budget_exceeds_available (requested={requested_gpu}, available={available_gpu})"
+            )
+        actor_count = len(self.server_ids)
+        if actor_count < 1:
+            return {}
+        gpu_per_actor = max(0.0, requested_gpu / float(actor_count))
+        print(
+            f"Applying dynamic GPU allocation (Spyker): budget={self.gpu_budget}, "
+            f"actors={actor_count}, num_gpus_per_actor={gpu_per_actor}"
+        )
+        return {"num_gpus": gpu_per_actor}
 
     def set_configurations(self, 
                            spyker_params: Dict[str, Any],
@@ -156,7 +177,7 @@ class SpykerSimulation:
         print(f"Spawning {len(self.server_ids)} Spyker Servers...")
 
         for s_id in self.server_ids:
-            actor = SpykerServer.remote(
+            actor = SpykerServer.options(**self._server_actor_options).remote(
                 server_id=s_id,
                 config=self.config,
                 context=self.context
@@ -215,7 +236,8 @@ class SpykerSimulation:
     def build(self):
         initialize_environment()
 
-        self.orchestrator = SimulationOrchestrator.remote()
+        self._server_actor_options = self._resolve_server_actor_options()
+        self.orchestrator = SimulationOrchestrator.options(num_gpus=0.0).remote()
 
         self.context = SimulationContext(
             orchestrator_actor=self.orchestrator,

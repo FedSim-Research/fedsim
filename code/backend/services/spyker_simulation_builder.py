@@ -213,6 +213,7 @@ def build_spyker_simulation(
     spyker_config: dict[str, Any] | None = None,
     run_time_limit: float | None = None,
     idle_token_delay: float | None = None,
+    gpu_budget: float | None = None,
     seed: int | None = None,
 ):
     SpykerSimulation, _, _, _, _ = _import_spyker()
@@ -236,7 +237,7 @@ def build_spyker_simulation(
         if idle < 0:
             raise ValueError("spyker_invalid_idle_token_delay")
         simulation_config["idle_token_delay"] = idle
-    sim = SpykerSimulation()
+    sim = SpykerSimulation(gpu_budget=gpu_budget)
     sim.set_configurations(
         spyker_params=algorithm_config,
         training_params=spyker_training_config,

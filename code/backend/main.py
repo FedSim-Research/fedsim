@@ -4,12 +4,15 @@ from contextlib import asynccontextmanager
 import ray
 from backend.api.api import router
 from backend.db import database
+from backend.services.simulation_run_queue import run_queue
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     database.init_db()
+    run_queue.start()
     yield
+    run_queue.stop()
     if ray.is_initialized():
         ray.shutdown()
 

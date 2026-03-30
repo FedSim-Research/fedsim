@@ -47,8 +47,9 @@ class DataLoaderAdapter:
 class HierarchicalSimulation:
     """See Hierarchical_Simulation_README.md for details on the simulation setup and how to use it."""
 
-    def __init__(self, run_time_limit: float = RUNTIME_LIMIT):
+    def __init__(self, run_time_limit: float = RUNTIME_LIMIT, gpu_budget: float | None = None):
         self.run_time_limit = run_time_limit
+        self.gpu_budget = gpu_budget
         self.super_id = None
         self.edge_ids = []
         self.client_ids = []
@@ -64,6 +65,26 @@ class HierarchicalSimulation:
         self.orchestrator = None
         self.super_actor = None
         self.edge_actors_map = {}
+        self._server_actor_options: dict[str, float] = {}
+
+    def _resolve_server_actor_options(self) -> dict[str, float]:
+        if self.gpu_budget is None:
+            return {}
+        available_gpu = float(ray.available_resources().get("GPU", 0.0))
+        requested_gpu = float(self.gpu_budget)
+        if requested_gpu > available_gpu + 1e-9:
+            raise ValueError(
+                f"hierfl_gpu_budget_exceeds_available (requested={requested_gpu}, available={available_gpu})"
+            )
+        actor_count = len(self.edge_ids) + 1  # super server + edge servers
+        if actor_count < 1:
+            return {}
+        gpu_per_actor = max(0.0, requested_gpu / float(actor_count))
+        print(
+            f"Applying dynamic GPU allocation (HierFL): budget={self.gpu_budget}, "
+            f"actors={actor_count}, num_gpus_per_actor={gpu_per_actor}"
+        )
+        return {"num_gpus": gpu_per_actor}
 
     def set_super_server(
         self,
@@ -153,7 +174,7 @@ class HierarchicalSimulation:
         initial_weights = parameters_to_ndarrays(initial_params)
 
         print(f"Spawning Super Server ({self.super_id})...")
-        self.super_actor = SuperServer.remote(
+        self.super_actor = SuperServer.options(**self._server_actor_options).remote(
             server_id=self.super_id,
             initial_parameters=initial_weights,
             required_updates=len(self.edge_ids),
@@ -164,7 +185,7 @@ class HierarchicalSimulation:
         print("Spawning Edge Servers...")
         for eid in self.edge_ids:
             assigned_clients = self.client_map[eid]
-            edge_actor = EdgeServer.remote(
+            edge_actor = EdgeServer.options(**self._server_actor_options).remote(
                 server_id=eid,
                 super_server_id=self.super_id,
                 super_server_ref=self.super_actor,
@@ -187,7 +208,8 @@ class HierarchicalSimulation:
         """Constructs the simulation environment, orchestrator, and actors."""
         initialize_environment()
 
-        self.orchestrator = SimulationOrchestrator.remote()
+        self._server_actor_options = self._resolve_server_actor_options()
+        self.orchestrator = SimulationOrchestrator.options(num_gpus=0.0).remote()
         self.context = SimulationContext(
             orchestrator_actor=self.orchestrator,
             client_registry=self.client_registry,

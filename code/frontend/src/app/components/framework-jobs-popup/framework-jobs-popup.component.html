@@ -24,6 +24,7 @@
           <i *ngIf="job.status === 'completed'" class="pi pi-check-circle"></i>
           <i *ngIf="job.status === 'failed'" class="pi pi-times-circle"></i>
           <i *ngIf="job.status === 'running'" class="pi pi-spinner pi-spin"></i>
+          <i *ngIf="job.status === 'queued'" class="pi pi-clock"></i>
         </span>
         <span class="jobs-title">{{ job.title }}</span>
       </li>

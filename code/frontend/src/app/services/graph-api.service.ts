@@ -111,6 +111,7 @@ export interface SimulationStartRequest {
   simulation_settings?: {
     run_time_limit?: number;
     idle_token_delay?: number;
+    gpu_budget?: number;
     seed?: number;
     output_filename?: string | null;
     evaluate_model?: boolean;
@@ -126,16 +127,37 @@ export interface SimulationStartRequest {
   };
 }
 
-export interface SimulationStartResponse {
-  status: 'completed';
+export interface SimulationStartBothRequest {
+  hierfl: SimulationStartRequest;
+  spyker: SimulationStartRequest;
+}
+
+export interface SimulationRunResponse {
+  run_id: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
   graph_id: number;
-  architecture: 'spyker' | 'hierfl';
+  architecture: 'spyker' | 'hierfl' | 'both';
   seed?: number | null;
+  queued_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  duration_seconds?: number | null;
   output_filename?: string | null;
   evaluation?: {
     accuracy: number;
     avg_loss: number;
   } | null;
+  results_by_architecture?: Record<
+    string,
+    {
+      output_filename?: string | null;
+      evaluation?: {
+        accuracy: number;
+        avg_loss: number;
+      } | null;
+    }
+  > | null;
+  error?: string | null;
 }
 
 export interface PresetResponse {
@@ -212,8 +234,16 @@ export class GraphApiService {
     await firstValueFrom(this.http.delete(this.url(`/edges/${edgeId}`)));
   }
 
-  public async startSimulation(payload: SimulationStartRequest): Promise<SimulationStartResponse> {
-    return firstValueFrom(this.http.post<SimulationStartResponse>(this.url('/start_simulation'), payload));
+  public async startSimulation(payload: SimulationStartRequest): Promise<SimulationRunResponse> {
+    return firstValueFrom(this.http.post<SimulationRunResponse>(this.url('/start_simulation'), payload));
+  }
+
+  public async startSimulationBoth(payload: SimulationStartBothRequest): Promise<SimulationRunResponse> {
+    return firstValueFrom(this.http.post<SimulationRunResponse>(this.url('/start_simulation_both'), payload));
+  }
+
+  public async getRunStatus(runId: string): Promise<SimulationRunResponse> {
+    return firstValueFrom(this.http.get<SimulationRunResponse>(this.url(`/runs/${runId}`)));
   }
 
   public async replaceGraphState(graphId: number, payload: VflowGraph): Promise<GraphDetail> {
