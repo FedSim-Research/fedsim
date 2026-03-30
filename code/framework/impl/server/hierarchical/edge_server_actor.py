@@ -1,6 +1,7 @@
 import ray
 import numpy as np
 import yaml
+import simulation.context
 from typing import List, Dict, Tuple, Any
 
 from flwr.common import (
@@ -14,6 +15,7 @@ from flwr.common import (
 from flwr.client import Client
 
 from server.server_actor import BaseAsyncServer
+from client.simulation_client import SimulationFlowerClient
 from client.virtual_client import VirtualClient
 from simulation.network_model import estimate_transmission_time
 from simulation.context import SimulationContext, set_global_context
@@ -36,7 +38,6 @@ class EdgeServer(BaseAsyncServer):
         server_id: str,
         super_server_id: str,
         super_server_ref: ray.ObjectRef,
-        assigned_clients: List[Tuple[str, Client]],
         min_clients_per_round: int,
         context: SimulationContext,
     ):
@@ -47,13 +48,33 @@ class EdgeServer(BaseAsyncServer):
         self.server_id = server_id
         self.super_server_id = super_server_id
         self.super_server_ref = super_server_ref
-        self.assigned_clients = assigned_clients
         self.min_clients_per_round = min_clients_per_round
+
+        self.assigned_client_instances: Dict[str, VirtualClient] = {}
 
         # Buffer stores: {client_id: (weights, num_examples)}
         self.client_updates_buffer: Dict[str, Tuple[List[np.ndarray], int]] = {}
         self.model_age = 0
         self.training_config: Dict[str, Scalar] = {}
+
+        try:
+            self.self_ref = ray.get_runtime_context().current_actor
+        except Exception:
+            self.self_ref = None
+
+    def set_global_context_remote(self, context: SimulationContext):
+        simulation.context.set_global_context(context)
+        self.context = context
+
+    def register_clients(self, client_configs: Dict[str, Dict[str, Any]]):
+        """Instantiates PyTorch DataLoaders safely inside the Ray worker."""
+        for c_id, config in client_configs.items():
+            inner_client = SimulationFlowerClient(
+                partition_id=config["dataset_partition_id"],
+                num_partitions=config["total_partitions"],
+                seed=config.get("seed")
+            )
+            self.assigned_client_instances[c_id] = VirtualClient(c_id, inner_client)
 
     def start_simulation(self):
         raise NotImplementedError(
@@ -67,7 +88,7 @@ class EdgeServer(BaseAsyncServer):
         event_type = data.get("type")
 
         print(
-            f"[{self.server_id}] Received {event_type}. Assigned Clients: {len(self.assigned_clients)}"
+            f"[{self.server_id}] Received {event_type}. Assigned Clients: {len(self.assigned_client_instances)}"
         )
 
         if event_type == MODEL_SYNC:
@@ -82,50 +103,46 @@ class EdgeServer(BaseAsyncServer):
             local_config["model_age"] = self.model_age
 
             # DEBUG PRINT
-            if not self.assigned_clients:
+            if not self.assigned_client_instances:
                 print(
                     f"[{self.server_id}] ERROR: No clients assigned! Loop will not run."
                 )
 
-            for client_id, inner_client in self.assigned_clients:
+            for client_id, virtual_client in self.assigned_client_instances.items():
                 try:
-                    virtual_client = VirtualClient(client_id, inner_client)
-
                     fit_ins = FitIns(global_params, local_config)
                     fit_res: FitRes = virtual_client.fit(fit_ins)
 
+                    target_ref = self.self_ref if self.self_ref else ray.get_runtime_context().current_actor
+
                     self._schedule_event(
                         delay=fit_res.metrics["simulation_duration"],
-                        target_actor=ray.get_runtime_context().current_actor,
+                        target_actor=target_ref,
                         event_type=CLIENT_UPDATE,
-                        data=fit_res,
+                        data={
+                            "client_id": client_id,
+                            "server_id": self.server_id,
+                            "fit_res": fit_res
+                        },
                     )
 
                     duration = fit_res.metrics["simulation_duration"]
-                    # --- ADD THIS PRINT ---
-                    print(
-                        f"[{self.server_id}] Client {client_id} finished. Duration: {duration:.2f} seconds"
-                    )
-                    # ----------------------
+                    print(f"[{self.server_id}] Client {client_id} finished. Duration: {duration:.2f} seconds")
 
                 except Exception as e:
                     import traceback
-
-                    print(
-                        f"[{self.server_id}] CRASH PROCESSING CLIENT {client_id}: {e}"
-                    )
+                    print(f"[{self.server_id}] CRASH PROCESSING CLIENT {client_id}: {e}")
                     print(traceback.format_exc())
+                    
         else:
-            raise ValueError(
-                f"[Edge Server {self.server_id}] Unknown event type: {event_type}"
-            )
+            raise ValueError(f"[Edge Server {self.server_id}] Unknown event type: {event_type}")
 
-    def on_client_update(self, data: FitRes):
+    def on_client_update(self, data: Dict[str, Any]):
         """
         Handle a VirtualClient finishing training.
         """
-        fit_res = data
-        client_id = fit_res.metrics["client_id"]
+        fit_res = data["fit_res"]
+        client_id = data["client_id"]
         num_examples = fit_res.num_examples
 
         weights = parameters_to_ndarrays(fit_res.parameters)

@@ -53,7 +53,7 @@ class HierarchicalSimulation:
         self.super_id = None
         self.edge_ids = []
         self.client_ids = []
-        self.client_map: Dict[str, List[Tuple[str, SimulationFlowerClient]]] = {}
+        self.client_map: Dict[str, List[Tuple[str, Dict[str, Any]]]] = {}
 
         self.client_registry: Dict[str, ClientSpec] = {}
         self.server_registry: Dict[str, ServerSpec] = {}
@@ -171,8 +171,12 @@ class HierarchicalSimulation:
             download_speed=download_speed,
         )
 
-        sim_client = SimulationFlowerClient(dataset_partition_id, total_partitions, seed=seed)
-        self.client_map[edge_id].append((client_id, sim_client))
+        client_config = {
+            "dataset_partition_id": dataset_partition_id,
+            "total_partitions": total_partitions,
+            "seed": seed
+        }
+        self.client_map[edge_id].append((client_id, client_config))
 
     def _spawn_actors(self):
         """Spawns the SuperServer and EdgeServer actors on the Ray cluster."""
@@ -182,9 +186,9 @@ class HierarchicalSimulation:
                 "First edge server must have at least one client to initialize global model."
             )
 
-        first_client = self.client_map[first_edge][0][1]
-        initial_params = first_client.get_parameters(config={})
-        initial_weights = parameters_to_ndarrays(initial_params)
+        from main.task import Net
+        dummy_model = Net()
+        initial_weights = [val.cpu().numpy() for _, val in dummy_model.state_dict().items()]
 
         print(f"Spawning Super Server ({self.super_id})...")
         self.super_actor = SuperServer.options(**self._server_actor_options).remote(
@@ -197,16 +201,29 @@ class HierarchicalSimulation:
 
         print("Spawning Edge Servers...")
         for eid in self.edge_ids:
-            assigned_clients = self.client_map[eid]
             edge_actor = EdgeServer.options(**self._server_actor_options).remote(
                 server_id=eid,
                 super_server_id=self.super_id,
                 super_server_ref=self.super_actor,
-                assigned_clients=assigned_clients,
-                min_clients_per_round=len(assigned_clients),
+                min_clients_per_round=len(self.client_map[eid]),
                 context=self.context,
             )
             self.edge_actors_map[eid] = edge_actor
+
+        # Update context locally
+        all_actors = {self.super_id: self.super_actor}
+        all_actors.update(self.edge_actors_map)
+        self.context.set_server_actor_handles(all_actors)
+
+        # Distribute context and register clients safely on the edge workers
+        for eid in self.edge_ids:
+            actor = self.edge_actors_map[eid]
+            ray.get(actor.set_global_context_remote.remote(self.context))
+            
+            assigned_client_configs = {
+                c_id: config for c_id, config in self.client_map[eid]
+            }
+            ray.get(actor.register_clients.remote(assigned_client_configs))
 
     def _configure_network(self):
         """Wiring server connections."""
