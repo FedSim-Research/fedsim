@@ -56,29 +56,29 @@ export class StartPopup {
 
   public hierflSettings = {
     epochs: 1,
-    lr: 0.01,
+    lr: 0.005,
     modelComplexity: 1.0,
     runTimeLimit: 5000,
     seed: 42,
-    outputFilename: 'final_model_hierfl.pth',
+    outputFilename: 'final_model_hierarchical.pth',
     evaluateModel: false,
   };
 
   public spykerSettings = {
     epochs: 1,
-    lr: 0.01,
+    lr: 0.005,
     modelComplexity: 1.0,
     runTimeLimit: 5000,
     seed: 42,
-    idleTokenDelay: 1.0,
+    idleTokenDelay: 0.5,
     outputFilename: 'final_model_spyker.pth',
     evaluateModel: false,
-    decayBeta: 0.05,
+    decayBeta: 0.1,
     minLearningRate: 0.000001,
     hInter: 5,
-    hIntra: 350,
-    sigmoidPhi: 1.5,
-    serverLearningRate: 0.6,
+    hIntra: 50,
+    sigmoidPhi: 1.0,
+    serverLearningRate: 0.1,
     tcpRtoDelay: 0.2,
   };
 
@@ -169,5 +169,15 @@ export class StartPopup {
         },
       },
     });
+  }
+
+  public formatDecimal(value: number): string {
+    return Number.isFinite(value) ? value.toString() : '';
+  }
+
+  public parseDecimalInput(value: string, fallback: number): number {
+    const normalized = value.trim().replace(',', '.');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : fallback;
   }
 }

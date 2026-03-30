@@ -17,11 +17,19 @@ RP_FedSim is a graph-based federated learning simulation platform with a FastAPI
 
 See `code/README.md` for a compact code directory overview.
 
-## One-Command Docker Startup
+## One-Command Docker Startup (No GPU-Support)
 
 ```bash
 cd code
 sudo docker compose -f docker-compose.yml up -d
+```
+
+## One-Command Docker Startup (With GPU-Support)
+
+For GPU-Support you have to additionally change num_gpus to something > 0 (f.e. to 0.25) inside code/config.yaml.
+```bash
+cd code
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
 ```
 
 Stop everything:
