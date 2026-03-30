@@ -60,27 +60,27 @@ class PeriodicEvaluator:
 
     def start(self):
         """Kicks off the first evaluation at T=0."""
-        self.evaluate({"trigger_time": 0.0})
+        return self.evaluate({"trigger_time": 0.0})
 
     def evaluate(self, payload: Dict[str, Any]):
         current_virtual_time = payload.get("trigger_time", 0.0)
         
-        # Fetch current global weights
+        # Fetch current global weights & metrics
         weights_np = ray.get(self.target_server.get_global_model.remote())
-        
-        # Fetch architecture-specific metrics
         try:
             server_metrics = ray.get(self.target_server.get_metrics.remote())
         except AttributeError:
             server_metrics = {}
 
-        # Load weights into PyTorch model
+        # Load weights & Evaluate
         keys = self.model.state_dict().keys()
         state_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(keys, weights_np)})
         self.model.load_state_dict(state_dict, strict=True)
-
-        # Execute evaluation
         avg_loss, accuracy = test(self.model, self.test_loader, self.device)
+
+        # STRICT SCHEMA DEFINITION
+        # Extract current round standardizing between Spyker (model_age) and Hierarchical
+        round_val = server_metrics.get("model_age", server_metrics.get("current_round", 0))
 
         extra_data = {
             "log_type": "periodic_evaluation",
@@ -88,24 +88,19 @@ class PeriodicEvaluator:
             "graph_id": self.graph_id,
             "architecture": self.architecture,
             "virtual_time": current_virtual_time,
-            "metrics": {
-                "accuracy": accuracy,
-                "loss": avg_loss,
-                **server_metrics
-            }
+            "round": round_val,
+            "accuracy": float(accuracy),
+            "loss": float(avg_loss),
+            "server_stats": server_metrics
         }
         
         self.logger.info("Evaluation Complete", extra={"extra_data": extra_data})
-        
-        print(f"[{self.architecture} Eval] T={current_virtual_time:>6.1f}s | Acc: {accuracy*100:>5.2f}% | Loss: {avg_loss:.4f} | Age: {server_metrics.get('model_age', 'N/A')}")
+        print(f"[{self.architecture} Eval] T={current_virtual_time:>6.1f}s | Round: {round_val} | Acc: {accuracy*100:>5.2f}% | Loss: {avg_loss:.4f}")
 
-        # Schedule Next Evaluation in the Orchestrator
+        # Schedule Next Evaluation
         if self.self_ref:
             next_payload = {"event_type": "EVALUATE", "trigger_time": current_virtual_time + self.interval}
-            
-            # Format: (delay, target_actor, method_name, payload)
             return[
                 (self.interval, self.self_ref, "evaluate", next_payload)
             ]
-        
-        return
+        return[]
