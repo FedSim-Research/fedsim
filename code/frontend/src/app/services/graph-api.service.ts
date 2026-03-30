@@ -110,6 +110,7 @@ export interface SimulationStartRequest {
   };
   simulation_settings?: {
     run_time_limit?: number;
+    eval_interval?: number;
     idle_token_delay?: number;
     gpu_budget?: number;
     seed?: number;

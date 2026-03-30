@@ -20,7 +20,15 @@ export class GraphValidatorService {
     edges: Edge[],
     config: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; gpuBudget: number; seed: number; outputFilename: string; evaluateModel: boolean; idleTokenDelay?: number };
+      simulationSettings: {
+        runTimeLimit: number;
+        evalInterval: number;
+        gpuBudget: number;
+        seed: number;
+        outputFilename: string;
+        evaluateModel: boolean;
+        idleTokenDelay?: number;
+      };
       spykerConfig?: {
         decayBeta: number;
         minLearningRate: number;
@@ -42,7 +50,15 @@ export class GraphValidatorService {
     architecture: SupportedArchitecture,
     config: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; gpuBudget: number; seed: number; outputFilename: string; evaluateModel: boolean; idleTokenDelay?: number };
+      simulationSettings: {
+        runTimeLimit: number;
+        evalInterval: number;
+        gpuBudget: number;
+        seed: number;
+        outputFilename: string;
+        evaluateModel: boolean;
+        idleTokenDelay?: number;
+      };
       spykerConfig?: {
         decayBeta: number;
         minLearningRate: number;
@@ -66,6 +82,9 @@ export class GraphValidatorService {
     }
     if (!Number.isFinite(config.simulationSettings.runTimeLimit) || config.simulationSettings.runTimeLimit <= 0) {
       errors.push(`${architecture}: run time limit must be > 0`);
+    }
+    if (!Number.isFinite(config.simulationSettings.evalInterval) || config.simulationSettings.evalInterval < 0) {
+      errors.push(`${architecture}: eval interval must be >= 0`);
     }
     if (!Number.isFinite(config.simulationSettings.gpuBudget) || config.simulationSettings.gpuBudget < 0) {
       errors.push(`${architecture}: gpu budget must be >= 0`);

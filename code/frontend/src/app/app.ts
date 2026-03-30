@@ -530,11 +530,11 @@ export class App implements OnInit{
     mode: 'spyker' | 'hierfl' | 'both';
     hierfl: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; gpuBudget: number; seed: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; outputFilename: string; evaluateModel: boolean };
     };
     spyker: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; gpuBudget: number; seed: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
       spykerConfig: {
         decayBeta: number;
         minLearningRate: number;
@@ -562,6 +562,7 @@ export class App implements OnInit{
           trainingConfig: archConfig.trainingConfig,
           simulationSettings: {
             ...archConfig.simulationSettings,
+            evalInterval: archConfig.simulationSettings.evalInterval,
             idleTokenDelay: architecture === 'spyker' ? payload.spyker.simulationSettings.idleTokenDelay : undefined,
           },
           spykerConfig: architecture === 'spyker' ? payload.spyker.spykerConfig : undefined,
@@ -584,6 +585,7 @@ export class App implements OnInit{
           },
           simulation_settings: {
             run_time_limit: archConfig.simulationSettings.runTimeLimit,
+            eval_interval: archConfig.simulationSettings.evalInterval,
             gpu_budget: archConfig.simulationSettings.gpuBudget,
             idle_token_delay: architecture === 'spyker' ? payload.spyker.simulationSettings.idleTokenDelay : undefined,
             seed: archConfig.simulationSettings.seed,
@@ -663,6 +665,7 @@ export class App implements OnInit{
             },
             simulation_settings: {
               run_time_limit: payload.hierfl.simulationSettings.runTimeLimit,
+              eval_interval: payload.hierfl.simulationSettings.evalInterval,
               gpu_budget: payload.hierfl.simulationSettings.gpuBudget,
               seed: payload.hierfl.simulationSettings.seed,
               output_filename: payload.hierfl.simulationSettings.outputFilename || null,
@@ -678,6 +681,7 @@ export class App implements OnInit{
             },
             simulation_settings: {
               run_time_limit: payload.spyker.simulationSettings.runTimeLimit,
+              eval_interval: payload.spyker.simulationSettings.evalInterval,
               gpu_budget: payload.spyker.simulationSettings.gpuBudget,
               idle_token_delay: payload.spyker.simulationSettings.idleTokenDelay,
               seed: payload.spyker.simulationSettings.seed,

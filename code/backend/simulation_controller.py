@@ -16,12 +16,21 @@ logger = logging.getLogger(__name__)
 class SimulationController:
     _active_runs = 0
     _active_runs_lock = threading.Lock()
-    def __init__(self, architecture: str, graph=None, training_config=None, simulation_settings=None, spyker_config=None):
+    def __init__(
+        self,
+        architecture: str,
+        graph=None,
+        training_config=None,
+        simulation_settings=None,
+        spyker_config=None,
+        run_id: str | None = None,
+    ):
         self.architecture = architecture
         self.graph = graph
         self.training_config = training_config
         self.simulation_settings = simulation_settings or {}
         self.spyker_config = spyker_config
+        self.run_id = run_id
 
     def start(self):
         graph_id = self.graph.id if self.graph is not None else None
@@ -43,6 +52,9 @@ class SimulationController:
                     run_time_limit=self.simulation_settings.get("run_time_limit"),
                     gpu_budget=self.simulation_settings.get("gpu_budget"),
                     seed=self.simulation_settings.get("seed"),
+                    run_id=self.run_id,
+                    graph_id=graph_id,
+                    eval_interval=self.simulation_settings.get("eval_interval"),
                 ),
                 evaluator=get_hierfl_evaluate_model,
             )
@@ -57,6 +69,9 @@ class SimulationController:
                     idle_token_delay=self.simulation_settings.get("idle_token_delay"),
                     gpu_budget=self.simulation_settings.get("gpu_budget"),
                     seed=self.simulation_settings.get("seed"),
+                    run_id=self.run_id,
+                    graph_id=graph_id,
+                    eval_interval=self.simulation_settings.get("eval_interval"),
                 ),
                 evaluator=get_spyker_evaluate_model,
             )

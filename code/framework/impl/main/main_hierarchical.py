@@ -66,6 +66,18 @@ class HierarchicalSimulation:
         self.super_actor = None
         self.edge_actors_map = {}
         self._server_actor_options: dict[str, float] = {}
+        self.evaluator_actor = None
+        self.eval_interval = 0.0
+        self.run_id = "unknown_run"
+        self.graph_id = -1
+
+    def set_metadata(self, run_id: str | None, graph_id: int | None, eval_interval: float | None = None) -> None:
+        if run_id:
+            self.run_id = run_id
+        if graph_id is not None:
+            self.graph_id = int(graph_id)
+        if eval_interval is not None:
+            self.eval_interval = max(0.0, float(eval_interval))
 
     def _resolve_server_actor_options(self) -> dict[str, float]:
         if self.gpu_budget is None:
@@ -93,11 +105,6 @@ class HierarchicalSimulation:
             f"actors={actor_count}, num_gpus_per_actor={gpu_per_actor}"
         )
         return {"num_gpus": gpu_per_actor}
-
-        self.evaluator_actor = None
-        self.eval_interval = 500 #TODO SET FROM OUTSIDE (stubs)
-        self.run_id = 0 #TODO SET FROM OUTSIDE (stubs)
-        self.graph_id = 0 #TODO SET FROM OUTSIDE (stubs)
 
     def set_super_server(
         self,
@@ -268,8 +275,8 @@ class HierarchicalSimulation:
             from telemetry.evaluator_actor import PeriodicEvaluator
             
             print(f"Spawning Periodic Evaluator (Interval: {self.eval_interval}s)...")
-            self.evaluator_actor = PeriodicEvaluator.remote(
-                run_id=self.run_id,
+            self.evaluator_actor = PeriodicEvaluator.options(num_gpus=0.0).remote(
+                run_id=str(self.run_id),
                 graph_id=self.graph_id,
                 architecture="hierarchical",
                 target_server_ref=self.super_actor,

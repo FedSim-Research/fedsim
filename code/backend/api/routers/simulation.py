@@ -18,6 +18,7 @@ class SimulationTrainingConfig(BaseModel):
 
 class SimulationSettings(BaseModel):
     run_time_limit: float | None = None
+    eval_interval: float | None = None
     idle_token_delay: float | None = None
     gpu_budget: float | None = None
     seed: int | None = None

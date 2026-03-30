@@ -186,6 +186,7 @@ class SimulationRunQueue:
                     training_config=job.training_config,
                     simulation_settings=job.simulation_settings,
                     spyker_config=job.spyker_config,
+                    run_id=job.run_id,
                 )
                 result = controller.start()
             status: RunStatus = "completed"
@@ -259,6 +260,7 @@ class SimulationRunQueue:
             training_config=hier_cfg.get("training_config"),
             simulation_settings=hier_cfg.get("simulation_settings"),
             spyker_config=None,
+            run_id=f"{job.run_id}:hierfl",
         )
         spyker_controller = SimulationController(
             "spyker",
@@ -266,6 +268,7 @@ class SimulationRunQueue:
             training_config=spyker_cfg.get("training_config"),
             simulation_settings=spyker_cfg.get("simulation_settings"),
             spyker_config=spyker_cfg.get("spyker_config"),
+            run_id=f"{job.run_id}:spyker",
         )
 
         with ThreadPoolExecutor(max_workers=2) as pool:

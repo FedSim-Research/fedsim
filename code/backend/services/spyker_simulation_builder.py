@@ -212,10 +212,12 @@ def build_spyker_simulation(
     training_config: dict[str, Any] | None = None,
     spyker_config: dict[str, Any] | None = None,
     run_time_limit: float | None = None,
-    # eval_time_delay: float | None = None,  TODO: Uncomment and inject in simulation_config
     idle_token_delay: float | None = None,
     gpu_budget: float | None = None,
     seed: int | None = None,
+    run_id: str | None = None,
+    graph_id: int | None = None,
+    eval_interval: float | None = None,
 ):
     SpykerSimulation, _, _, _, _ = _import_spyker()
     validate_spyker_graph(graph)
@@ -232,7 +234,12 @@ def build_spyker_simulation(
         raise ValueError("spyker_invalid_run_time_limit")
     spyker_training_config = _require_training_config(training_config)
     algorithm_config = _require_spyker_config(spyker_config)
-    simulation_config: dict[str, Any] = {"run_time_limit": limit, "eval_time_delay": 100.0} #TODO: Add eval_time_delay from params
+    if eval_interval is not None and float(eval_interval) < 0:
+        raise ValueError("spyker_invalid_eval_interval")
+    simulation_config: dict[str, Any] = {
+        "run_time_limit": limit,
+        "eval_time_delay": 100.0 if eval_interval is None else float(eval_interval),
+    }
     if idle_token_delay is not None:
         idle = float(idle_token_delay)
         if idle < 0:
@@ -245,7 +252,11 @@ def build_spyker_simulation(
         simulation_params=simulation_config,
     )
 
-    sim.set_metadata("RUN_TEST", "GRAPH_ID_TEST") # TODO: PLACEHOLDER, connect to database values
+    sim.set_metadata(
+        run_id=run_id or "unknown_run",
+        graph_id=str(graph.id if graph_id is None else graph_id),
+        eval_interval=eval_interval,
+    )
 
     edge_networks: dict[tuple[str, str], Any] = {}
     for edge in edges:

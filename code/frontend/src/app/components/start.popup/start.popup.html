@@ -61,6 +61,10 @@
                       <input type="number" min="1" step="1" [(ngModel)]="hierflSettings.runTimeLimit" />
                     </label>
                     <label class="field">
+                      <span class="field-label">Eval interval (s) <span class="help-dot" title="Periodic evaluation interval in virtual seconds. 0 disables periodic evaluation.">?</span></span>
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(hierflSettings.evalInterval)" (ngModelChange)="hierflSettings.evalInterval = parseDecimalInput($event, hierflSettings.evalInterval)" />
+                    </label>
+                    <label class="field">
                       <span class="field-label">GPU budget <span class="help-dot" title="Total GPU share for this run. 0 means CPU only.">?</span></span>
                       <input type="text" inputmode="decimal" [ngModel]="formatDecimal(hierflSettings.gpuBudget)" (ngModelChange)="hierflSettings.gpuBudget = parseDecimalInput($event, hierflSettings.gpuBudget)" />
                     </label>
@@ -118,6 +122,10 @@
                     <label class="field">
                       <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>
                       <input type="number" min="1" step="1" [(ngModel)]="spykerSettings.runTimeLimit" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Eval interval (s) <span class="help-dot" title="Periodic evaluation interval in virtual seconds. 0 disables periodic evaluation.">?</span></span>
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.evalInterval)" (ngModelChange)="spykerSettings.evalInterval = parseDecimalInput($event, spykerSettings.evalInterval)" />
                     </label>
                     <label class="field">
                       <span class="field-label">GPU budget <span class="help-dot" title="Total GPU share for this run. 0 means CPU only.">?</span></span>

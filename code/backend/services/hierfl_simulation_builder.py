@@ -192,6 +192,9 @@ def build_hierfl_simulation(
     run_time_limit: float | None = None,
     gpu_budget: float | None = None,
     seed: int | None = None,
+    run_id: str | None = None,
+    graph_id: int | None = None,
+    eval_interval: float | None = None,
 ):
     HierarchicalSimulation, _, _, _ = _import_hierfl()
     validate_hierfl_graph(graph)
@@ -215,7 +218,14 @@ def build_hierfl_simulation(
     limit = DEFAULT_RUN_TIME_LIMIT if run_time_limit is None else float(run_time_limit)
     if limit <= 0:
         raise ValueError("hierfl_invalid_run_time_limit")
+    if eval_interval is not None and float(eval_interval) < 0:
+        raise ValueError("hierfl_invalid_eval_interval")
     sim = HierarchicalSimulation(run_time_limit=limit, gpu_budget=gpu_budget)
+    sim.set_metadata(
+        run_id=run_id,
+        graph_id=graph.id if graph_id is None else graph_id,
+        eval_interval=eval_interval,
+    )
     sim.set_super_server(
         server_id=super_id,
         name=super_name,

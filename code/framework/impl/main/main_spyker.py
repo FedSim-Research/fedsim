@@ -120,11 +120,14 @@ class SpykerSimulation:
         print(f"  > Epochs: {self.config.training.local_epochs}")
         print(f"  > Token Heartbeat: {self.config.simulation.idle_token_delay}s")
 
-    def set_metadata(self, run_id: str, graph_id: str):
+    def set_metadata(self, run_id: str, graph_id: str, eval_interval: float | None = None):
         """Configure telemetry settings."""
         if run_id: self.run_id = run_id
         if graph_id: self.graph_id = graph_id
-        self.eval_interval = self.config.simulation.eval_time_delay
+        if eval_interval is None:
+            self.eval_interval = self.config.simulation.eval_time_delay
+        else:
+            self.eval_interval = max(0.0, float(eval_interval))
 
     def add_server(
             self, 

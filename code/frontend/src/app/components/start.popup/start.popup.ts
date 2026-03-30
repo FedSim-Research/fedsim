@@ -13,6 +13,7 @@ type CommonTrainingConfig = {
 
 type CommonSimulationConfig = {
   runTimeLimit: number;
+  evalInterval: number;
   gpuBudget: number;
   seed: number;
   outputFilename: string;
@@ -60,6 +61,7 @@ export class StartPopup {
     lr: 0.005,
     modelComplexity: 1.0,
     runTimeLimit: 5000,
+    evalInterval: 30,
     gpuBudget: 0,
     seed: 42,
     outputFilename: 'final_model_hierarchical.pth',
@@ -71,6 +73,7 @@ export class StartPopup {
     lr: 0.005,
     modelComplexity: 1.0,
     runTimeLimit: 5000,
+    evalInterval: 30,
     gpuBudget: 0,
     seed: 42,
     idleTokenDelay: 0.5,
@@ -143,6 +146,7 @@ export class StartPopup {
         },
         simulationSettings: {
           runTimeLimit: this.hierflSettings.runTimeLimit,
+          evalInterval: this.hierflSettings.evalInterval,
           gpuBudget: this.hierflSettings.gpuBudget,
           seed: this.hierflSettings.seed,
           outputFilename: this.hierflSettings.outputFilename,
@@ -157,6 +161,7 @@ export class StartPopup {
         },
         simulationSettings: {
           runTimeLimit: this.spykerSettings.runTimeLimit,
+          evalInterval: this.spykerSettings.evalInterval,
           gpuBudget: this.spykerSettings.gpuBudget,
           seed: this.spykerSettings.seed,
           idleTokenDelay: this.spykerSettings.idleTokenDelay,
