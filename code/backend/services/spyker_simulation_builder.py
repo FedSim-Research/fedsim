@@ -238,7 +238,7 @@ def build_spyker_simulation(
         raise ValueError("spyker_invalid_eval_interval")
     simulation_config: dict[str, Any] = {
         "run_time_limit": limit,
-        "eval_time_delay": 100.0 if eval_interval is None else float(eval_interval),
+        "eval_time_delay": 500.0 if eval_interval is None else float(eval_interval),
     }
     if idle_token_delay is not None:
         idle = float(idle_token_delay)

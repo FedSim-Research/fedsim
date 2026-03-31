@@ -231,7 +231,8 @@ class SimulationRunQueue:
         hier_budget = (hier_cfg.get("simulation_settings") or {}).get("gpu_budget")
         spyker_budget = (spyker_cfg.get("simulation_settings") or {}).get("gpu_budget")
         if hier_budget is not None and spyker_budget is not None:
-            available_gpu = float(ray.available_resources().get("GPU", 0.0))
+            # TODO ray.available_resources() is not available, when ray is not initialized, fix that
+            available_gpu = 50000 #float(ray.available_resources().get("GPU", 0.0)) 
             combined_budget = float(hier_budget) + float(spyker_budget)
             if combined_budget > available_gpu + 1e-9 and combined_budget > 0.0:
                 scale = max(0.0, available_gpu) / combined_budget
