@@ -1,0 +1,57 @@
+local.file_match "ray_actor_stdout" {
+  path_targets = [
+    {
+      __path__  = "/ray-logs/session_latest/logs/*.out",
+      app       = "fedsim",
+      component = "ray",
+      job       = "ray-actors",
+      stream    = "stdout",
+    },
+    {
+      __path__  = "/ray-logs/session_*/logs/*.out",
+      app       = "fedsim",
+      component = "ray",
+      job       = "ray-actors",
+      stream    = "stdout",
+    },
+    {
+      __path__  = "/ray-logs/session_latest/logs/*.err",
+      app       = "fedsim",
+      component = "ray",
+      job       = "ray-actors",
+      stream    = "stderr",
+    },
+    {
+      __path__  = "/ray-logs/session_*/logs/*.err",
+      app       = "fedsim",
+      component = "ray",
+      job       = "ray-actors",
+      stream    = "stderr",
+    },
+    {
+      __path__  = "/ray-logs/session_latest/logs/*.log",
+      app       = "fedsim",
+      component = "ray",
+      job       = "ray-actors",
+      stream    = "log",
+    },
+    {
+      __path__  = "/ray-logs/session_*/logs/*.log",
+      app       = "fedsim",
+      component = "ray",
+      job       = "ray-actors",
+      stream    = "log",
+    },
+  ]
+}
+
+loki.source.file "ray_actor_logs" {
+  targets    = local.file_match.ray_actor_stdout.targets
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

@@ -30,11 +30,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 0.5mm;
-  opacity: 0;
-  pointer-events: none;
+  margin-right: 0;
+  opacity: 1;
+  pointer-events: auto;
   transition: opacity 0.15s ease, transform 0.15s ease;
-  transform: translateY(-2px);
+  transform: translateY(0);
 }
 
 .action-button {
@@ -45,11 +45,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 0.5mm;
-  opacity: 0;
-  pointer-events: none;
+  margin-right: 0;
+  opacity: 1;
+  pointer-events: auto;
   transition: opacity 0.15s ease, transform 0.15s ease;
-  transform: translateY(-2px);
+  transform: translateY(0);
 }
 
 .action-button--visible {
@@ -58,14 +58,13 @@
   transform: translateY(0);
 }
 
-.node-card:hover .action-button {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
 .edit-button {
   color: #60a5fa;
+}
+
+.forward-button,
+.forward-button .pi {
+  color: #ffffff !important;
 }
 
 .edit-button:hover {
@@ -86,12 +85,6 @@
   transform: translateY(0);
 }
 
-.node-card:hover .delete-button {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
 .delete-button:hover {
   color: #f87171;
 }
@@ -102,7 +95,13 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 6px;
+}
+
+.action-button svg,
+.node-header > svg {
+  width: 18px;
+  height: 18px;
 }
 
 .node-title {

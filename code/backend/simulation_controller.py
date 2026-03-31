@@ -1,29 +1,45 @@
 from typing import Any, Callable
+import logging
 import importlib
 import threading
 
+
 import random
 import numpy as np
-import ray
 import torch
 
 from backend.services.hierfl_simulation_builder import build_hierfl_simulation, get_hierfl_evaluate_model
 from backend.services.spyker_simulation_builder import build_spyker_simulation, get_spyker_evaluate_model
 
+logger = logging.getLogger(__name__)
+
 class SimulationController:
     _active_runs = 0
     _active_runs_lock = threading.Lock()
-
-    def __init__(self, architecture: str, graph=None, training_config=None, simulation_settings=None, spyker_config=None):
+    def __init__(
+        self,
+        architecture: str,
+        graph=None,
+        training_config=None,
+        simulation_settings=None,
+        spyker_config=None,
+        run_id: str | None = None,
+    ):
         self.architecture = architecture
         self.graph = graph
         self.training_config = training_config
         self.simulation_settings = simulation_settings or {}
         self.spyker_config = spyker_config
+        self.run_id = run_id
 
     def start(self):
-        graph_info = f" graph_id={self.graph.id}" if self.graph is not None else ""
-        print(f"Starting architecture: {self.architecture}{graph_info}")
+        graph_id = self.graph.id if self.graph is not None else None
+        logger.info(
+            "simulation_controller_start architecture=%s graph_id=%s seed=%s",
+            self.architecture,
+            graph_id,
+            self.simulation_settings.get("seed"),
+        )
 
         if self.graph is None:
             raise ValueError(f"{self.architecture}_requires_graph")
@@ -34,7 +50,11 @@ class SimulationController:
                     self.graph,
                     training_config=self.training_config,
                     run_time_limit=self.simulation_settings.get("run_time_limit"),
+                    gpu_budget=self.simulation_settings.get("gpu_budget"),
                     seed=self.simulation_settings.get("seed"),
+                    run_id=self.run_id,
+                    graph_id=graph_id,
+                    eval_interval=self.simulation_settings.get("eval_interval"),
                 ),
                 evaluator=get_hierfl_evaluate_model,
             )
@@ -47,7 +67,11 @@ class SimulationController:
                     spyker_config=self.spyker_config,
                     run_time_limit=self.simulation_settings.get("run_time_limit"),
                     idle_token_delay=self.simulation_settings.get("idle_token_delay"),
+                    gpu_budget=self.simulation_settings.get("gpu_budget"),
                     seed=self.simulation_settings.get("seed"),
+                    run_id=self.run_id,
+                    graph_id=graph_id,
+                    eval_interval=self.simulation_settings.get("eval_interval"),
                 ),
                 evaluator=get_spyker_evaluate_model,
             )
@@ -65,6 +89,7 @@ class SimulationController:
         finally:
             self._release_runtime()
 
+
     def _run_simulation(
         self,
         builder: Callable[[], Any],
@@ -73,8 +98,11 @@ class SimulationController:
         seed = self.simulation_settings.get("seed")
         self._apply_seed(seed)
         simulation = builder()
+        logger.debug("simulation_build_start architecture=%s", self.architecture)
         simulation.build()
+        logger.debug("simulation_run_start architecture=%s", self.architecture)
         simulation.run()
+        logger.debug("simulation_run_finished architecture=%s", self.architecture)
 
         output_filename = self.simulation_settings.get("output_filename")
         evaluation = None
@@ -86,15 +114,22 @@ class SimulationController:
         result = {"output_filename": output_filename, "seed": seed}
         if evaluation is not None:
             result["evaluation"] = evaluation
-        
+        logger.info(
+            "simulation_controller_finished architecture=%s output_filename=%s evaluated=%s",
+            self.architecture,
+            output_filename,
+            evaluation is not None,
+        )
         return result
 
     def _apply_seed(self, seed: int | None) -> None:
         if seed is None:
+            logger.debug("simulation_seed_not_set architecture=%s", self.architecture)
             return
         random.seed(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)
+        logger.info("simulation_seed_applied architecture=%s seed=%s", self.architecture, seed)
 
     @classmethod
     def _retain_runtime(cls) -> None:
@@ -118,5 +153,4 @@ class SimulationController:
             if ray.is_initialized():
                 ray.shutdown()
             return
-
         ray_runtime.shutdown_ray()

@@ -26,7 +26,7 @@ sudo docker compose -f docker-compose.yml up -d
 
 ## One-Command Docker Startup (With GPU-Support)
 
-For GPU-Support you have to additionally change num_gpus to something > 0 (f.e. to 0.25) inside code/config.yaml.
+GPU allocation is configured per simulation run via the frontend/API `gpu_budget` setting.
 ```bash
 cd code
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d

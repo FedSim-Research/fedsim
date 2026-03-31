@@ -2,7 +2,6 @@ import numpy as np
 import ray
 import random
 import math
-import yaml
 from typing import Dict, Any, Tuple, List, Optional
 
 from flwr.common import (
@@ -22,13 +21,7 @@ from simulation.network_model import estimate_transmission_time
 from client.simulation_client import SimulationFlowerClient
 from client.virtual_client import VirtualClient
 
-
-with open("config.yaml", "r") as config_file:
-    global doc
-    doc = yaml.load(config_file, Loader=yaml.SafeLoader)
-
-
-@ray.remote(num_gpus=doc["num_gpus"])
+@ray.remote
 class SpykerServer(BaseAsyncServer):
     def __init__(
         self, server_id: str, config: FullConfiguration, context: SimulationContext
