@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import importlib
 import logging
 from queue import Queue, Empty
 from threading import Event, Lock, Thread
@@ -19,6 +20,32 @@ logger = logging.getLogger(__name__)
 
 def _utcnow_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _ensure_ray_initialized_for_resources() -> None:
+    """Initialize Ray lazily for resource checks in the queue worker."""
+    if ray.is_initialized():
+        return
+    try:
+        ray_runtime = importlib.import_module("main.ray_runtime")
+        ray_runtime.ensure_ray_initialized()
+        return
+    except Exception:
+        # Fallback keeps this worker resilient if dynamic import path is unavailable.
+        pass
+    try:
+        ray.init(address="auto", ignore_reinit_error=True, include_dashboard=False, log_to_driver=False)
+    except Exception:
+        ray.init(ignore_reinit_error=True, include_dashboard=False, log_to_driver=False)
+
+
+def _get_cluster_gpu_capacity() -> float:
+    try:
+        _ensure_ray_initialized_for_resources()
+        return float(ray.cluster_resources().get("GPU", 0.0))
+    except Exception:
+        logger.exception("ray_gpu_capacity_probe_failed")
+        return 0.0
 
 
 @dataclass
@@ -231,8 +258,7 @@ class SimulationRunQueue:
         hier_budget = (hier_cfg.get("simulation_settings") or {}).get("gpu_budget")
         spyker_budget = (spyker_cfg.get("simulation_settings") or {}).get("gpu_budget")
         if hier_budget is not None and spyker_budget is not None:
-            # TODO ray.available_resources() is not available, when ray is not initialized, fix that
-            available_gpu = 50000 #float(ray.available_resources().get("GPU", 0.0)) 
+            available_gpu = _get_cluster_gpu_capacity()
             combined_budget = float(hier_budget) + float(spyker_budget)
             if combined_budget > available_gpu + 1e-9 and combined_budget > 0.0:
                 scale = max(0.0, available_gpu) / combined_budget
