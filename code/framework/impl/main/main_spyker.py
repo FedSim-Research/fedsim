@@ -86,6 +86,11 @@ class SpykerSimulation:
         self.eval_interval = 0.0 # disabled
         self.evaluator_actor = None
 
+        self.run_id = f"run_{uuid.uuid4().hex[:6]}"
+        self.graph_id = "default_graph"
+        self.eval_interval = 0.0 # disabled
+        self.evaluator_actor = None
+
     def set_configurations(self, 
                            spyker_params: Dict[str, Any],
                            training_params: Dict[str, Any],

@@ -212,6 +212,7 @@ def build_spyker_simulation(
     training_config: dict[str, Any] | None = None,
     spyker_config: dict[str, Any] | None = None,
     run_time_limit: float | None = None,
+    # eval_time_delay: float | None = None,  TODO: Uncomment and inject in simulation_config
     idle_token_delay: float | None = None,
     gpu_budget: float | None = None,
     seed: int | None = None,

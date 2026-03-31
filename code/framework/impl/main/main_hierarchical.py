@@ -106,6 +106,11 @@ class HierarchicalSimulation:
         )
         return {"num_gpus": gpu_per_actor}
 
+        self.evaluator_actor = None
+        self.eval_interval = 500 #TODO SET FROM OUTSIDE (stubs)
+        self.run_id = 0 #TODO SET FROM OUTSIDE (stubs)
+        self.graph_id = 0 #TODO SET FROM OUTSIDE (stubs)
+
     def set_super_server(
         self,
         server_id: str,
