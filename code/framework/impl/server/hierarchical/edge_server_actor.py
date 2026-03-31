@@ -1,6 +1,5 @@
 import ray
 import numpy as np
-import yaml
 import simulation.context
 from typing import List, Dict, Tuple, Any
 
@@ -25,13 +24,7 @@ CLIENT_UPDATE = "CLIENT_UPDATE"
 MODEL_SYNC = "MODEL_SYNC"
 SERVER_MESSAGE = "SERVER_MESSAGE"
 
-
-with open("config.yaml", "r") as config_file:
-    global doc
-    doc = yaml.load(config_file, Loader=yaml.SafeLoader)
-
-
-@ray.remote(num_gpus=doc["num_gpus"])
+@ray.remote
 class EdgeServer(BaseAsyncServer):
     def __init__(
         self,
