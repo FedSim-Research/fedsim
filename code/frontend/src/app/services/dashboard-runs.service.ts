@@ -36,12 +36,14 @@ export class DashboardRunsService {
     const all = this.runs();
     const completed = all.filter((run) => run.status === 'completed').length;
     const failed = all.filter((run) => run.status === 'failed').length;
+    const queued = all.filter((run) => run.status === 'queued').length;
     const running = all.filter((run) => run.status === 'running').length;
     return {
       total: all.length,
+      queued,
+      running,
       completed,
       failed,
-      running,
     };
   });
 

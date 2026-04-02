@@ -6,8 +6,8 @@
         <div class="metric-value metric-value--large">{{ runStats().total }}</div>
       </article>
       <article class="summary-card">
-        <h3>Running</h3>
-        <div class="metric-value metric-value--large">{{ runStats().running }}</div>
+        <h3>Queued</h3>
+        <div class="metric-value metric-value--large">{{ runStats().queued }}</div>
       </article>
       <article class="summary-card">
         <h3>Completed</h3>
@@ -34,13 +34,26 @@
         <article class="summary-card">
           <h3>Model Quality</h3>
           @let metrics = getRunMetrics(run);
-          <div class="metric-block">
-            <span class="metric-label">Accuracy</span>
-            <strong class="metric-value">{{ formatPercent(metrics.accuracy) }}</strong>
-          </div>
-          <div class="metric-block">
-            <span class="metric-label">Loss</span>
-            <strong class="metric-value">{{ formatLoss(metrics.loss) }}</strong>
+          <div class="model-quality-grid">
+            <div class="model-quality-metrics">
+              <div class="metric-block">
+                <span class="metric-label">Accuracy</span>
+                <strong class="metric-value">{{ formatPercent(metrics.accuracy) }}</strong>
+              </div>
+              <div class="metric-block">
+                <span class="metric-label">Loss</span>
+                <strong class="metric-value">{{ formatLoss(metrics.loss) }}</strong>
+              </div>
+            </div>
+            <section class="mini-telemetry-card">
+              <iframe
+                [src]="modelQualityTrendEmbed()"
+                width="100%"
+                height="150"
+                frameborder="0"
+                loading="eager"
+              ></iframe>
+            </section>
           </div>
         </article>
       </div>

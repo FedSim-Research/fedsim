@@ -24,10 +24,7 @@ export class DashboardViewComponent {
 
   private grafanaBaseUrl = ((window as any).FEDSIM_GRAFANA_BASE_URL as string | undefined) ?? 'http://localhost:3000';
   private grafanaUrlCache = new Map<string, SafeResourceUrl>();
-  private fallbackRange = {
-    from: Date.now() - 60 * 60 * 1000,
-    to: Date.now(),
-  };
+  private readonly defaultRangeMs = 60 * 60 * 1000;
 
   @Input() public sidebarOpen = true;
 
@@ -64,6 +61,21 @@ export class DashboardViewComponent {
         architecture,
       }),
     }));
+  });
+
+  public modelQualityTrendEmbed = computed(() => {
+    const run = this.selectedRun();
+    const range = this.runTimeRange(run);
+    const runId = run?.run_id ?? '';
+    const architecture = run?.architecture ? String(run.architecture) : '';
+    return this.getGrafanaPanelUrl({
+      uid: '0dd000cc-2774-4007-b7a3-cf5fe5c5e07d',
+      panelId: 1007,
+      rangeFrom: range.from,
+      rangeTo: range.to,
+      runId,
+      architecture,
+    });
   });
 
   public getStatusClass(status: SimulationRunResponse['status']): string {
@@ -130,11 +142,23 @@ export class DashboardViewComponent {
   }
 
   private runTimeRange(run: SimulationRunResponse | null): { from: number; to: number } {
-    const from = run?.started_at ? new Date(run.started_at).getTime() : this.fallbackRange.from;
-    const to = run?.finished_at ? new Date(run.finished_at).getTime() : this.fallbackRange.to;
+    const now = Date.now();
+    const queuedAt = run?.queued_at ? new Date(run.queued_at).getTime() : NaN;
+    const startedAt = run?.started_at ? new Date(run.started_at).getTime() : NaN;
+    const finishedAt = run?.finished_at ? new Date(run.finished_at).getTime() : NaN;
+
+    const fromCandidate = Number.isFinite(startedAt)
+      ? startedAt
+      : Number.isFinite(queuedAt)
+      ? queuedAt
+      : now - this.defaultRangeMs;
+    const toCandidate = Number.isFinite(finishedAt) ? finishedAt : now;
+    const fromSafe = Number.isFinite(fromCandidate) ? fromCandidate : now - this.defaultRangeMs;
+    const toSafe = Number.isFinite(toCandidate) ? toCandidate : now;
+
     return {
-      from: Number.isFinite(from) ? from : this.fallbackRange.from,
-      to: Number.isFinite(to) ? to : this.fallbackRange.to,
+      from: Math.min(fromSafe, toSafe),
+      to: Math.max(fromSafe + 1000, toSafe),
     };
   }
 
