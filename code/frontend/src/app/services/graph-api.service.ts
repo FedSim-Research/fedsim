@@ -138,6 +138,36 @@ export interface SimulationStartResponse {
   } | null;
 }
 
+export interface SimulationRunResult {
+  architecture?: 'spyker' | 'hierfl' | string;
+  graph_id?: number | null;
+  seed?: number | null;
+  output_filename?: string | null;
+  evaluation?: {
+    accuracy?: number | null;
+    avg_loss?: number | null;
+  } | null;
+}
+
+export interface SimulationRunResponse {
+  run_id: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  architecture?: 'spyker' | 'hierfl' | 'both' | string;
+  graph_id?: number | null;
+  seed?: number | null;
+  queued_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  duration_seconds?: number | null;
+  output_filename?: string | null;
+  error?: string | null;
+  evaluation?: {
+    accuracy?: number | null;
+    avg_loss?: number | null;
+  } | null;
+  results_by_architecture?: Record<string, SimulationRunResult> | null;
+}
+
 export interface PresetResponse {
   preset_id: number;
   architecture: 'spyker' | 'hierfl';
@@ -214,6 +244,10 @@ export class GraphApiService {
 
   public async startSimulation(payload: SimulationStartRequest): Promise<SimulationStartResponse> {
     return firstValueFrom(this.http.post<SimulationStartResponse>(this.url('/start_simulation'), payload));
+  }
+
+  public async listRuns(): Promise<SimulationRunResponse[]> {
+    return firstValueFrom(this.http.get<SimulationRunResponse[]>(this.url('/runs')));
   }
 
   public async replaceGraphState(graphId: number, payload: VflowGraph): Promise<GraphDetail> {

@@ -5,6 +5,7 @@ import { StartPopup } from '../start.popup/start.popup';
 import { ResetButton } from '../reset.button/reset.button';
 import { ViewGraphsDialog } from '../view-graphs.component/view-graphs.component';
 import { HelpDialog } from '../help-dialog/help-dialog.component';
+import { SidebarDashboardPanelComponent } from '../sidebar-dashboard-panel/sidebar-dashboard-panel.component';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { Shortcuts } from '../../directives/shortcuts';
@@ -53,6 +54,8 @@ type SavePresetTarget = {
   name: string;
 };
 
+type WorkspaceView = 'editor' | 'dashboard';
+
 const DEFAULT_SUPER_SERVER_CONFIG: SuperServerConfig = {
   name: 'Super Server',
   computeFactor: 2.0,
@@ -84,7 +87,7 @@ const DEFAULT_CLIENT_CONFIG: ClientConfig = {
   standalone: true,
   templateUrl: './sidebar.component.html',
   styleUrls: ['./sidebar.component.css'],
-  imports: [FormsModule, CommonModule, StartPopup, ResetButton, ViewGraphsDialog, HelpDialog, ToastModule],
+  imports: [FormsModule, CommonModule, StartPopup, ResetButton, ViewGraphsDialog, HelpDialog, SidebarDashboardPanelComponent, ToastModule],
 })
 export class SidebarComponent implements OnInit {
   public isOpen = true;
@@ -103,8 +106,11 @@ export class SidebarComponent implements OnInit {
   @ViewChild('supDetails') private supDetails?: ElementRef<HTMLDetailsElement>;
 
   @Input() shortcuts?: Shortcuts;
+  @Input() activeView: WorkspaceView = 'editor';
   @Output() resetGraph = new EventEmitter<void>();
   @Output() modeChange = new EventEmitter<'spyker' | 'hierfl'>();
+  @Output() viewChange = new EventEmitter<WorkspaceView>();
+  @Output() sidebarOpenChange = new EventEmitter<boolean>();
   @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
   @Output() simulationRequested = new EventEmitter<{
     mode: 'spyker' | 'hierfl' | 'both';
@@ -131,6 +137,8 @@ export class SidebarComponent implements OnInit {
     spyker: false,
     hierfl: true,
   };
+  public architectureMode: 'spyker' | 'hierfl' = 'hierfl';
+  public architectureMenuOpen = false;
 
   public configDraft: {
     superserver: SuperServerConfig;
@@ -172,6 +180,8 @@ export class SidebarComponent implements OnInit {
   ) {}
 
   public async ngOnInit(): Promise<void> {
+    this.architectureMode = this.currentArchitecture();
+    this.sidebarOpenChange.emit(this.isOpen);
     await this.ensureGraphForMode(this.currentArchitecture());
     await this.loadPresetsForCurrentArchitecture();
   }
@@ -219,6 +229,7 @@ export class SidebarComponent implements OnInit {
   public async toggleArchitecture(): Promise<void> {
     this.selectedArchitectures.spyker = !this.selectedArchitectures.spyker;
     this.selectedArchitectures.hierfl = !this.selectedArchitectures.spyker;
+    this.architectureMode = this.currentArchitecture();
     this.modeChange.emit(this.selectedArchitectures.spyker ? 'spyker' : 'hierfl');
     if (this.selectedArchitectures.spyker) {
       this.closeSuperServerDisclosure();
@@ -230,12 +241,55 @@ export class SidebarComponent implements OnInit {
   public async setArchitecture(isSpyker: boolean): Promise<void> {
     this.selectedArchitectures.spyker = isSpyker;
     this.selectedArchitectures.hierfl = !isSpyker;
+    this.architectureMode = this.currentArchitecture();
     this.modeChange.emit(isSpyker ? 'spyker' : 'hierfl');
     if (isSpyker) {
       this.closeSuperServerDisclosure();
     }
     await this.ensureGraphForMode(this.currentArchitecture());
     await this.loadPresetsForCurrentArchitecture();
+  }
+
+  public setView(view: WorkspaceView): void {
+    if (this.activeView === view) {
+      return;
+    }
+    this.viewChange.emit(view);
+  }
+
+  public async onArchitectureModeChange(mode: 'spyker' | 'hierfl'): Promise<void> {
+    await this.setArchitecture(mode === 'spyker');
+  }
+
+  public toggleArchitectureMenu(event?: Event): void {
+    event?.stopPropagation();
+    this.architectureMenuOpen = !this.architectureMenuOpen;
+  }
+
+  public closeArchitectureMenu(): void {
+    this.architectureMenuOpen = false;
+  }
+
+  public architectureLabel(): string {
+    return this.architectureMode === 'spyker' ? 'Spyker' : 'Hierarchical';
+  }
+
+  public async selectArchitectureMode(mode: 'spyker' | 'hierfl', event?: Event): Promise<void> {
+    event?.stopPropagation();
+    this.architectureMenuOpen = false;
+    if (mode === this.architectureMode) {
+      return;
+    }
+    this.architectureMode = mode;
+    await this.onArchitectureModeChange(mode);
+  }
+
+  @HostListener('document:click', ['$event'])
+  public onDocumentClick(event: Event): void {
+    const target = event.target as HTMLElement | null;
+    if (!target?.closest('.architecture-select')) {
+      this.architectureMenuOpen = false;
+    }
   }
 
   private async ensureGraphForMode(mode: 'spyker' | 'hierfl'): Promise<void> {
@@ -298,9 +352,25 @@ export class SidebarComponent implements OnInit {
     }
   }
 
-  public toggleSidebar(): void { this.isOpen = !this.isOpen; }
-  public openSidebar(): void { this.isOpen = true; }
-  public closeSidebar(): void { this.isOpen = false; }
+  public toggleSidebar(): void {
+    this.setSidebarOpen(!this.isOpen);
+  }
+
+  public openSidebar(): void {
+    this.setSidebarOpen(true);
+  }
+
+  public closeSidebar(): void {
+    this.setSidebarOpen(false);
+  }
+
+  private setSidebarOpen(next: boolean): void {
+    if (this.isOpen === next) {
+      return;
+    }
+    this.isOpen = next;
+    this.sidebarOpenChange.emit(this.isOpen);
+  }
 
   public toggleTheme(): void {
     this.isDarkMode = !this.isDarkMode;
@@ -965,6 +1035,10 @@ export class SidebarComponent implements OnInit {
 
   @HostListener('document:keydown.escape')
   public onEscapePressed(): void {
+    if (this.architectureMenuOpen) {
+      this.closeArchitectureMenu();
+      return;
+    }
     if (this.showConfirmSavePresetPopup) {
       this.closeConfirmSavePresetPopup();
       return;

@@ -64,177 +64,223 @@
   </header>
 
   <div class="content">
-    <div class="block">
-      <div class="block__title">Architecture Mode</div>
-      <div class="mode-tabs">
-        <button type="button" class="mode-tab" [class.active]="!selectedArchitectures.spyker"
-          (click)="setArchitecture(false)">
-          Hierarchical
-        </button>
-        <button type="button" class="mode-tab" [class.active]="selectedArchitectures.spyker"
-          (click)="setArchitecture(true)">
-          Spyker
-        </button>
+    <section class="control-hub">
+      <div class="control-row">
+        <div class="control-row__label">Workspace</div>
+        <div class="mode-tabs mode-tabs--compact">
+          <button type="button" class="mode-tab" [class.active]="activeView === 'editor'" (click)="setView('editor')">
+            Graph Editor
+          </button>
+          <button type="button" class="mode-tab" [class.active]="activeView === 'dashboard'" (click)="setView('dashboard')">
+            Dashboard
+          </button>
+        </div>
       </div>
-    </div>
 
-    <div class="rightpane__header">
-      <div class="rightpane__subtitle">Configuration</div>
-    </div>
+      @if (activeView === 'editor') {
+        <div class="control-row">
+          <div class="control-row__label">Architecture</div>
+          <div class="architecture-select">
+            <button
+              type="button"
+              class="architecture-select__trigger"
+              [class.architecture-select__trigger--open]="architectureMenuOpen"
+              (click)="toggleArchitectureMenu($event)">
+              <span>{{ architectureLabel() }}</span>
+              <span class="architecture-select__chevron" [class.architecture-select__chevron--open]="architectureMenuOpen"></span>
+            </button>
+            @if (architectureMenuOpen) {
+              <div class="architecture-select__menu">
+                <button
+                  type="button"
+                  class="architecture-select__option"
+                  [class.architecture-select__option--active]="architectureMode === 'hierfl'"
+                  (click)="selectArchitectureMode('hierfl', $event)">
+                  Hierarchical
+                </button>
+                <button
+                  type="button"
+                  class="architecture-select__option"
+                  [class.architecture-select__option--active]="architectureMode === 'spyker'"
+                  (click)="selectArchitectureMode('spyker', $event)">
+                  Spyker
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </section>
 
-    <div class="tooltip-wrapper" [title]="selectedArchitectures.spyker ? 'Not available in Spyker' : ''">
-      <details #supDetails class="disclosure" [class.disclosure--disabled]="selectedArchitectures.spyker">
-        <summary class="disclosure__summary" (click)="onSuperServerSummaryClick($event)">
-          <span>Super Server</span>
+    @if (activeView === 'editor') {
+      <div class="rightpane__header">
+        <div class="rightpane__subtitle">Node Library</div>
+      </div>
+
+      <div class="tooltip-wrapper" [title]="selectedArchitectures.spyker ? 'Not available in Spyker' : ''">
+        <details #supDetails class="disclosure" [class.disclosure--disabled]="selectedArchitectures.spyker">
+          <summary class="disclosure__summary" (click)="onSuperServerSummaryClick($event)">
+            <span>Super Server</span>
+          </summary>
+          <div class="disclosure__body">
+            <label class="field field-with-plus">
+              <span>Name</span>
+              <div class="field-row">
+                <input class="field-input--short" type="text" [(ngModel)]="configDraft.superserver.name" placeholder="Name" />
+                <button class="plus-btn" type="button" (click)="openSuperServerBlueprintPopup()" aria-label="Inspect Super Server presets" title="Inspect presets">+</button>
+                <button class="plus-btn plus-btn--save" type="button" (click)="saveCurrentSuperServerPreset()" aria-label="Save Super Server preset" title="Save preset">
+                  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                    <path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-8h8v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            </label>
+            <div class="selected-preset-info">Selected preset: {{ selectedSuperServerPresetName() }}</div>
+            <div class="grid">
+              <label class="field">
+                <span>Upload (Mbps)</span>
+                <input type="number" min="0" [(ngModel)]="configDraft.superserver.uploadMbps" />
+              </label>
+              <label class="field">
+                <span>Download (Mbps)</span>
+                <input type="number" min="0" [(ngModel)]="configDraft.superserver.downloadMbps" />
+              </label>
+            </div>
+            <div class="field-pair">
+              <label class="field">
+                <span>Compute factor</span>
+                <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.superserver.computeFactor" />
+              </label>
+              <span class="field-divider" aria-hidden="true">±</span>
+              <label class="field">
+                <span>Performance σ</span>
+                <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.superserver.performanceSigma" />
+              </label>
+            </div>
+            <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'SuperServerNode')">
+              Drag Super Server
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <details class="disclosure">
+        <summary class="disclosure__summary">
+          <span>Server Nodes</span>
         </summary>
         <div class="disclosure__body">
           <label class="field field-with-plus">
             <span>Name</span>
             <div class="field-row">
-              <input class="field-input--short" type="text" [(ngModel)]="configDraft.superserver.name" placeholder="Name" />
-              <button class="plus-btn" type="button" (click)="openSuperServerBlueprintPopup()" aria-label="Inspect Super Server presets" title="Inspect presets">+</button>
-              <button class="plus-btn plus-btn--save" type="button" (click)="saveCurrentSuperServerPreset()" aria-label="Save Super Server preset" title="Save preset">
+              <input class="field-input--short" type="text" [(ngModel)]="configDraft.server.name" />
+              <button class="plus-btn" type="button" (click)="openServerBlueprintPopup()" aria-label="Inspect Server Node presets" title="Inspect presets">+</button>
+              <button class="plus-btn plus-btn--save" type="button" (click)="saveCurrentServerPreset()" aria-label="Save Server Node preset" title="Save preset">
                 <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
                   <path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-8h8v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </button>
             </div>
           </label>
-          <div class="selected-preset-info">Selected preset: {{ selectedSuperServerPresetName() }}</div>
+          <div class="selected-preset-info">Selected preset: {{ selectedServerPresetName() }}</div>
           <div class="grid">
             <label class="field">
               <span>Upload (Mbps)</span>
-              <input type="number" min="0" [(ngModel)]="configDraft.superserver.uploadMbps" />
+              <input type="number" min="0" [(ngModel)]="configDraft.server.uploadMbps" />
             </label>
             <label class="field">
               <span>Download (Mbps)</span>
-              <input type="number" min="0" [(ngModel)]="configDraft.superserver.downloadMbps" />
+              <input type="number" min="0" [(ngModel)]="configDraft.server.downloadMbps" />
             </label>
           </div>
           <div class="field-pair">
             <label class="field">
               <span>Compute factor</span>
-              <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.superserver.computeFactor" />
+              <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.server.computeFactor" />
             </label>
             <span class="field-divider" aria-hidden="true">±</span>
             <label class="field">
               <span>Performance σ</span>
-              <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.superserver.performanceSigma" />
+              <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.server.performanceSigma" />
             </label>
           </div>
-          <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'SuperServerNode')">
-            Drag Super Server
+          <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'ServerNode')">
+            Drag Server Node
           </div>
         </div>
       </details>
-    </div>
 
-    <details class="disclosure">
-      <summary class="disclosure__summary">
-        <span>Server Nodes</span>
-      </summary>
-      <div class="disclosure__body">
-        <label class="field field-with-plus">
-          <span>Name</span>
-          <div class="field-row">
-            <input class="field-input--short" type="text" [(ngModel)]="configDraft.server.name" />
-            <button class="plus-btn" type="button" (click)="openServerBlueprintPopup()" aria-label="Inspect Server Node presets" title="Inspect presets">+</button>
-            <button class="plus-btn plus-btn--save" type="button" (click)="saveCurrentServerPreset()" aria-label="Save Server Node preset" title="Save preset">
-              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-                <path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-8h8v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </button>
+      <details class="disclosure">
+        <summary class="disclosure__summary">
+          <span>Client Nodes</span>
+        </summary>
+        <div class="disclosure__body">
+          <label class="field field-with-plus">
+            <span>Client type</span>
+            <div class="field-row">
+              <select class="field-input--short" [(ngModel)]="configDraft.client.type">
+                <option value="laptop">Laptop</option>
+                <option value="workstation">Workstation</option>
+                <option value="mobile">Mobile</option>
+              </select>
+              <button class="plus-btn" type="button" (click)="openClientBlueprintPopup()" aria-label="Inspect Client Node presets" title="Inspect presets">+</button>
+              <button class="plus-btn plus-btn--save" type="button" (click)="saveCurrentClientPreset()" aria-label="Save Client Node preset" title="Save preset">
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                  <path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-8h8v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </div>
+          </label>
+          <div class="selected-preset-info">Selected preset: {{ selectedClientPresetName() }}</div>
+          <label class="field">
+            <span>Number of clients</span>
+            <input type="number" min="1" [(ngModel)]="configDraft.client.count" />
+          </label>
+          <div class="grid">
+            <label class="field">
+              <span>Upload (Mbps)</span>
+              <input type="number" min="0" [(ngModel)]="configDraft.client.uploadMbps" />
+            </label>
+            <label class="field">
+              <span>Download (Mbps)</span>
+              <input type="number" min="0" [(ngModel)]="configDraft.client.downloadMbps" />
+            </label>
           </div>
-        </label>
-        <div class="selected-preset-info">Selected preset: {{ selectedServerPresetName() }}</div>
-        <div class="grid">
-          <label class="field">
-            <span>Upload (Mbps)</span>
-            <input type="number" min="0" [(ngModel)]="configDraft.server.uploadMbps" />
-          </label>
-          <label class="field">
-            <span>Download (Mbps)</span>
-            <input type="number" min="0" [(ngModel)]="configDraft.server.downloadMbps" />
-          </label>
-        </div>
-        <div class="field-pair">
-          <label class="field">
-            <span>Compute factor</span>
-            <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.server.computeFactor" />
-          </label>
-          <span class="field-divider" aria-hidden="true">±</span>
-          <label class="field">
-            <span>Performance σ</span>
-            <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.server.performanceSigma" />
-          </label>
-        </div>
-        <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'ServerNode')">
-          Drag Server Node
-        </div>
-      </div>
-    </details>
-
-    <details class="disclosure">
-      <summary class="disclosure__summary">
-        <span>Client Nodes</span>
-      </summary>
-      <div class="disclosure__body">
-        <label class="field field-with-plus">
-          <span>Client type</span>
-          <div class="field-row">
-            <select class="field-input--short" [(ngModel)]="configDraft.client.type">
-              <option value="laptop">Laptop</option>
-              <option value="workstation">Workstation</option>
-              <option value="mobile">Mobile</option>
-            </select>
-            <button class="plus-btn" type="button" (click)="openClientBlueprintPopup()" aria-label="Inspect Client Node presets" title="Inspect presets">+</button>
-            <button class="plus-btn plus-btn--save" type="button" (click)="saveCurrentClientPreset()" aria-label="Save Client Node preset" title="Save preset">
-              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-                <path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-8h8v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </button>
+          <div class="field-pair">
+            <label class="field">
+              <span>Compute factor</span>
+              <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.client.computeFactor" />
+            </label>
+            <span class="field-divider" aria-hidden="true">±</span>
+            <label class="field">
+              <span>Performance σ</span>
+              <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.client.performanceSigma" />
+            </label>
           </div>
-        </label>
-        <div class="selected-preset-info">Selected preset: {{ selectedClientPresetName() }}</div>
-        <label class="field">
-          <span>Number of clients</span>
-          <input type="number" min="1" [(ngModel)]="configDraft.client.count" />
-        </label>
-        <div class="grid">
-          <label class="field">
-            <span>Upload (Mbps)</span>
-            <input type="number" min="0" [(ngModel)]="configDraft.client.uploadMbps" />
-          </label>
-          <label class="field">
-            <span>Download (Mbps)</span>
-            <input type="number" min="0" [(ngModel)]="configDraft.client.downloadMbps" />
-          </label>
+          <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'ClientNode')">
+            Drag Client Node
+          </div>
         </div>
-        <div class="field-pair">
-          <label class="field">
-            <span>Compute factor</span>
-            <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.client.computeFactor" />
-          </label>
-          <span class="field-divider" aria-hidden="true">±</span>
-          <label class="field">
-            <span>Performance σ</span>
-            <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.client.performanceSigma" />
-          </label>
-        </div>
-        <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'ClientNode')">
-          Drag Client Node
-        </div>
+      </details>
+    } @else {
+      <div class="rightpane__header">
+        <div class="rightpane__subtitle">Dashboard</div>
       </div>
-    </details>
+      <app-sidebar-dashboard-panel></app-sidebar-dashboard-panel>
+    }
   </div>
 
   <footer class="sidebar__footer">
-    <div class="footer__info footer__info--expand">
-      <button class="cta" cta--secondary type="button" (click)="undo()">Undo</button>
-      <button class="cta" cta--secondary type="button" (click)="redo()">Redo</button>
-    </div>
-    <button class="cta" type="button" (click)="openSimulationpopup()">Start simulation</button>
-    <app-reset-button (reset)="onResetRequested()"></app-reset-button>
+    @if (activeView === 'editor') {
+      <div class="footer__info footer__info--expand">
+        <button class="cta" cta--secondary type="button" (click)="undo()">Undo</button>
+        <button class="cta" cta--secondary type="button" (click)="redo()">Redo</button>
+      </div>
+      <button class="cta" type="button" (click)="openSimulationpopup()">Start simulation</button>
+      <app-reset-button (reset)="onResetRequested()"></app-reset-button>
+    } @else {
+      <button class="cta" type="button" (click)="openSimulationpopup()">Start simulation</button>
+      <button class="cta" type="button" (click)="setView('editor')">Back to Graph Editor</button>
+    }
   </footer>
 </aside>
 
