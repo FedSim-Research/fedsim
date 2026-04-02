@@ -1,5 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 import { NgIf } from '@angular/common';
+import { ButtonModule } from 'primeng/button';
 import { CustomNodeComponent, HandleComponent } from 'ngx-vflow';
 import { NodeDeleteUiService } from '../../../services/node-delete-ui.service';
 import { GraphServiceHierach } from '../../../services/subservices/graph-service-hierach';
@@ -10,7 +11,7 @@ import { MessageService } from 'primeng/api';
 @Component({
   selector: 'app-client-node',
   standalone: true,
-  imports: [NgIf, HandleComponent],
+  imports: [NgIf, HandleComponent, ButtonModule],
   templateUrl: './client-node.html',
   styleUrl: './client-node.css',
 })
@@ -90,6 +91,20 @@ export class ClientNode extends CustomNodeComponent {
     }
   }
 
+  public onForwardNode(event: MouseEvent): void {
+    event.stopPropagation();
+    const current = this.client();
+    window.dispatchEvent(new CustomEvent('node-forward', {
+      detail: {
+        kind: 'client',
+        config: {
+          ...current,
+          type: String(current.type ?? '').toLowerCase(),
+        },
+      },
+    }));
+  }
+
   public onStartEdit(event: MouseEvent): void {
     event.stopPropagation();
     const current = this.client();
@@ -133,7 +148,7 @@ export class ClientNode extends CustomNodeComponent {
   }
 
   public updateTextField(field: 'type', event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
+    const value = (event.target as HTMLInputElement | HTMLSelectElement).value;
     this.nodeEditUi.updateDraft(this.node().id, { [field]: value });
   }
 

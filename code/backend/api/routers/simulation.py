@@ -1,65 +1,14 @@
-from datetime import datetime, timezone
-from threading import Lock
-from uuid import uuid4
-
 from fastapi import APIRouter, HTTPException
+import logging
 from pydantic import BaseModel
-from backend.simulation_controller import SimulationController
+
 from backend.services import graph_service
+from backend.services.simulation_run_queue import run_queue
 from backend.services.simulation_validation import validate_start_payload
 
 router = APIRouter(tags=["simulation"])
+logger = logging.getLogger(__name__)
 
-_runs_lock = Lock()
-_runs_order: list[str] = []
-_runs_by_id: dict[str, dict] = {}
-
-
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _create_run_record(*, graph_id: int, architecture: str, seed: int | None) -> dict:
-    run_id = str(uuid4())
-    now = _utc_now_iso()
-    run = {
-        "run_id": run_id,
-        "status": "queued",
-        "graph_id": graph_id,
-        "architecture": architecture,
-        "seed": seed,
-        "queued_at": now,
-        "started_at": None,
-        "finished_at": None,
-        "duration_seconds": None,
-        "output_filename": None,
-        "evaluation": None,
-        "error": None,
-    }
-    with _runs_lock:
-        _runs_by_id[run_id] = run
-        _runs_order.append(run_id)
-    return run
-
-
-def _update_run(run_id: str, **updates) -> dict:
-    with _runs_lock:
-        current = _runs_by_id.get(run_id)
-        if current is None:
-            raise KeyError(run_id)
-        current.update(updates)
-        return dict(current)
-
-
-def _list_runs_latest_first() -> list[dict]:
-    with _runs_lock:
-        return [dict(_runs_by_id[run_id]) for run_id in reversed(_runs_order)]
-
-
-def _get_run(run_id: str) -> dict | None:
-    with _runs_lock:
-        run = _runs_by_id.get(run_id)
-        return dict(run) if run is not None else None
 
 class SimulationTrainingConfig(BaseModel):
     epochs: int
@@ -69,10 +18,13 @@ class SimulationTrainingConfig(BaseModel):
 
 class SimulationSettings(BaseModel):
     run_time_limit: float | None = None
+    eval_interval: float | None = None
     idle_token_delay: float | None = None
+    gpu_budget: float | None = None
     seed: int | None = None
     output_filename: str | None = None
     evaluate_model: bool = False
+
 
 class SpykerAlgorithmConfig(BaseModel):
     decay_beta: float | None = None
@@ -90,22 +42,10 @@ class SimulationStartRequest(BaseModel):
     simulation_settings: SimulationSettings | None = None
     spyker_config: SpykerAlgorithmConfig | None = None
 
+
 class SimulationEvaluationResult(BaseModel):
     accuracy: float
     avg_loss: float
-
-class SimulationStartResponse(BaseModel):
-    run_id: str | None = None
-    status: str
-    graph_id: int
-    architecture: str
-    queued_at: str | None = None
-    started_at: str | None = None
-    finished_at: str | None = None
-    duration_seconds: float | None = None
-    seed: int | None = None
-    output_filename: str | None = None
-    evaluation: SimulationEvaluationResult | None = None
 
 
 class SimulationRunResponse(BaseModel):
@@ -113,27 +53,41 @@ class SimulationRunResponse(BaseModel):
     status: str
     graph_id: int
     architecture: str
+    seed: int | None = None
     queued_at: str | None = None
     started_at: str | None = None
     finished_at: str | None = None
     duration_seconds: float | None = None
-    seed: int | None = None
     output_filename: str | None = None
     evaluation: SimulationEvaluationResult | None = None
+    results_by_architecture: dict[str, dict] | None = None
     error: str | None = None
 
 
-@router.post("/start_simulation", response_model=SimulationStartResponse)
-def start_simulation(
-    payload: SimulationStartRequest,
-):
+class SimulationSingleConfig(BaseModel):
+    graph_id: int
+    training_config: SimulationTrainingConfig | None = None
+    simulation_settings: SimulationSettings | None = None
+    spyker_config: SpykerAlgorithmConfig | None = None
+
+
+class SimulationStartBothRequest(BaseModel):
+    hierfl: SimulationSingleConfig
+    spyker: SimulationSingleConfig
+
+
+@router.post("/start_simulation", response_model=SimulationRunResponse)
+def start_simulation(payload: SimulationStartRequest):
+    logger.info("start_simulation_requested graph_id=%s", payload.graph_id)
     graph = graph_service.get_graph(payload.graph_id)
     if graph is None:
+        logger.warning("start_simulation_graph_not_found graph_id=%s", payload.graph_id)
         raise HTTPException(status_code=404, detail="Graph not found")
 
     training_config = payload.training_config.model_dump() if payload.training_config else None
     simulation_settings = payload.simulation_settings.model_dump() if payload.simulation_settings else None
     spyker_config = payload.spyker_config.model_dump() if payload.spyker_config else None
+
     try:
         validate_start_payload(
             architecture=graph.architecture,
@@ -143,74 +97,92 @@ def start_simulation(
             spyker_config=spyker_config,
         )
     except ValueError as exc:
+        logger.warning(
+            "start_simulation_validation_failed graph_id=%s architecture=%s error=%s",
+            graph.id,
+            graph.architecture,
+            str(exc),
+        )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    run = _create_run_record(
+    run = run_queue.enqueue(
         graph_id=graph.id,
         architecture=graph.architecture,
-        seed=simulation_settings.get("seed") if simulation_settings else None,
-    )
-    started_at = _utc_now_iso()
-    _update_run(run["run_id"], status="running", started_at=started_at)
-
-    controller = SimulationController(
-        graph.architecture,
-        graph=graph,
         training_config=training_config,
         simulation_settings=simulation_settings,
         spyker_config=spyker_config,
     )
-    try:
-        result = controller.start()
-    except Exception as exc:
-        finished_at = _utc_now_iso()
-        started_dt = datetime.fromisoformat(started_at)
-        finished_dt = datetime.fromisoformat(finished_at)
-        duration_seconds = (finished_dt - started_dt).total_seconds()
-        _update_run(
-            run["run_id"],
-            status="failed",
-            finished_at=finished_at,
-            duration_seconds=duration_seconds,
-            error=str(exc),
-        )
-        raise
-
-    finished_at = _utc_now_iso()
-    started_dt = datetime.fromisoformat(started_at)
-    finished_dt = datetime.fromisoformat(finished_at)
-    duration_seconds = (finished_dt - started_dt).total_seconds()
-    updated = _update_run(
-        run["run_id"],
-        status="completed",
-        finished_at=finished_at,
-        duration_seconds=duration_seconds,
-        output_filename=(result or {}).get("output_filename"),
-        evaluation=(result or {}).get("evaluation"),
-        seed=(result or {}).get("seed"),
+    logger.info(
+        "start_simulation_queued run_id=%s graph_id=%s architecture=%s",
+        run.run_id,
+        graph.id,
+        graph.architecture,
     )
+    return run.to_api_dict()
 
-    return {
-        "run_id": updated["run_id"],
-        "status": updated["status"],
-        "graph_id": graph.id,
-        "architecture": graph.architecture,
-        "queued_at": updated["queued_at"],
-        "started_at": updated["started_at"],
-        "finished_at": updated["finished_at"],
-        "duration_seconds": updated["duration_seconds"],
-        **(result or {}),
-    }
+
+@router.post("/start_simulation_both", response_model=SimulationRunResponse)
+def start_simulation_both(payload: SimulationStartBothRequest):
+    hierfl_graph = graph_service.get_graph(payload.hierfl.graph_id)
+    if hierfl_graph is None or hierfl_graph.architecture != "hierfl":
+        raise HTTPException(status_code=404, detail="HierFL graph not found")
+
+    spyker_graph = graph_service.get_graph(payload.spyker.graph_id)
+    if spyker_graph is None or spyker_graph.architecture != "spyker":
+        raise HTTPException(status_code=404, detail="Spyker graph not found")
+
+    hierfl_training = payload.hierfl.training_config.model_dump() if payload.hierfl.training_config else None
+    hierfl_settings = payload.hierfl.simulation_settings.model_dump() if payload.hierfl.simulation_settings else None
+    spyker_training = payload.spyker.training_config.model_dump() if payload.spyker.training_config else None
+    spyker_settings = payload.spyker.simulation_settings.model_dump() if payload.spyker.simulation_settings else None
+    spyker_algo = payload.spyker.spyker_config.model_dump() if payload.spyker.spyker_config else None
+
+    try:
+        validate_start_payload(
+            architecture="hierfl",
+            graph=hierfl_graph,
+            training_config=hierfl_training,
+            simulation_settings=hierfl_settings,
+            spyker_config=None,
+        )
+        validate_start_payload(
+            architecture="spyker",
+            graph=spyker_graph,
+            training_config=spyker_training,
+            simulation_settings=spyker_settings,
+            spyker_config=spyker_algo,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    run = run_queue.enqueue_combined(
+        {
+            "hierfl": {
+                "graph_id": hierfl_graph.id,
+                "training_config": hierfl_training,
+                "simulation_settings": hierfl_settings,
+            },
+            "spyker": {
+                "graph_id": spyker_graph.id,
+                "training_config": spyker_training,
+                "simulation_settings": spyker_settings,
+                "spyker_config": spyker_algo,
+            },
+        }
+    )
+    return run.to_api_dict()
+
+
+@router.get("/runs/{run_id}", response_model=SimulationRunResponse)
+def get_run_status(run_id: str):
+    run = run_queue.get(run_id)
+    if run is None:
+        logger.warning("get_run_status_not_found run_id=%s", run_id)
+        raise HTTPException(status_code=404, detail="Run not found")
+    logger.debug("get_run_status run_id=%s status=%s", run_id, run.status)
+    return run.to_api_dict()
 
 
 @router.get("/runs", response_model=list[SimulationRunResponse])
 def list_runs():
-    return _list_runs_latest_first()
-
-
-@router.get("/runs/{run_id}", response_model=SimulationRunResponse)
-def get_run(run_id: str):
-    run = _get_run(run_id)
-    if run is None:
-        raise HTTPException(status_code=404, detail="Run not found")
-    return run
+    return [run.to_api_dict() for run in run_queue.list_runs()]

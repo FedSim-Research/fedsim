@@ -110,7 +110,9 @@ export interface SimulationStartRequest {
   };
   simulation_settings?: {
     run_time_limit?: number;
+    eval_interval?: number;
     idle_token_delay?: number;
+    gpu_budget?: number;
     seed?: number;
     output_filename?: string | null;
     evaluate_model?: boolean;
@@ -126,16 +128,9 @@ export interface SimulationStartRequest {
   };
 }
 
-export interface SimulationStartResponse {
-  status: 'completed';
-  graph_id: number;
-  architecture: 'spyker' | 'hierfl';
-  seed?: number | null;
-  output_filename?: string | null;
-  evaluation?: {
-    accuracy: number;
-    avg_loss: number;
-  } | null;
+export interface SimulationStartBothRequest {
+  hierfl: SimulationStartRequest;
+  spyker: SimulationStartRequest;
 }
 
 export interface SimulationRunResult {
@@ -144,15 +139,15 @@ export interface SimulationRunResult {
   seed?: number | null;
   output_filename?: string | null;
   evaluation?: {
-    accuracy?: number | null;
-    avg_loss?: number | null;
+    accuracy: number;
+    avg_loss: number;
   } | null;
 }
 
 export interface SimulationRunResponse {
   run_id: string;
   status: 'queued' | 'running' | 'completed' | 'failed';
-  architecture?: 'spyker' | 'hierfl' | 'both' | string;
+  architecture?: 'spyker' | 'hierfl' | 'both';
   graph_id?: number | null;
   seed?: number | null;
   queued_at?: string | null;
@@ -162,8 +157,8 @@ export interface SimulationRunResponse {
   output_filename?: string | null;
   error?: string | null;
   evaluation?: {
-    accuracy?: number | null;
-    avg_loss?: number | null;
+    accuracy: number;
+    avg_loss: number;
   } | null;
   results_by_architecture?: Record<string, SimulationRunResult> | null;
 }
@@ -242,8 +237,16 @@ export class GraphApiService {
     await firstValueFrom(this.http.delete(this.url(`/edges/${edgeId}`)));
   }
 
-  public async startSimulation(payload: SimulationStartRequest): Promise<SimulationStartResponse> {
-    return firstValueFrom(this.http.post<SimulationStartResponse>(this.url('/start_simulation'), payload));
+  public async startSimulation(payload: SimulationStartRequest): Promise<SimulationRunResponse> {
+    return firstValueFrom(this.http.post<SimulationRunResponse>(this.url('/start_simulation'), payload));
+  }
+
+  public async startSimulationBoth(payload: SimulationStartBothRequest): Promise<SimulationRunResponse> {
+    return firstValueFrom(this.http.post<SimulationRunResponse>(this.url('/start_simulation_both'), payload));
+  }
+
+  public async getRunStatus(runId: string): Promise<SimulationRunResponse> {
+    return firstValueFrom(this.http.get<SimulationRunResponse>(this.url(`/runs/${runId}`)));
   }
 
   public async listRuns(): Promise<SimulationRunResponse[]> {

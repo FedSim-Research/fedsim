@@ -546,11 +546,11 @@ export class App implements OnInit{
     mode: 'spyker' | 'hierfl' | 'both';
     hierfl: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; seed: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; outputFilename: string; evaluateModel: boolean };
     };
     spyker: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; seed: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
       spykerConfig: {
         decayBeta: number;
         minLearningRate: number;
@@ -578,6 +578,7 @@ export class App implements OnInit{
           trainingConfig: archConfig.trainingConfig,
           simulationSettings: {
             ...archConfig.simulationSettings,
+            evalInterval: archConfig.simulationSettings.evalInterval,
             idleTokenDelay: architecture === 'spyker' ? payload.spyker.simulationSettings.idleTokenDelay : undefined,
           },
           spykerConfig: architecture === 'spyker' ? payload.spyker.spykerConfig : undefined,
@@ -590,8 +591,8 @@ export class App implements OnInit{
 
       const jobId = this.frameworkJobs.startJob(`${architecture.toUpperCase()} simulation`);
       try {
-        this.showInfoToast(`${architecture} simulation running...`);
-        const result = await this.graphApi.startSimulation({
+        this.showInfoToast(`${architecture} simulation queued...`);
+        const queuedRun = await this.graphApi.startSimulation({
           graph_id: graphId,
           training_config: {
             epochs: archConfig.trainingConfig.epochs,
@@ -600,6 +601,8 @@ export class App implements OnInit{
           },
           simulation_settings: {
             run_time_limit: archConfig.simulationSettings.runTimeLimit,
+            eval_interval: archConfig.simulationSettings.evalInterval,
+            gpu_budget: archConfig.simulationSettings.gpuBudget,
             idle_token_delay: architecture === 'spyker' ? payload.spyker.simulationSettings.idleTokenDelay : undefined,
             seed: archConfig.simulationSettings.seed,
             output_filename: archConfig.simulationSettings.outputFilename || null,
@@ -617,8 +620,8 @@ export class App implements OnInit{
               }
             : undefined,
         });
-        this.showSuccessToast(this.formatSimulationResult(architecture, result));
-        this.frameworkJobs.markCompleted(jobId);
+
+        await this.waitForRunCompletion(queuedRun.run_id, architecture, jobId);
       } catch {
         this.showErrorToast(`Failed to start ${architecture} simulation.`);
         this.frameworkJobs.markFailed(jobId);
@@ -627,8 +630,95 @@ export class App implements OnInit{
 
     if (payload.mode === 'both') {
       this.simulationRunning.set(true);
+      const jobId = this.frameworkJobs.startJob('SPYKER + HIERFL simulation');
       try {
-        await Promise.all([runFor('spyker'), runFor('hierfl')]);
+        const hierGraphId = this.graphServiceHierach.getGraphId() ?? this.graphServiceHierach.loadGraphIdFromStorage();
+        const spykerGraphId = this.graphServiceSpyker.getGraphId() ?? this.graphServiceSpyker.loadGraphIdFromStorage();
+        if (hierGraphId === null || spykerGraphId === null) {
+          this.showErrorToast('Both HierFL and Spyker graphs must be available.');
+          this.frameworkJobs.markFailed(jobId);
+          return;
+        }
+
+        const hierValidationErrors = this.graphValidator.validateSimulationRequest(
+          'hierfl',
+          this.graphServiceHierach.nodes(),
+          this.graphServiceHierach.edges(),
+          {
+            trainingConfig: payload.hierfl.trainingConfig,
+            simulationSettings: payload.hierfl.simulationSettings,
+          },
+        );
+        const spykerValidationErrors = this.graphValidator.validateSimulationRequest(
+          'spyker',
+          this.graphServiceSpyker.nodes(),
+          this.graphServiceSpyker.edges(),
+          {
+            trainingConfig: payload.spyker.trainingConfig,
+            simulationSettings: payload.spyker.simulationSettings,
+            spykerConfig: payload.spyker.spykerConfig,
+          },
+        );
+        if (hierValidationErrors.length > 0) {
+          this.showValidationErrors('hierfl', hierValidationErrors);
+          this.frameworkJobs.markFailed(jobId);
+          return;
+        }
+        if (spykerValidationErrors.length > 0) {
+          this.showValidationErrors('spyker', spykerValidationErrors);
+          this.frameworkJobs.markFailed(jobId);
+          return;
+        }
+
+        this.showInfoToast('Combined simulation queued...');
+        const queuedRun = await this.graphApi.startSimulationBoth({
+          hierfl: {
+            graph_id: hierGraphId,
+            training_config: {
+              epochs: payload.hierfl.trainingConfig.epochs,
+              lr: payload.hierfl.trainingConfig.lr,
+              model_complexity: payload.hierfl.trainingConfig.modelComplexity,
+            },
+            simulation_settings: {
+              run_time_limit: payload.hierfl.simulationSettings.runTimeLimit,
+              eval_interval: payload.hierfl.simulationSettings.evalInterval,
+              gpu_budget: payload.hierfl.simulationSettings.gpuBudget,
+              seed: payload.hierfl.simulationSettings.seed,
+              output_filename: payload.hierfl.simulationSettings.outputFilename || null,
+              evaluate_model: payload.hierfl.simulationSettings.evaluateModel,
+            },
+          },
+          spyker: {
+            graph_id: spykerGraphId,
+            training_config: {
+              epochs: payload.spyker.trainingConfig.epochs,
+              lr: payload.spyker.trainingConfig.lr,
+              model_complexity: payload.spyker.trainingConfig.modelComplexity,
+            },
+            simulation_settings: {
+              run_time_limit: payload.spyker.simulationSettings.runTimeLimit,
+              eval_interval: payload.spyker.simulationSettings.evalInterval,
+              gpu_budget: payload.spyker.simulationSettings.gpuBudget,
+              idle_token_delay: payload.spyker.simulationSettings.idleTokenDelay,
+              seed: payload.spyker.simulationSettings.seed,
+              output_filename: payload.spyker.simulationSettings.outputFilename || null,
+              evaluate_model: payload.spyker.simulationSettings.evaluateModel,
+            },
+            spyker_config: {
+              decay_beta: payload.spyker.spykerConfig.decayBeta,
+              min_learning_rate: payload.spyker.spykerConfig.minLearningRate,
+              h_inter: payload.spyker.spykerConfig.hInter,
+              h_intra: payload.spyker.spykerConfig.hIntra,
+              sigmoid_phi: payload.spyker.spykerConfig.sigmoidPhi,
+              server_learning_rate: payload.spyker.spykerConfig.serverLearningRate,
+              tcp_rto_delay: payload.spyker.spykerConfig.tcpRtoDelay,
+            },
+          },
+        });
+        await this.waitForCombinedRunCompletion(queuedRun.run_id, jobId);
+      } catch {
+        this.showErrorToast('Failed to start combined simulation.');
+        this.frameworkJobs.markFailed(jobId);
       } finally {
         this.simulationRunning.set(false);
       }
@@ -695,6 +785,80 @@ export class App implements OnInit{
       parts.push(`Loss ${loss}`);
     }
     return `${architecture}: ${parts.join(' • ')}`;
+  }
+
+  private async waitForRunCompletion(
+    runId: string,
+    architecture: 'spyker' | 'hierfl',
+    jobId: string
+  ): Promise<void> {
+    let lastStatus: 'queued' | 'running' | 'completed' | 'failed' | null = null;
+    for (;;) {
+      const run = await this.graphApi.getRunStatus(runId);
+      if (run.status !== lastStatus) {
+        console.info(
+          `[simulation] run status changed: runId=${runId} architecture=${architecture} status=${run.status}`
+        );
+        lastStatus = run.status;
+      }
+
+      if (run.status === 'running') {
+        this.frameworkJobs.markRunning(jobId);
+      }
+
+      if (run.status === 'completed') {
+        this.frameworkJobs.markCompleted(jobId);
+        this.showSuccessToast(this.formatSimulationResult(architecture, run));
+        return;
+      }
+
+      if (run.status === 'failed') {
+        this.frameworkJobs.markFailed(jobId);
+        const detail = run.error ? ` (${run.error})` : '';
+        this.showErrorToast(`${architecture} simulation failed${detail}`);
+        return;
+      }
+
+      await this.sleep(2000);
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async waitForCombinedRunCompletion(runId: string, jobId: string): Promise<void> {
+    let lastStatus: 'queued' | 'running' | 'completed' | 'failed' | null = null;
+    for (;;) {
+      const run = await this.graphApi.getRunStatus(runId);
+      if (run.status !== lastStatus) {
+        console.info(`[simulation] combined run status changed: runId=${runId} status=${run.status}`);
+        lastStatus = run.status;
+      }
+      if (run.status === 'running') {
+        this.frameworkJobs.markRunning(jobId);
+      }
+      if (run.status === 'completed') {
+        this.frameworkJobs.markCompleted(jobId);
+        const bothResults = run.results_by_architecture ?? {};
+        const hierResult = bothResults['hierfl'];
+        const spykerResult = bothResults['spyker'];
+        if (hierResult) {
+          this.showSuccessToast(this.formatSimulationResult('hierfl', hierResult));
+        }
+        if (spykerResult) {
+          this.showSuccessToast(this.formatSimulationResult('spyker', spykerResult));
+        }
+        return;
+      }
+      if (run.status === 'failed') {
+        this.frameworkJobs.markFailed(jobId);
+        const detail = run.error ? ` (${run.error})` : '';
+        this.showErrorToast(`combined simulation failed${detail}`);
+        return;
+      }
+      await this.sleep(2000);
+    }
   }
 
   public async handleGraphSelected(event: { graphId: number; architecture: 'spyker' | 'hierfl' }): Promise<void> {

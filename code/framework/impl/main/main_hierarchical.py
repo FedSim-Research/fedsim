@@ -47,8 +47,9 @@ class DataLoaderAdapter:
 class HierarchicalSimulation:
     """See Hierarchical_Simulation_README.md for details on the simulation setup and how to use it."""
 
-    def __init__(self, run_time_limit: float = RUNTIME_LIMIT):
+    def __init__(self, run_time_limit: float = RUNTIME_LIMIT, gpu_budget: float | None = None):
         self.run_time_limit = run_time_limit
+        self.gpu_budget = gpu_budget
         self.super_id = None
         self.edge_ids = []
         self.client_ids = []
@@ -64,6 +65,46 @@ class HierarchicalSimulation:
         self.orchestrator = None
         self.super_actor = None
         self.edge_actors_map = {}
+        self._server_actor_options: dict[str, float] = {}
+        self.evaluator_actor = None
+        self.eval_interval = 0.0
+        self.run_id = "unknown_run"
+        self.graph_id = -1
+
+    def set_metadata(self, run_id: str | None, graph_id: int | None, eval_interval: float | None = None) -> None:
+        if run_id:
+            self.run_id = run_id
+        if graph_id is not None:
+            self.graph_id = int(graph_id)
+        if eval_interval is not None:
+            self.eval_interval = max(0.0, float(eval_interval))
+
+    def _resolve_server_actor_options(self) -> dict[str, float]:
+        if self.gpu_budget is None:
+            return {}
+        available_gpu = float(ray.available_resources().get("GPU", 0.0))
+        requested_gpu = max(0.0, float(self.gpu_budget))
+        if available_gpu <= 1e-3 and requested_gpu > 0.0:
+            print(
+                "HierFL GPU budget requested but effective cluster GPU capacity is near zero; "
+                "falling back to CPU actor placement."
+            )
+            requested_gpu = 0.0
+        elif requested_gpu > available_gpu + 1e-9:
+            print(
+                f"HierFL GPU budget exceeds available resources; capping budget "
+                f"from {requested_gpu} to {available_gpu}."
+            )
+            requested_gpu = available_gpu
+        actor_count = len(self.edge_ids) + 1  # super server + edge servers
+        if actor_count < 1:
+            return {}
+        gpu_per_actor = max(0.0, requested_gpu / float(actor_count))
+        print(
+            f"Applying dynamic GPU allocation (HierFL): budget={self.gpu_budget}, "
+            f"actors={actor_count}, num_gpus_per_actor={gpu_per_actor}"
+        )
+        return {"num_gpus": gpu_per_actor}
 
         self.evaluator_actor = None
         self.eval_interval = 500 #TODO SET FROM OUTSIDE (stubs)
@@ -162,7 +203,7 @@ class HierarchicalSimulation:
         initial_weights = [val.cpu().numpy() for _, val in dummy_model.state_dict().items()]
 
         print(f"Spawning Super Server ({self.super_id})...")
-        self.super_actor = SuperServer.remote(
+        self.super_actor = SuperServer.options(**self._server_actor_options).remote(
             server_id=self.super_id,
             initial_parameters=initial_weights,
             required_updates=len(self.edge_ids),
@@ -172,7 +213,7 @@ class HierarchicalSimulation:
 
         print("Spawning Edge Servers...")
         for eid in self.edge_ids:
-            edge_actor = EdgeServer.remote(
+            edge_actor = EdgeServer.options(**self._server_actor_options).remote(
                 server_id=eid,
                 super_server_id=self.super_id,
                 super_server_ref=self.super_actor,
@@ -209,7 +250,8 @@ class HierarchicalSimulation:
         """Constructs the simulation environment, orchestrator, and actors."""
         initialize_environment()
 
-        self.orchestrator = SimulationOrchestrator.remote()
+        self._server_actor_options = self._resolve_server_actor_options()
+        self.orchestrator = SimulationOrchestrator.options(num_gpus=0.0).remote()
         self.context = SimulationContext(
             orchestrator_actor=self.orchestrator,
             client_registry=self.client_registry,
@@ -238,8 +280,8 @@ class HierarchicalSimulation:
             from telemetry.evaluator_actor import PeriodicEvaluator
             
             print(f"Spawning Periodic Evaluator (Interval: {self.eval_interval}s)...")
-            self.evaluator_actor = PeriodicEvaluator.remote(
-                run_id=self.run_id,
+            self.evaluator_actor = PeriodicEvaluator.options(num_gpus=0.0).remote(
+                run_id=str(self.run_id),
                 graph_id=self.graph_id,
                 architecture="hierarchical",
                 target_server_ref=self.super_actor,

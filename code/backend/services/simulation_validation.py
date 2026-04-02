@@ -40,6 +40,12 @@ def _validate_hierfl_payload(
         run_time_limit = simulation_settings.get("run_time_limit")
         if run_time_limit is not None:
             _parse_float_gt_zero(run_time_limit, "hierfl_invalid_run_time_limit")
+        eval_interval = simulation_settings.get("eval_interval")
+        if eval_interval is not None:
+            _parse_float_ge_zero(eval_interval, "hierfl_invalid_eval_interval")
+        gpu_budget = simulation_settings.get("gpu_budget")
+        if gpu_budget is not None:
+            _parse_float_ge_zero(gpu_budget, "hierfl_invalid_gpu_budget")
         seed = simulation_settings.get("seed")
         if seed is not None:
             _parse_int_ge_zero(seed, "hierfl_invalid_seed")
@@ -63,9 +69,15 @@ def _validate_spyker_payload(
         run_time_limit = simulation_settings.get("run_time_limit")
         if run_time_limit is not None:
             _parse_float_gt_zero(run_time_limit, "spyker_invalid_run_time_limit")
+        eval_interval = simulation_settings.get("eval_interval")
+        if eval_interval is not None:
+            _parse_float_ge_zero(eval_interval, "spyker_invalid_eval_interval")
         idle_token_delay = simulation_settings.get("idle_token_delay")
         if idle_token_delay is not None:
             _parse_float_ge_zero(idle_token_delay, "spyker_invalid_idle_token_delay")
+        gpu_budget = simulation_settings.get("gpu_budget")
+        if gpu_budget is not None:
+            _parse_float_ge_zero(gpu_budget, "spyker_invalid_gpu_budget")
         seed = simulation_settings.get("seed")
         if seed is not None:
             _parse_int_ge_zero(seed, "spyker_invalid_seed")

@@ -1,15 +1,9 @@
 import heapq
 import ray
-import yaml
 from typing import List
 from simulation.event import Event
 
-with open("/app/config.yaml", "r") as config_file:
-    global doc
-    doc = yaml.safe_load(config_file)
-
-
-@ray.remote(num_gpus=doc["num_gpus"])
+@ray.remote
 class SimulationOrchestrator:
     def __init__(self):
         self._event_heap: List[Event] = []

@@ -15,6 +15,7 @@
         (mousedown)="$event.stopPropagation()"
         (click)="onStartEdit($event)"
         aria-label="Knoten bearbeiten"
+        title="Edit"
       >
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
           <path
@@ -23,6 +24,17 @@
           />
         </svg>
       </button>
+      <button
+        *ngIf="!isEditing()"
+        pButton
+        type="button"
+        icon="pi pi-arrow-left"
+        class="action-button action-button--visible forward-button"
+        (mousedown)="$event.stopPropagation()"
+        (click)="onForwardNode($event)"
+        aria-label="Copy values to sidebar"
+        title="Fill in sidebar"
+      ></button>
       <button
         *ngIf="isEditing()"
         class="action-button save-button action-button--visible"
@@ -45,6 +57,7 @@
         (mousedown)="$event.stopPropagation()"
         (click)="onDelete($event)"
         aria-label="Knoten loeschen"
+        title="Delete"
       >
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
           <path
@@ -82,6 +95,7 @@
         *ngIf="isEditing()"
         class="spec-input"
         type="number"
+        step="0.1"
         [value]="editDraft().computeFactor"
         (mousedown)="$event.stopPropagation()"
         (click)="$event.stopPropagation()"
@@ -96,6 +110,7 @@
         *ngIf="isEditing()"
         class="spec-input"
         type="number"
+        step="0.1"
         [value]="editDraft().performanceSigma"
         (mousedown)="$event.stopPropagation()"
         (click)="$event.stopPropagation()"
