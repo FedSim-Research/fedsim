@@ -22,6 +22,11 @@ export class Shortcuts{
   protected messageService = inject(MessageService);
   protected elRef = inject(ElementRef) as ElementRef<HTMLElement>;
   public activeService = input.required<GraphServiceSpyker | GraphServiceHierach>();
+  private readonly nodeTypeMap = {
+    ClientNode,
+    ServerNode,
+    SuperServerNode,
+  } as const;
   private clipboard: Node[] = [];
   public selectedNodeIds: Set<string> = new Set();
   public selectedEdgeIds: Set<string> = new Set();
@@ -282,28 +287,18 @@ export class Shortcuts{
 
   public pasteCopiedNodes() {
     if (!this.clipboard.length) return;
-    const NODE_TYPE_MAP = {
-      ClientNode, ServerNode, SuperServerNode
-    } as const;
-
-    const isSpyker = this.activeService() instanceof GraphServiceSpyker;
+    const targetArchitecture = this.activeService() instanceof GraphServiceHierach ? 'hierfl' : 'spyker';
     let blockedSuperServer = false;
 
     const newNodeIds = this.clipboard.flatMap((node) => {
-      const newId = crypto.randomUUID();
-      const typeString = ((node as any).data as any)?.type;
-      if (isSpyker && typeString === 'SuperServerNode') {
+      const typeString = ((node as any).data as any)?.type as keyof typeof this.nodeTypeMap | undefined;
+      if (targetArchitecture === 'spyker' && typeString === 'SuperServerNode') {
         blockedSuperServer = true;
         return [];
       }
-      const newNode: Node = {
-        ...JSON.parse(JSON.stringify(node)),
-        id: newId,
-        type: typeString ? NODE_TYPE_MAP[typeString as keyof typeof NODE_TYPE_MAP] : undefined,
-        point: { x: (node.point?.x ?? 0) + 50, y: (node.point?.y ?? 0) + 50 },
-      };
+      const newNode = this.buildPastedNode(node, targetArchitecture, typeString);
       this.activeService().addNode(newNode);
-      return [newId];
+      return [newNode.id];
     });
 
     if (blockedSuperServer) {
@@ -319,6 +314,35 @@ export class Shortcuts{
     }
   }
 
+  private buildPastedNode(
+    sourceNode: Node,
+    targetArchitecture: 'spyker' | 'hierfl',
+    typeString?: keyof typeof this.nodeTypeMap
+  ): Node {
+    const clone = JSON.parse(JSON.stringify(sourceNode));
+    const data = ((clone as any).data as any) ?? {};
+    const config = (data.config as Record<string, unknown> | undefined) ?? {};
+    const nextData = {
+      ...data,
+      selected: false,
+      fromJson: false,
+      environment: targetArchitecture,
+      config: {
+        ...config,
+        environment: targetArchitecture,
+      },
+    } as Record<string, unknown>;
+    delete nextData['backendId'];
+
+    return {
+      ...clone,
+      id: crypto.randomUUID(),
+      type: typeString ? this.nodeTypeMap[typeString] : undefined,
+      point: { x: (sourceNode.point?.x ?? 0) + 50, y: (sourceNode.point?.y ?? 0) + 50 },
+      data: nextData,
+    };
+  }
+
   private async applyHistoryAction(action: 'undo' | 'redo'): Promise<void> {
     const service = this.activeService();
     if (!service) return;
@@ -331,8 +355,7 @@ export class Shortcuts{
     }
     const snapshot = history.getState();
     if (before === snapshot) return;
-    service.nodes.set(snapshot.nodes);
-    service.edges.set(snapshot.edges);
+    service.applyHistoryState(snapshot);
     const architecture = service instanceof GraphServiceHierach ? 'hierfl' : 'spyker';
     try {
       await this.graphPersistence.syncGraphState(service, architecture, false);
@@ -418,7 +441,7 @@ export class Shortcuts{
           const NODE_TYPE_MAP = {
             ClientNode, ServerNode, SuperServerNode
           } as const;
-          this.activeService().resetGraph();
+          await this.activeService().resetGraph();
           for (const nodeData of data.nodes) {
             const typeString = nodeData.data?.type;
             const node: Node = {

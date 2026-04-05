@@ -1,6 +1,6 @@
 import { Injectable, WritableSignal, signal, inject } from '@angular/core';
 import { Node, Edge, NodePositionChange } from 'ngx-vflow';
-import { GraphHistoryService } from './graph-history.service';
+import { GraphHistoryService, State } from './graph-history.service';
 import { GraphApiService } from './graph-api.service';
 import { EdgeMetrics, EDGE_METRIC_DEFAULTS } from '../models/edge-metrics';
 
@@ -21,6 +21,7 @@ export abstract class GraphService<T extends GraphHistoryService> {
   protected api = inject(GraphApiService);
   private graphId: number | null = null;
   private pendingEdgeConfig = new Map<string, EdgeMetrics>();
+  private pendingGraphReset: Promise<void> = Promise.resolve();
 
   protected constructor(protected graphHistory: T, private architecture: 'spyker' | 'hierfl'){}
 
@@ -45,14 +46,16 @@ export abstract class GraphService<T extends GraphHistoryService> {
   }
 
   public setGraphState(nodes: Node[], edges: Edge[], resetHistory: boolean): void {
-    this.nodes.set(nodes);
-    const normalizedEdges = edges.map((edge) => this.normalizeEdge(edge));
-    this.edges.set(normalizedEdges);
+    const snapshot = this.applyState(nodes, edges);
     if (resetHistory) {
-      this.graphHistory.resetHistory({ nodes, edges: normalizedEdges });
+      this.graphHistory.resetHistory(snapshot);
     } else {
-      this.graphHistory.saveState({ nodes, edges: normalizedEdges });
+      this.graphHistory.saveState(snapshot);
     }
+  }
+
+  public applyHistoryState(state: State): void {
+    this.applyState(state.nodes, state.edges);
   }
 
   public addNode(newNode: Node): void {
@@ -127,15 +130,26 @@ export abstract class GraphService<T extends GraphHistoryService> {
     void this.api.updateEdge(targetId, { config: normalized }).catch(() => undefined);
   }
 
-  public resetGraph(){
-    this.nodes.set([]);
-    this.edges.set([]);
-    this.graphHistory.resetHistory({nodes: this.nodes(), edges: this.edges()});
-    void this.resetGraphInBackend();
+  public async resetGraph(): Promise<void> {
+    const hadContent = this.nodes().length > 0 || this.edges().length > 0;
+    const emptyState = this.applyState([], []);
+    if (hadContent) {
+      this.graphHistory.saveState(emptyState);
+    } else {
+      this.graphHistory.resetHistory(emptyState);
+    }
+    this.pendingGraphReset = this.pendingGraphReset
+      .catch(() => undefined)
+      .then(() => this.resetGraphInBackend());
+    await this.pendingGraphReset;
   }
 
   public getGraphHistory(){
     return this.graphHistory
+  }
+
+  public async waitForGraphReady(): Promise<void> {
+    await this.pendingGraphReset.catch(() => undefined);
   }
 
   public updateNodePositions(posChanges: NodePositionChange[]){
@@ -177,6 +191,17 @@ export abstract class GraphService<T extends GraphHistoryService> {
     const updatedConfig =
       ((updatedNode?.data?.['config'] as Record<string, unknown>) ?? configPatch);
     void this.api.updateNode(backendId, { config: updatedConfig }).catch(() => undefined);
+  }
+
+  protected onStateApplied(_state: State): void {}
+
+  private applyState(nodes: Node[], edges: Edge[]): State {
+    const normalizedEdges = edges.map((edge) => this.normalizeEdge(edge));
+    const snapshot = { nodes, edges: normalizedEdges };
+    this.nodes.set(nodes);
+    this.edges.set(normalizedEdges);
+    this.onStateApplied(snapshot);
+    return snapshot;
   }
 
   private normalizeEdge(edge: Edge): EdgeWithData {
@@ -231,7 +256,8 @@ export abstract class GraphService<T extends GraphHistoryService> {
     return Math.min(max, boundedMin);
   }
 
-  protected persistCreateNode(newNode: Node): void {
+  protected async persistCreateNode(newNode: Node): Promise<void> {
+    await this.waitForGraphReady();
     if (this.graphId === null) return;
     const data = (newNode as NodeWithData).data ?? {};
     const point = (newNode as any)?.point ?? {};
@@ -273,7 +299,8 @@ export abstract class GraphService<T extends GraphHistoryService> {
     }).catch(() => undefined);
   }
 
-  protected persistCreateEdge(newEdge: Edge): void {
+  protected async persistCreateEdge(newEdge: Edge): Promise<void> {
+    await this.waitForGraphReady();
     if (this.graphId === null) return;
     const edgeInState = this.edges().find((edge) => edge.id === newEdge.id) as EdgeWithData | undefined;
     const existingBackendId = edgeInState?.data?.backendId;
@@ -318,7 +345,8 @@ export abstract class GraphService<T extends GraphHistoryService> {
     }
   }
 
-  private persistPositionUpdates(posChanges: NodePositionChange[]): void {
+  private async persistPositionUpdates(posChanges: NodePositionChange[]): Promise<void> {
+    await this.waitForGraphReady();
     if (this.graphId === null) return;
     for (const change of posChanges) {
       const node = this.nodes().find((n) => n.id === change.id) as NodeWithData | undefined;
@@ -328,17 +356,20 @@ export abstract class GraphService<T extends GraphHistoryService> {
     }
   }
 
-  private resetGraphInBackend(): void {
-    if (this.graphId !== null) {
-      void this.api.deleteGraph(this.graphId).catch(() => undefined);
+  private async resetGraphInBackend(): Promise<void> {
+    const graphIdToDelete = this.graphId;
+    this.setGraphId(null);
+    if (graphIdToDelete !== null) {
+      await this.api.deleteGraph(graphIdToDelete).catch(() => undefined);
     }
-    void this.api.createGraph({
+    const created = await this.api.createGraph({
       name: `${this.architecture}-graph`,
       architecture: this.architecture,
       metadata: null,
-    }).then((created) => {
+    }).catch(() => null);
+    if (created) {
       this.setGraphId(created.graph_id);
-    }).catch(() => undefined);
+    }
   }
 
   private storageKey(): string {

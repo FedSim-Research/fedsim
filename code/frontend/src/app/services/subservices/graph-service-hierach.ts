@@ -3,6 +3,7 @@ import { GraphService } from '../graph-service';
 import { Edge, Node } from 'ngx-vflow';
 import { SuperServerNode } from '../../components/nodes/super-server-node/super-server-node';
 import { GraphHistoryServiceHierach } from './graph-history-service-hierach';
+import { State } from '../graph-history.service';
 
 @Injectable({
   providedIn: 'root',
@@ -32,5 +33,9 @@ export class GraphServiceHierach extends GraphService<GraphHistoryServiceHierach
       this.hasSuperServer = false;
     }
     super.removeNodeById(nodeId);
+  }
+
+  protected override onStateApplied(state: State): void {
+    this.hasSuperServer = state.nodes.some((node) => node.type === SuperServerNode);
   }
 }

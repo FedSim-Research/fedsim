@@ -78,11 +78,11 @@ export class App implements OnInit{
     void this.graphPersistence.initializeGraph(this.graphServiceHierach, 'hierfl', false);
   }
 
-  public handleReset() {
+  public async handleReset() {
     if (this.activeMode()=='hierfl'){
-      this.graphServiceHierach.resetGraph();
+      await this.graphServiceHierach.resetGraph();
     } else if (this.activeMode()=='spyker') {
-      this.graphServiceSpyker.resetGraph();
+      await this.graphServiceSpyker.resetGraph();
     }
   }
 
@@ -159,9 +159,12 @@ export class App implements OnInit{
     history.undo();
     const after = history.getState();
     if (before === after) return;
-    this.activeGraph().nodes.set(after.nodes);
-    this.activeGraph().edges.set(after.edges);
-    await this.graphPersistence.syncGraphState(this.activeGraph(), this.activeMode(), false);
+    this.activeGraph().applyHistoryState(after);
+    try {
+      await this.graphPersistence.syncGraphState(this.activeGraph(), this.activeMode(), false);
+    } catch {
+      this.showErrorToast('Undo could not be saved to the backend.');
+    }
   }
 
   public async redo(){
@@ -170,9 +173,12 @@ export class App implements OnInit{
     history.redo();
     const after = history.getState();
     if (before === after) return;
-    this.activeGraph().nodes.set(after.nodes);
-    this.activeGraph().edges.set(after.edges);
-    await this.graphPersistence.syncGraphState(this.activeGraph(), this.activeMode(), false);
+    this.activeGraph().applyHistoryState(after);
+    try {
+      await this.graphPersistence.syncGraphState(this.activeGraph(), this.activeMode(), false);
+    } catch {
+      this.showErrorToast('Redo could not be saved to the backend.');
+    }
   }
 
   public reloadUI(){
@@ -367,7 +373,7 @@ export class App implements OnInit{
 
     const resolved = isHier ? this.normalizeHierConnection(connection) : this.normalizeSpykerConnection(connection);
 
-    if (isHier && (sourceType === 'ClientNode' || targetType === 'ClientNode')) {
+    if (sourceType === 'ClientNode' || targetType === 'ClientNode') {
       const clientId = sourceType === 'ClientNode' ? connection.source : connection.target;
       if (this.edges().some(e => e.source === clientId || e.target === clientId)) {
         return false;

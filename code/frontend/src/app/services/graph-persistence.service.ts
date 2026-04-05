@@ -6,6 +6,7 @@ import { ClientNode } from '../components/nodes/client-node/client-node';
 import { ServerNode } from '../components/nodes/server-node/server-node';
 import { SuperServerNode } from '../components/nodes/super-server-node/super-server-node';
 import { EdgeMetrics, EDGE_METRIC_DEFAULTS } from '../models/edge-metrics';
+import { State } from './graph-history.service';
 
 const NODE_TYPE_MAP = {
   ClientNode: ClientNode,
@@ -63,6 +64,21 @@ export class GraphPersistenceService {
   }
 
   private applyGraph(service: GraphService<any>, architecture: Architecture, graph: GraphDetail): void {
+    const snapshot = this.toStateSnapshot(architecture, graph);
+    service.setGraphState(snapshot.nodes, snapshot.edges, true);
+  }
+
+  private reconcileGraph(service: GraphService<any>, architecture: Architecture, graph: GraphDetail): void {
+    const backendSnapshot = this.toStateSnapshot(architecture, graph);
+    const mergedSnapshot = this.mergeBackendState(service, backendSnapshot);
+    service.applyHistoryState(mergedSnapshot);
+    service.getGraphHistory().replaceCurrentState({
+      nodes: service.nodes(),
+      edges: service.edges(),
+    });
+  }
+
+  private toStateSnapshot(architecture: Architecture, graph: GraphDetail): State {
     const nodes: Node[] = [];
     const externalByBackendId = new Map<string, string>();
 
@@ -107,7 +123,54 @@ export class GraphPersistenceService {
       });
     }
 
-    service.setGraphState(nodes, edges, true);
+    return { nodes, edges };
+  }
+
+  private mergeBackendState(service: GraphService<any>, backendSnapshot: State): State {
+    const backendNodes = new Map(
+      backendSnapshot.nodes.map((node) => [node.id, node] as const)
+    );
+    const backendEdges = new Map(
+      backendSnapshot.edges.map((edge) => [`${edge.source}->${edge.target}`, edge] as const)
+    );
+
+    const nodes = service.nodes().map((node) => {
+      const backendNode = backendNodes.get(node.id);
+      if (!backendNode) {
+        return node;
+      }
+      const currentData = (node as any).data ?? {};
+      const backendData = (backendNode as any).data ?? {};
+      return {
+        ...node,
+        data: {
+          ...currentData,
+          ...backendData,
+          config: backendData.config ?? currentData.config ?? {},
+          selected: currentData.selected ?? false,
+        },
+      } as Node;
+    });
+
+    const edges = service.edges().map((edge) => {
+      const backendEdge = backendEdges.get(`${edge.source}->${edge.target}`);
+      if (!backendEdge) {
+        return edge;
+      }
+      const currentData = (edge as any).data ?? {};
+      const backendData = (backendEdge as any).data ?? {};
+      return {
+        ...edge,
+        data: {
+          ...currentData,
+          ...backendData,
+          metrics: backendData.metrics ?? currentData.metrics ?? EDGE_METRIC_DEFAULTS,
+          selected: currentData.selected ?? false,
+        },
+      } as Edge;
+    });
+
+    return { nodes, edges };
   }
 
   public async syncGraphState(
@@ -115,12 +178,15 @@ export class GraphPersistenceService {
     architecture: Architecture,
     refreshFromBackend: boolean = true
   ): Promise<void> {
+    await service.waitForGraphReady();
     const graphId = service.getGraphId() ?? service.loadGraphIdFromStorage();
     if (graphId === null) return;
     const payload = this.buildVflowGraph(service, architecture);
     const updated = await this.api.replaceGraphState(graphId, payload);
     if (refreshFromBackend) {
       this.applyGraph(service, architecture, updated);
+    } else {
+      this.reconcileGraph(service, architecture, updated);
     }
     service.setGraphId(graphId);
   }
