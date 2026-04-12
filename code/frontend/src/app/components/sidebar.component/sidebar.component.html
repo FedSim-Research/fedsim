@@ -254,7 +254,12 @@
 <p-toast position="top-right" />
 
 @if (showSimulationpopup) {
-<app-start-popup (close)="closeSimulationpopup()" (run)="runSimulation($event)"> </app-start-popup>
+<app-start-popup
+  [hierflGraphId]="hierflGraphId"
+  [spykerGraphId]="spykerGraphId"
+  (close)="closeSimulationpopup()"
+  (run)="runSimulation($event)">
+</app-start-popup>
 }
 
 @if (showSuperServerBlueprintPopup) {

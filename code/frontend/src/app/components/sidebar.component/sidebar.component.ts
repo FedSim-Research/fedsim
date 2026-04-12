@@ -103,6 +103,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
   @ViewChild('supDetails') private supDetails?: ElementRef<HTMLDetailsElement>;
 
   @Input() shortcuts?: Shortcuts;
+  @Input() hierflGraphId: number | null = null;
+  @Input() spykerGraphId: number | null = null;
   @Output() resetGraph = new EventEmitter<void>();
   @Output() modeChange = new EventEmitter<'spyker' | 'hierfl'>();
   @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();

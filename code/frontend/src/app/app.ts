@@ -62,6 +62,14 @@ export class App implements OnInit{
     return this.activeGraph().edges();
   });
 
+  public hierflGraphId(): number | null {
+    return this.graphServiceHierach.getGraphId() ?? this.graphServiceHierach.loadGraphIdFromStorage();
+  }
+
+  public spykerGraphId(): number | null {
+    return this.graphServiceSpyker.getGraphId() ?? this.graphServiceSpyker.loadGraphIdFromStorage();
+  }
+
   private _dragging = false;
   private _dragCooldown = false;
   
