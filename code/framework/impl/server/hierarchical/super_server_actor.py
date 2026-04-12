@@ -1,6 +1,5 @@
 import ray
 import numpy as np
-import yaml
 from typing import List, Dict, Any, Tuple
 
 from server.server_actor import BaseAsyncServer
@@ -9,13 +8,7 @@ from simulation.context import SimulationContext, set_global_context
 
 SERVER_MESSAGE = "SERVER_MESSAGE"
 
-
-with open("config.yaml", "r") as config_file:
-    global doc
-    doc = yaml.load(config_file, Loader=yaml.SafeLoader)
-
-
-@ray.remote(num_gpus=doc["num_gpus"])
+@ray.remote
 class SuperServer(BaseAsyncServer):
     def __init__(
         self,
@@ -45,6 +38,12 @@ class SuperServer(BaseAsyncServer):
         """
         self.edge_server_refs = edge_server_refs
         print(f"[SuperServer] Registered {len(edge_server_refs)} edge servers.")
+
+    def get_metrics(self) -> Dict[str, Any]:
+        return {
+            "model_age": self.model_age,
+            "pending_updates": len(self.updates_buffer)
+        }
 
     def start_simulation(self):
         """

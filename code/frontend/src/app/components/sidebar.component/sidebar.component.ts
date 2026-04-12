@@ -103,6 +103,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
   @ViewChild('supDetails') private supDetails?: ElementRef<HTMLDetailsElement>;
 
   @Input() shortcuts?: Shortcuts;
+  @Input() hierflGraphId: number | null = null;
+  @Input() spykerGraphId: number | null = null;
   @Output() resetGraph = new EventEmitter<void>();
   @Output() modeChange = new EventEmitter<'spyker' | 'hierfl'>();
   @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
@@ -110,11 +112,11 @@ export class SidebarComponent implements OnInit, OnDestroy {
     mode: 'spyker' | 'hierfl' | 'both';
     hierfl: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; seed: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; outputFilename: string; evaluateModel: boolean };
     };
     spyker: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; seed: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
       spykerConfig: {
         decayBeta: number;
         minLearningRate: number;
@@ -966,11 +968,11 @@ export class SidebarComponent implements OnInit, OnDestroy {
     mode: 'spyker' | 'hierfl' | 'both';
     hierfl: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; seed: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; outputFilename: string; evaluateModel: boolean };
     };
     spyker: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; seed: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
       spykerConfig: {
         decayBeta: number;
         minLearningRate: number;

@@ -2,7 +2,6 @@ import numpy as np
 import ray
 import random
 import math
-import yaml
 from typing import Dict, Any, Tuple, List, Optional
 
 from flwr.common import (
@@ -22,13 +21,7 @@ from simulation.network_model import estimate_transmission_time
 from client.simulation_client import SimulationFlowerClient
 from client.virtual_client import VirtualClient
 
-
-with open("config.yaml", "r") as config_file:
-    global doc
-    doc = yaml.load(config_file, Loader=yaml.SafeLoader)
-
-
-@ray.remote(num_gpus=doc["num_gpus"])
+@ray.remote
 class SpykerServer(BaseAsyncServer):
     def __init__(
         self, server_id: str, config: FullConfiguration, context: SimulationContext
@@ -104,15 +97,30 @@ class SpykerServer(BaseAsyncServer):
         for peer in peer_connections:
             self.server_ages[peer] = 0
 
-    def register_clients(self, client_objects: Dict[str, SimulationFlowerClient]):
+    def register_clients(self, client_configs: Dict[str, Any]):
         """
-        Wraps the raw SimulationFlowerClient objects in the VirtualClient logic.
+        Receives configuration dictionaries for clients and instantiates the 
+        PyTorch DataLoaders safely inside the Ray worker memory space.
         """
-        for c_id, inner_client in client_objects.items():
+        for c_id, config in client_configs.items():
+            inner_client = SimulationFlowerClient(
+                partition_id=config["dataset_partition_id"],
+                num_partitions=config["total_partitions"],
+                seed=config.get("seed")
+            )
+
             self.assigned_client_instances[c_id] = VirtualClient(c_id, inner_client)
 
     def set_token_holder(self, is_holder: bool):
         self.has_token = is_holder
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """Returns Spyker specific metrics for telemetry."""
+        return {
+            "model_age": self.model_age,
+            "total_client_updates": sum(self.client_update_counts.values()),
+            "has_token": int(self.has_token)
+        }
 
     # ==============================================================
 

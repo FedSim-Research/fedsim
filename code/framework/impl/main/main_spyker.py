@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from typing import Dict, List, Any, Tuple
+import uuid
 
 import ray
 import torch
@@ -36,20 +37,59 @@ class DataLoaderAdapter:
         return len(self.loader)
 
 class SpykerSimulation:
-    def __init__(self):
+    def __init__(self, gpu_budget: float | None = None):
+        self.gpu_budget = gpu_budget
         self.server_ids = []
         self.client_ids = []
 
         self.client_registry: Dict[str, ClientSpec] = {}
         self.server_registry: Dict[str, ServerSpec] = {}
 
-        self.client_map: Dict[str, List[Tuple[str, SimulationFlowerClient]]] = {}
+        self.client_map: Dict[str, List[Tuple[str, Any]]] = {}
 
         self.config = FullConfiguration()
 
         self.context = None
         self.orchestrator = None
         self.spyker_actors_map: Dict[str, Any] = {}
+        self._server_actor_options: dict[str, float] = {}
+
+    def _resolve_server_actor_options(self) -> dict[str, float]:
+        if self.gpu_budget is None:
+            return {}
+        available_gpu = float(ray.available_resources().get("GPU", 0.0))
+        requested_gpu = max(0.0, float(self.gpu_budget))
+        if available_gpu <= 1e-3 and requested_gpu > 0.0:
+            print(
+                "Spyker GPU budget requested but effective cluster GPU capacity is near zero; "
+                "falling back to CPU actor placement."
+            )
+            requested_gpu = 0.0
+        elif requested_gpu > available_gpu + 1e-9:
+            print(
+                f"Spyker GPU budget exceeds available resources; capping budget "
+                f"from {requested_gpu} to {available_gpu}."
+            )
+            requested_gpu = available_gpu
+        actor_count = len(self.server_ids)
+        if actor_count < 1:
+            return {}
+        gpu_per_actor = max(0.0, requested_gpu / float(actor_count))
+        print(
+            f"Applying dynamic GPU allocation (Spyker): budget={self.gpu_budget}, "
+            f"actors={actor_count}, num_gpus_per_actor={gpu_per_actor}"
+        )
+        return {"num_gpus": gpu_per_actor}
+
+        self.run_id = f"run_{uuid.uuid4().hex[:6]}"
+        self.graph_id = "default_graph"
+        self.eval_interval = 0.0 # disabled
+        self.evaluator_actor = None
+
+        self.run_id = f"run_{uuid.uuid4().hex[:6]}"
+        self.graph_id = "default_graph"
+        self.eval_interval = 0.0 # disabled
+        self.evaluator_actor = None
 
     def set_configurations(self, 
                            spyker_params: Dict[str, Any],
@@ -84,6 +124,15 @@ class SpykerSimulation:
         print(f"  > Run Limit: {self.config.simulation.run_time_limit}s")
         print(f"  > Epochs: {self.config.training.local_epochs}")
         print(f"  > Token Heartbeat: {self.config.simulation.idle_token_delay}s")
+
+    def set_metadata(self, run_id: str, graph_id: str, eval_interval: float | None = None):
+        """Configure telemetry settings."""
+        if run_id: self.run_id = run_id
+        if graph_id: self.graph_id = graph_id
+        if eval_interval is None:
+            self.eval_interval = self.config.simulation.eval_time_delay
+        else:
+            self.eval_interval = max(0.0, float(eval_interval))
 
     def add_server(
             self, 
@@ -136,8 +185,12 @@ class SpykerSimulation:
             upload_speed=upload_speed
         )
 
-        sim_client = SimulationFlowerClient(dataset_partition_id, total_partitions, seed=seed)
-        self.client_map[server_id].append((client_id, sim_client))
+        client_config = {
+        "dataset_partition_id": dataset_partition_id,
+        "total_partitions": total_partitions,
+        "seed": seed
+    }
+        self.client_map[server_id].append((client_id, client_config))
 
     def _spawn_actors(self):
         if not self.server_ids:
@@ -149,14 +202,14 @@ class SpykerSimulation:
                 "First spyker server must have at least one client to initialize global model."
             )
         
-        first_client_sim = self.client_map[first_server][0][1]
-        initial_params = first_client_sim.get_parameters(config={})
-        initial_weights_np = parameters_to_ndarrays(initial_params)
+        from main.task import Net
+        dummy_model = Net()
+        initial_weights_np = [val.cpu().numpy() for _, val in dummy_model.state_dict().items()]
 
         print(f"Spawning {len(self.server_ids)} Spyker Servers...")
 
         for s_id in self.server_ids:
-            actor = SpykerServer.remote(
+            actor = SpykerServer.options(**self._server_actor_options).remote(
                 server_id=s_id,
                 config=self.config,
                 context=self.context
@@ -176,11 +229,11 @@ class SpykerSimulation:
             ray.get(actor.set_initial_weights.remote(initial_weights_np))
 
             # Register Clients
-            assigned_clients = {
-                c_id: sim_client
-                for c_id, sim_client in self.client_map[s_id]
+            assigned_client_configs = {
+                c_id: client_config 
+                for c_id, client_config in self.client_map[s_id]
             }
-            ray.get(actor.register_clients.remote(assigned_clients))
+            ray.get(actor.register_clients.remote(assigned_client_configs))
     
     def _configure_network(self):
         print("Wiring Spyker Mesh and Token Ring...")
@@ -215,7 +268,8 @@ class SpykerSimulation:
     def build(self):
         initialize_environment()
 
-        self.orchestrator = SimulationOrchestrator.remote()
+        self._server_actor_options = self._resolve_server_actor_options()
+        self.orchestrator = SimulationOrchestrator.options(num_gpus=0.0).remote()
 
         self.context = SimulationContext(
             orchestrator_actor=self.orchestrator,
@@ -234,8 +288,28 @@ class SpykerSimulation:
             raise RuntimeError("Simulation not built. Call build() first.")
         
         print("Initializing Spyker simulation...")
+        all_initial_events =[]
 
-        all_initial_events = []
+        # Telemetry
+        if self.eval_interval > 0:
+            from telemetry.evaluator_actor import PeriodicEvaluator
+            
+            # Use Server 0 as the representative model to evaluate
+            target_srv = self.spyker_actors_map[self.server_ids[0]]
+            
+            self.evaluator_actor = PeriodicEvaluator.remote(
+                run_id=self.run_id,
+                graph_id=self.graph_id,
+                architecture="spyker",
+                target_server_ref=target_srv,
+                orchestrator_ref=self.orchestrator,
+                evaluation_interval=self.eval_interval
+            )
+
+            eval_events = ray.get(self.evaluator_actor.start.remote())
+            if eval_events:
+                all_initial_events.extend(eval_events)
+
         for s_id, actor in self.spyker_actors_map.items():
             events = ray.get(actor.start_simulation.remote())
             if events:
@@ -249,7 +323,6 @@ class SpykerSimulation:
         limit = self.config.simulation.run_time_limit
 
         ray.get(self.orchestrator.run_until.remote(limit))
-
         print("Simulation execution finished")
 
     def save_model(self, filename: str):

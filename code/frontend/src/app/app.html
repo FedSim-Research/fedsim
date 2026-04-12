@@ -44,6 +44,8 @@
   </ngx-selecto>
   <app-sidebar
     [shortcuts]="shortcuts"
+    [hierflGraphId]="hierflGraphId()"
+    [spykerGraphId]="spykerGraphId()"
     (resetGraph)="handleReset()"
     (undoRequested)="undo()"
     (redoRequested)="redo()"

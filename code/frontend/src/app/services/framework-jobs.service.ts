@@ -1,6 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
 
-export type FrameworkJobStatus = 'running' | 'completed' | 'failed';
+export type FrameworkJobStatus = 'queued' | 'running' | 'completed' | 'failed';
 
 export interface FrameworkJob {
   id: string;
@@ -15,7 +15,7 @@ export class FrameworkJobsService {
   private jobsState = signal<FrameworkJob[]>([]);
   public jobs = this.jobsState.asReadonly();
   public runningCount = computed(
-    () => this.jobsState().filter((job) => job.status !== 'completed').length
+    () => this.jobsState().filter((job) => job.status === 'queued' || job.status === 'running').length
   );
 
   public startJob(title: string): string {
@@ -23,11 +23,24 @@ export class FrameworkJobsService {
     const next: FrameworkJob = {
       id,
       title,
-      status: 'running',
+      status: 'queued',
       startedAt: Date.now(),
     };
     this.jobsState.update((jobs) => [next, ...jobs]);
     return id;
+  }
+
+  public markRunning(id: string): void {
+    this.jobsState.update((jobs) =>
+      jobs.map((job) =>
+        job.id === id
+          ? {
+              ...job,
+              status: 'running',
+            }
+          : job
+      )
+    );
   }
 
   public markCompleted(id: string): void {

@@ -46,27 +46,35 @@
                   <div class="grid">
                     <label class="field">
                       <span class="field-label">Epochs <span class="help-dot" title="Number of local training passes per client before aggregation.">?</span></span>
-                      <input type="number" min="1" [(ngModel)]="hierflSettings.epochs" />
+                      <input type="number" min="1" [(ngModel)]="hierflSettings.epochs" (ngModelChange)="onSettingsChanged()" />
                     </label>
                     <label class="field">
                       <span class="field-label">Learning rate <span class="help-dot" title="Step size used by the optimizer during local training.">?</span></span>
-                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(hierflSettings.lr)" (ngModelChange)="hierflSettings.lr = parseDecimalInput($event, hierflSettings.lr)" />
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(hierflSettings.lr)" (ngModelChange)="hierflSettings.lr = parseDecimalInput($event, hierflSettings.lr); onSettingsChanged()" />
                     </label>
                     <label class="field">
                       <span class="field-label">Model complexity <span class="help-dot" title="Scaling factor for simulated compute effort per training step.">?</span></span>
-                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(hierflSettings.modelComplexity)" (ngModelChange)="hierflSettings.modelComplexity = parseDecimalInput($event, hierflSettings.modelComplexity)" />
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(hierflSettings.modelComplexity)" (ngModelChange)="hierflSettings.modelComplexity = parseDecimalInput($event, hierflSettings.modelComplexity); onSettingsChanged()" />
                     </label>
                     <label class="field">
                       <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>
-                      <input type="number" min="1" step="1" [(ngModel)]="hierflSettings.runTimeLimit" />
+                      <input type="number" min="1" step="1" [(ngModel)]="hierflSettings.runTimeLimit" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Eval interval (s) <span class="help-dot" title="Periodic evaluation interval in virtual seconds. 0 disables periodic evaluation.">?</span></span>
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(hierflSettings.evalInterval)" (ngModelChange)="hierflSettings.evalInterval = parseDecimalInput($event, hierflSettings.evalInterval); onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">GPU budget <span class="help-dot" title="Total GPU share for this run. 0 means CPU only.">?</span></span>
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(hierflSettings.gpuBudget)" (ngModelChange)="hierflSettings.gpuBudget = parseDecimalInput($event, hierflSettings.gpuBudget); onSettingsChanged()" />
                     </label>
                     <label class="field">
                       <span class="field-label">Seed <span class="help-dot" title="Controls random operations for reproducible runs.">?</span></span>
-                      <input type="number" min="0" step="1" [(ngModel)]="hierflSettings.seed" />
+                      <input type="number" min="0" step="1" [(ngModel)]="hierflSettings.seed" (ngModelChange)="onSettingsChanged()" />
                     </label>
                     <label class="field">
                       <span class="field-label">Output filename <span class="help-dot" title="Target file path/name used to store the final model checkpoint.">?</span></span>
-                      <input type="text" [(ngModel)]="hierflSettings.outputFilename" />
+                      <input type="text" [(ngModel)]="hierflSettings.outputFilename" (ngModelChange)="onSettingsChanged()" />
                     </label>
                   </div>
                 </section>
@@ -77,7 +85,7 @@
                 @if (canStartFromHierflStep()) {
                 <div class="step-actions-right">
                   <label class="field checkbox field-checkbox-inline">
-                    <input type="checkbox" [(ngModel)]="evaluateAfterRun" />
+                    <input type="checkbox" [(ngModel)]="evaluateAfterRun" (ngModelChange)="onEvaluateAfterRunChanged($event)" />
                     <span class="field-label">Evaluate after run <span class="help-dot" title="Runs post-training evaluation and returns accuracy/loss.">?</span></span>
                   </label>
                   <button class="nav-btn nav-btn--primary" (click)="onRun()">Start</button>
@@ -101,31 +109,39 @@
                   <div class="grid">
                     <label class="field">
                       <span class="field-label">Epochs <span class="help-dot" title="Number of local training passes per client before aggregation.">?</span></span>
-                      <input type="number" min="1" [(ngModel)]="spykerSettings.epochs" />
+                      <input type="number" min="1" [(ngModel)]="spykerSettings.epochs" (ngModelChange)="onSettingsChanged()" />
                     </label>
                     <label class="field">
                       <span class="field-label">Learning rate <span class="help-dot" title="Step size used by the optimizer during local training.">?</span></span>
-                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.lr)" (ngModelChange)="spykerSettings.lr = parseDecimalInput($event, spykerSettings.lr)" />
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.lr)" (ngModelChange)="spykerSettings.lr = parseDecimalInput($event, spykerSettings.lr); onSettingsChanged()" />
                     </label>
                     <label class="field">
                       <span class="field-label">Model complexity <span class="help-dot" title="Scaling factor for simulated compute effort per training step.">?</span></span>
-                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.modelComplexity)" (ngModelChange)="spykerSettings.modelComplexity = parseDecimalInput($event, spykerSettings.modelComplexity)" />
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.modelComplexity)" (ngModelChange)="spykerSettings.modelComplexity = parseDecimalInput($event, spykerSettings.modelComplexity); onSettingsChanged()" />
                     </label>
                     <label class="field">
                       <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>
-                      <input type="number" min="1" step="1" [(ngModel)]="spykerSettings.runTimeLimit" />
+                      <input type="number" min="1" step="1" [(ngModel)]="spykerSettings.runTimeLimit" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Eval interval (s) <span class="help-dot" title="Periodic evaluation interval in virtual seconds. 0 disables periodic evaluation.">?</span></span>
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.evalInterval)" (ngModelChange)="spykerSettings.evalInterval = parseDecimalInput($event, spykerSettings.evalInterval); onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">GPU budget <span class="help-dot" title="Total GPU share for this run. 0 means CPU only.">?</span></span>
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.gpuBudget)" (ngModelChange)="spykerSettings.gpuBudget = parseDecimalInput($event, spykerSettings.gpuBudget); onSettingsChanged()" />
                     </label>
                     <label class="field">
                       <span class="field-label">Seed <span class="help-dot" title="Controls random operations for reproducible runs.">?</span></span>
-                      <input type="number" min="0" step="1" [(ngModel)]="spykerSettings.seed" />
+                      <input type="number" min="0" step="1" [(ngModel)]="spykerSettings.seed" (ngModelChange)="onSettingsChanged()" />
                     </label>
                     <label class="field">
                       <span class="field-label">Idle token delay (s) <span class="help-dot" title="Delay before token forwarding when no immediate sync is triggered.">?</span></span>
-                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.idleTokenDelay)" (ngModelChange)="spykerSettings.idleTokenDelay = parseDecimalInput($event, spykerSettings.idleTokenDelay)" />
+                      <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.idleTokenDelay)" (ngModelChange)="spykerSettings.idleTokenDelay = parseDecimalInput($event, spykerSettings.idleTokenDelay); onSettingsChanged()" />
                     </label>
                     <label class="field">
                       <span class="field-label">Output filename <span class="help-dot" title="Target file path/name used to store the final model checkpoint.">?</span></span>
-                      <input type="text" [(ngModel)]="spykerSettings.outputFilename" />
+                      <input type="text" [(ngModel)]="spykerSettings.outputFilename" (ngModelChange)="onSettingsChanged()" />
                     </label>
                   </div>
                   <div class="sim-settings-section sim-settings-section--separated">
@@ -133,31 +149,31 @@
                     <div class="grid">
                       <label class="field">
                         <span class="field-label">Decay beta <span class="help-dot" title="Decay factor for reducing contribution of frequently-updating clients.">?</span></span>
-                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.decayBeta)" (ngModelChange)="spykerSettings.decayBeta = parseDecimalInput($event, spykerSettings.decayBeta)" />
+                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.decayBeta)" (ngModelChange)="spykerSettings.decayBeta = parseDecimalInput($event, spykerSettings.decayBeta); onSettingsChanged()" />
                       </label>
                       <label class="field">
                         <span class="field-label">Min learning rate <span class="help-dot" title="Lower bound for client contribution scaling during decay.">?</span></span>
-                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.minLearningRate)" (ngModelChange)="spykerSettings.minLearningRate = parseDecimalInput($event, spykerSettings.minLearningRate)" />
+                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.minLearningRate)" (ngModelChange)="spykerSettings.minLearningRate = parseDecimalInput($event, spykerSettings.minLearningRate); onSettingsChanged()" />
                       </label>
                       <label class="field">
                         <span class="field-label">h_inter <span class="help-dot" title="Inter-server drift threshold to trigger synchronization.">?</span></span>
-                        <input type="number" min="1" step="1" [(ngModel)]="spykerSettings.hInter" />
+                        <input type="number" min="1" step="1" [(ngModel)]="spykerSettings.hInter" (ngModelChange)="onSettingsChanged()" />
                       </label>
                       <label class="field">
                         <span class="field-label">h_intra <span class="help-dot" title="Intra-server drift threshold to trigger synchronization.">?</span></span>
-                        <input type="number" min="1" step="1" [(ngModel)]="spykerSettings.hIntra" />
+                        <input type="number" min="1" step="1" [(ngModel)]="spykerSettings.hIntra" (ngModelChange)="onSettingsChanged()" />
                       </label>
                       <label class="field">
                         <span class="field-label">Sigmoid phi <span class="help-dot" title="Sharpness parameter for weighting server-side aggregation.">?</span></span>
-                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.sigmoidPhi)" (ngModelChange)="spykerSettings.sigmoidPhi = parseDecimalInput($event, spykerSettings.sigmoidPhi)" />
+                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.sigmoidPhi)" (ngModelChange)="spykerSettings.sigmoidPhi = parseDecimalInput($event, spykerSettings.sigmoidPhi); onSettingsChanged()" />
                       </label>
                       <label class="field">
                         <span class="field-label">Server learning rate <span class="help-dot" title="Server-side aggregation learning rate.">?</span></span>
-                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.serverLearningRate)" (ngModelChange)="spykerSettings.serverLearningRate = parseDecimalInput($event, spykerSettings.serverLearningRate)" />
+                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.serverLearningRate)" (ngModelChange)="spykerSettings.serverLearningRate = parseDecimalInput($event, spykerSettings.serverLearningRate); onSettingsChanged()" />
                       </label>
                       <label class="field">
                         <span class="field-label">TCP RTO delay <span class="help-dot" title="Simulated TCP retransmission timeout delay.">?</span></span>
-                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.tcpRtoDelay)" (ngModelChange)="spykerSettings.tcpRtoDelay = parseDecimalInput($event, spykerSettings.tcpRtoDelay)" />
+                        <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.tcpRtoDelay)" (ngModelChange)="spykerSettings.tcpRtoDelay = parseDecimalInput($event, spykerSettings.tcpRtoDelay); onSettingsChanged()" />
                       </label>
                     </div>
                   </div>
@@ -168,7 +184,7 @@
                 <button class="nav-btn" (click)="previousFromSpyker()">Back</button>
                 <div class="step-actions-right">
                   <label class="field checkbox field-checkbox-inline">
-                    <input type="checkbox" [(ngModel)]="evaluateAfterRun" />
+                    <input type="checkbox" [(ngModel)]="evaluateAfterRun" (ngModelChange)="onEvaluateAfterRunChanged($event)" />
                     <span class="field-label">Evaluate after run <span class="help-dot" title="Runs post-training evaluation and returns accuracy/loss.">?</span></span>
                   </label>
                   <button class="nav-btn nav-btn--primary" (click)="onRun()">Start</button>

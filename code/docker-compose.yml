@@ -14,8 +14,12 @@ services:
       - HF_HOME=/hf-cache
       - HF_DATASETS_CACHE=/hf-cache/datasets
       - TRANSFORMERS_CACHE=/hf-cache/transformers
+      - PYTHONPATH=/app/framework/impl:/app
     volumes:
-      - hf_cache:/hf-cache
+      - ./backend:/app/backend
+      - ./framework/impl:/app/framework/impl
+      - ./data:/app/data
+      - ray_logs:/tmp/ray
     restart: unless-stopped
     networks:
       - fedsim-network
@@ -37,7 +41,6 @@ services:
     volumes:
       - ./backend:/app/backend
       - ./framework/impl:/app/framework/impl
-      - ./config.yaml:/app/config.yaml
       - ./data:/app/data
       - hf_cache:/hf-cache
     depends_on:
@@ -93,6 +96,20 @@ services:
     networks:
       - fedsim-network
 
+  alloy:
+    image: grafana/alloy:latest
+    container_name: fedsim-alloy
+    command: run /etc/alloy/config.alloy --server.http.listen-addr=0.0.0.0:12345
+    volumes:
+      - ./monitoring-configs/alloy.config.alloy:/etc/alloy/config.alloy:ro
+      - ray_logs:/ray-logs:ro
+    depends_on:
+      - loki
+      - ray
+    restart: unless-stopped
+    networks:
+      - fedsim-network
+
   grafana:
     image: grafana/grafana:latest
     container_name: fedsim-grafana
@@ -120,3 +137,4 @@ networks:
 volumes:
   frontend_node_modules:
   hf_cache:
+  ray_logs:

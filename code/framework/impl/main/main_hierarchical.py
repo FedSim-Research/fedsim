@@ -47,12 +47,13 @@ class DataLoaderAdapter:
 class HierarchicalSimulation:
     """See Hierarchical_Simulation_README.md for details on the simulation setup and how to use it."""
 
-    def __init__(self, run_time_limit: float = RUNTIME_LIMIT):
+    def __init__(self, run_time_limit: float = RUNTIME_LIMIT, gpu_budget: float | None = None):
         self.run_time_limit = run_time_limit
+        self.gpu_budget = gpu_budget
         self.super_id = None
         self.edge_ids = []
         self.client_ids = []
-        self.client_map: Dict[str, List[Tuple[str, SimulationFlowerClient]]] = {}
+        self.client_map: Dict[str, List[Tuple[str, Dict[str, Any]]]] = {}
 
         self.client_registry: Dict[str, ClientSpec] = {}
         self.server_registry: Dict[str, ServerSpec] = {}
@@ -64,6 +65,51 @@ class HierarchicalSimulation:
         self.orchestrator = None
         self.super_actor = None
         self.edge_actors_map = {}
+        self._server_actor_options: dict[str, float] = {}
+        self.evaluator_actor = None
+        self.eval_interval = 0.0
+        self.run_id = "unknown_run"
+        self.graph_id = -1
+
+    def set_metadata(self, run_id: str | None, graph_id: int | None, eval_interval: float | None = None) -> None:
+        if run_id:
+            self.run_id = run_id
+        if graph_id is not None:
+            self.graph_id = int(graph_id)
+        if eval_interval is not None:
+            self.eval_interval = max(0.0, float(eval_interval))
+
+    def _resolve_server_actor_options(self) -> dict[str, float]:
+        if self.gpu_budget is None:
+            return {}
+        available_gpu = float(ray.available_resources().get("GPU", 0.0))
+        requested_gpu = max(0.0, float(self.gpu_budget))
+        if available_gpu <= 1e-3 and requested_gpu > 0.0:
+            print(
+                "HierFL GPU budget requested but effective cluster GPU capacity is near zero; "
+                "falling back to CPU actor placement."
+            )
+            requested_gpu = 0.0
+        elif requested_gpu > available_gpu + 1e-9:
+            print(
+                f"HierFL GPU budget exceeds available resources; capping budget "
+                f"from {requested_gpu} to {available_gpu}."
+            )
+            requested_gpu = available_gpu
+        actor_count = len(self.edge_ids) + 1  # super server + edge servers
+        if actor_count < 1:
+            return {}
+        gpu_per_actor = max(0.0, requested_gpu / float(actor_count))
+        print(
+            f"Applying dynamic GPU allocation (HierFL): budget={self.gpu_budget}, "
+            f"actors={actor_count}, num_gpus_per_actor={gpu_per_actor}"
+        )
+        return {"num_gpus": gpu_per_actor}
+
+        self.evaluator_actor = None
+        self.eval_interval = 500 #TODO SET FROM OUTSIDE (stubs)
+        self.run_id = 0 #TODO SET FROM OUTSIDE (stubs)
+        self.graph_id = 0 #TODO SET FROM OUTSIDE (stubs)
 
     def set_super_server(
         self,
@@ -137,8 +183,12 @@ class HierarchicalSimulation:
             download_speed=download_speed,
         )
 
-        sim_client = SimulationFlowerClient(dataset_partition_id, total_partitions, seed=seed)
-        self.client_map[edge_id].append((client_id, sim_client))
+        client_config = {
+            "dataset_partition_id": dataset_partition_id,
+            "total_partitions": total_partitions,
+            "seed": seed
+        }
+        self.client_map[edge_id].append((client_id, client_config))
 
     def _spawn_actors(self):
         """Spawns the SuperServer and EdgeServer actors on the Ray cluster."""
@@ -148,12 +198,12 @@ class HierarchicalSimulation:
                 "First edge server must have at least one client to initialize global model."
             )
 
-        first_client = self.client_map[first_edge][0][1]
-        initial_params = first_client.get_parameters(config={})
-        initial_weights = parameters_to_ndarrays(initial_params)
+        from main.task import Net
+        dummy_model = Net()
+        initial_weights = [val.cpu().numpy() for _, val in dummy_model.state_dict().items()]
 
         print(f"Spawning Super Server ({self.super_id})...")
-        self.super_actor = SuperServer.remote(
+        self.super_actor = SuperServer.options(**self._server_actor_options).remote(
             server_id=self.super_id,
             initial_parameters=initial_weights,
             required_updates=len(self.edge_ids),
@@ -163,16 +213,29 @@ class HierarchicalSimulation:
 
         print("Spawning Edge Servers...")
         for eid in self.edge_ids:
-            assigned_clients = self.client_map[eid]
-            edge_actor = EdgeServer.remote(
+            edge_actor = EdgeServer.options(**self._server_actor_options).remote(
                 server_id=eid,
                 super_server_id=self.super_id,
                 super_server_ref=self.super_actor,
-                assigned_clients=assigned_clients,
-                min_clients_per_round=len(assigned_clients),
+                min_clients_per_round=len(self.client_map[eid]),
                 context=self.context,
             )
             self.edge_actors_map[eid] = edge_actor
+
+        # Update context locally
+        all_actors = {self.super_id: self.super_actor}
+        all_actors.update(self.edge_actors_map)
+        self.context.set_server_actor_handles(all_actors)
+
+        # Distribute context and register clients safely on the edge workers
+        for eid in self.edge_ids:
+            actor = self.edge_actors_map[eid]
+            ray.get(actor.set_global_context_remote.remote(self.context))
+            
+            assigned_client_configs = {
+                c_id: config for c_id, config in self.client_map[eid]
+            }
+            ray.get(actor.register_clients.remote(assigned_client_configs))
 
     def _configure_network(self):
         """Wiring server connections."""
@@ -187,7 +250,8 @@ class HierarchicalSimulation:
         """Constructs the simulation environment, orchestrator, and actors."""
         initialize_environment()
 
-        self.orchestrator = SimulationOrchestrator.remote()
+        self._server_actor_options = self._resolve_server_actor_options()
+        self.orchestrator = SimulationOrchestrator.options(num_gpus=0.0).remote()
         self.context = SimulationContext(
             orchestrator_actor=self.orchestrator,
             client_registry=self.client_registry,
@@ -209,14 +273,40 @@ class HierarchicalSimulation:
             raise RuntimeError("Simulation not built. Call build() first.")
 
         print("Initializing simulation...")
-        initial_events = ray.get(self.super_actor.start_simulation.remote())
+        all_initial_events =[]
 
-        for delay, target, method, payload in initial_events:
+        # --- EVALUATOR INITIALIZATION ---
+        if getattr(self, 'eval_interval', 0.0) > 0:
+            from telemetry.evaluator_actor import PeriodicEvaluator
+            
+            print(f"Spawning Periodic Evaluator (Interval: {self.eval_interval}s)...")
+            self.evaluator_actor = PeriodicEvaluator.options(num_gpus=0.0).remote(
+                run_id=str(self.run_id),
+                graph_id=self.graph_id,
+                architecture="hierarchical",
+                target_server_ref=self.super_actor,
+                orchestrator_ref=self.orchestrator,
+                evaluation_interval=self.eval_interval
+            )
+            
+            # Fetch the first event (T=0 evaluation + scheduling the next)
+            eval_events = ray.get(self.evaluator_actor.start.remote())
+            if eval_events:
+                all_initial_events.extend(eval_events)
+        # ---------------------------------
+
+        server_events = ray.get(self.super_actor.start_simulation.remote())
+        if server_events:
+            all_initial_events.extend(server_events)
+
+        for delay, target, method, payload in all_initial_events:
             ray.get(self.orchestrator.add_event.remote(delay, target, method, payload))
 
-        print(f"Simulation started with {len(initial_events)} initial events.")
+        print(f"Simulation started with {len(all_initial_events)} initial events.")
         print("Running simulation loop...")
+        
         ray.get(self.orchestrator.run_until.remote(self.run_time_limit))
+        
         print("Simulation execution finished.")
 
     def save_model(self, filename: str):
