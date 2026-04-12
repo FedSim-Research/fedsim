@@ -2,12 +2,6 @@
 
 RP_FedSim is a graph-based federated learning simulation platform with a FastAPI backend, an Angular frontend, and two simulation engines (Hierarchical FL and Spyker FL).
 
-## Prerequisites
-
-- Python 3.10+ (recommended: Python 3.12)
-- Node.js + npm (LTS)
-- Docker + Docker Compose (for Grafana/Prometheus/Loki monitoring stack)
-
 ## Repository Overview
 
 - [`code/backend/`](code/backend): FastAPI API, persistence layer, simulation orchestration
