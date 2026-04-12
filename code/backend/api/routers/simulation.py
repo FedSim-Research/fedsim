@@ -14,6 +14,7 @@ class SimulationTrainingConfig(BaseModel):
     epochs: int
     lr: float
     model_complexity: float | None = None
+    batch_size: int | None = None
 
 
 class SimulationSettings(BaseModel):

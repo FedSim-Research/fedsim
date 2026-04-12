@@ -9,6 +9,7 @@ type CommonTrainingConfig = {
   epochs: number;
   lr: number;
   modelComplexity: number;
+  batchSize?: number;
 };
 
 type CommonSimulationConfig = {
@@ -66,6 +67,7 @@ export class StartPopup implements OnInit {
     epochs: 1,
     lr: 0.005,
     modelComplexity: 1.0,
+    batchSize: 32,
     runTimeLimit: 5000,
     evalInterval: 500,
     gpuBudget: 0,
@@ -157,6 +159,7 @@ export class StartPopup implements OnInit {
           epochs: this.hierflSettings.epochs,
           lr: this.hierflSettings.lr,
           modelComplexity: this.hierflSettings.modelComplexity,
+          batchSize: this.hierflSettings.batchSize,
         },
         simulationSettings: {
           runTimeLimit: this.hierflSettings.runTimeLimit,

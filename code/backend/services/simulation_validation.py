@@ -29,6 +29,9 @@ def _validate_hierfl_payload(
 ) -> None:
     if training_config is None:
         raise ValueError("hierfl_missing_training_config")
+    batch_size = training_config.get("batch_size")
+    if batch_size is not None:
+        _parse_int_min_one(batch_size, "hierfl_invalid_batch_size")
     model_complexity = training_config.get("model_complexity")
     if model_complexity is not None:
         _parse_float_gt_zero(model_complexity, "hierfl_invalid_model_complexity")
@@ -58,6 +61,9 @@ def _validate_spyker_payload(
 ) -> None:
     if training_config is None:
         raise ValueError("spyker_missing_training_config")
+    batch_size = training_config.get("batch_size")
+    if batch_size is not None:
+        _parse_int_min_one(batch_size, "spyker_invalid_batch_size")
     model_complexity = training_config.get("model_complexity")
     if model_complexity is not None:
         _parse_float_gt_zero(model_complexity, "spyker_invalid_model_complexity")

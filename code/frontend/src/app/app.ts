@@ -543,11 +543,11 @@ export class App implements OnInit{
   public async handleSimulation(payload: {
     mode: 'spyker' | 'hierfl' | 'both';
     hierfl: {
-      trainingConfig: { epochs: number; lr: number; modelComplexity: number };
+      trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
       simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; outputFilename: string; evaluateModel: boolean };
     };
     spyker: {
-      trainingConfig: { epochs: number; lr: number; modelComplexity: number };
+      trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
       simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
       spykerConfig: {
         decayBeta: number;
@@ -596,6 +596,7 @@ export class App implements OnInit{
             epochs: archConfig.trainingConfig.epochs,
             lr: archConfig.trainingConfig.lr,
             model_complexity: archConfig.trainingConfig.modelComplexity,
+            batch_size: archConfig.trainingConfig.batchSize,
           },
           simulation_settings: {
             run_time_limit: archConfig.simulationSettings.runTimeLimit,
@@ -676,6 +677,7 @@ export class App implements OnInit{
               epochs: payload.hierfl.trainingConfig.epochs,
               lr: payload.hierfl.trainingConfig.lr,
               model_complexity: payload.hierfl.trainingConfig.modelComplexity,
+              batch_size: payload.hierfl.trainingConfig.batchSize,
             },
             simulation_settings: {
               run_time_limit: payload.hierfl.simulationSettings.runTimeLimit,
@@ -692,6 +694,7 @@ export class App implements OnInit{
               epochs: payload.spyker.trainingConfig.epochs,
               lr: payload.spyker.trainingConfig.lr,
               model_complexity: payload.spyker.trainingConfig.modelComplexity,
+              batch_size: payload.spyker.trainingConfig.batchSize,
             },
             simulation_settings: {
               run_time_limit: payload.spyker.simulationSettings.runTimeLimit,

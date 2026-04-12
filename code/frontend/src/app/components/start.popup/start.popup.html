@@ -57,6 +57,10 @@
                       <input type="text" inputmode="decimal" [ngModel]="formatDecimal(hierflSettings.modelComplexity)" (ngModelChange)="hierflSettings.modelComplexity = parseDecimalInput($event, hierflSettings.modelComplexity); onSettingsChanged()" />
                     </label>
                     <label class="field">
+                      <span class="field-label">Batch size <span class="help-dot" title="Mini-batch size used for local client training in HierFL.">?</span></span>
+                      <input type="number" min="1" step="1" [(ngModel)]="hierflSettings.batchSize" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
                       <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>
                       <input type="number" min="1" step="1" [(ngModel)]="hierflSettings.runTimeLimit" (ngModelChange)="onSettingsChanged()" />
                     </label>
