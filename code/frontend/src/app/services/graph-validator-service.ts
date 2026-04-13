@@ -19,7 +19,7 @@ export class GraphValidatorService {
     nodes: Node[],
     edges: Edge[],
     config: {
-      trainingConfig: { epochs: number; lr: number; modelComplexity: number };
+      trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
       simulationSettings: {
         runTimeLimit: number;
         evalInterval: number;
@@ -49,7 +49,7 @@ export class GraphValidatorService {
   private validateTrainingAndSimulationFields(
     architecture: SupportedArchitecture,
     config: {
-      trainingConfig: { epochs: number; lr: number; modelComplexity: number };
+      trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
       simulationSettings: {
         runTimeLimit: number;
         evalInterval: number;
@@ -79,6 +79,12 @@ export class GraphValidatorService {
     }
     if (!Number.isFinite(config.trainingConfig.modelComplexity) || config.trainingConfig.modelComplexity <= 0) {
       errors.push(`${architecture}: model complexity must be > 0`);
+    }
+    if (
+      config.trainingConfig.batchSize !== undefined
+      && (!Number.isInteger(config.trainingConfig.batchSize) || config.trainingConfig.batchSize < 1)
+    ) {
+      errors.push(`${architecture}: batch size must be an integer >= 1`);
     }
     if (!Number.isFinite(config.simulationSettings.runTimeLimit) || config.simulationSettings.runTimeLimit <= 0) {
       errors.push(`${architecture}: run time limit must be > 0`);

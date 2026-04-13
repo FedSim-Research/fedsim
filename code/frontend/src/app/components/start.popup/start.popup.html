@@ -18,15 +18,15 @@
             <ng-template #content>
               <p class="section-hint">Choose which architecture to run.</p>
               <div class="popup-actions">
-                <button class="cta-option" [class.active]="selectedMode === 'hierfl'" (click)="selectMode('hierfl')">
+                <button class="cta-option cta-option--hier" [class.active]="selectedMode === 'hierfl'" (click)="selectMode('hierfl')">
                   <span class="dot hier-dot"></span>
                   Hierarchical
                 </button>
-                <button class="cta-option" [class.active]="selectedMode === 'spyker'" (click)="selectMode('spyker')">
+                <button class="cta-option cta-option--spyker" [class.active]="selectedMode === 'spyker'" (click)="selectMode('spyker')">
                   <span class="dot spyker-dot"></span>
                   Spyker
                 </button>
-                <button class="cta-option both" [class.active]="selectedMode === 'both'" (click)="selectMode('both')">
+                <button class="cta-option cta-option--both" [class.active]="selectedMode === 'both'" (click)="selectMode('both')">
                   <span class="dot both-dot"></span>
                   Spyker & Hierarchical
                 </button>
@@ -55,6 +55,10 @@
                     <label class="field">
                       <span class="field-label">Model complexity <span class="help-dot" title="Scaling factor for simulated compute effort per training step.">?</span></span>
                       <input type="text" inputmode="decimal" [ngModel]="formatDecimal(hierflSettings.modelComplexity)" (ngModelChange)="hierflSettings.modelComplexity = parseDecimalInput($event, hierflSettings.modelComplexity); onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Batch size <span class="help-dot" title="Mini-batch size used for local client training in HierFL.">?</span></span>
+                      <input type="number" min="1" step="1" [(ngModel)]="hierflSettings.batchSize" (ngModelChange)="onSettingsChanged()" />
                     </label>
                     <label class="field">
                       <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>
@@ -118,6 +122,10 @@
                     <label class="field">
                       <span class="field-label">Model complexity <span class="help-dot" title="Scaling factor for simulated compute effort per training step.">?</span></span>
                       <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.modelComplexity)" (ngModelChange)="spykerSettings.modelComplexity = parseDecimalInput($event, spykerSettings.modelComplexity); onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Batch size <span class="help-dot" title="Mini-batch size used for local client training in Spyker.">?</span></span>
+                      <input type="number" min="1" step="1" [(ngModel)]="spykerSettings.batchSize" (ngModelChange)="onSettingsChanged()" />
                     </label>
                     <label class="field">
                       <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>

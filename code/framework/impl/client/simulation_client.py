@@ -4,6 +4,7 @@ import random
 import numpy as np
 from typing import Dict
 from collections import OrderedDict
+from torch.utils.data import DataLoader
 from flwr.common import (
     FitIns,
     FitRes,
@@ -58,16 +59,27 @@ class SimulationFlowerClient(flwr.client.Client):
         # 2. Extract Config (Passed from SuperServer -> EdgeServer -> Client)
         epochs = int(ins.config.get("epochs", 1))
         lr = float(ins.config.get("lr", 0.001))
+        batch_size = int(ins.config.get("batch_size", 32))
+        if batch_size < 1:
+            batch_size = 32
+
+        trainloader = self.trainloader
+        if trainloader.batch_size != batch_size:
+            trainloader = DataLoader(
+                trainloader.dataset,
+                batch_size=batch_size,
+                shuffle=True,
+            )
 
         # 3. Train (using task.py logic)
-        loss = train(self.net, self.trainloader, epochs, lr, self.device)
+        loss = train(self.net, trainloader, epochs, lr, self.device)
 
         # 4. Return Results
         # Note: We return the updated weights and the 'real' training loss
         return FitRes(
             status=Status(code=Code.OK, message="Success"),
             parameters=self.get_parameters(config={}),
-            num_examples=len(self.trainloader.dataset),
+            num_examples=len(trainloader.dataset),
             metrics={"train_loss": loss},
         )
 

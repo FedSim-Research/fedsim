@@ -107,6 +107,7 @@ export interface SimulationStartRequest {
     epochs: number;
     lr: number;
     model_complexity?: number;
+    batch_size?: number;
   };
   simulation_settings?: {
     run_time_limit?: number;

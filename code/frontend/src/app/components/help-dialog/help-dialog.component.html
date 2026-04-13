@@ -6,26 +6,384 @@
   [resizable]="false"
   [closeOnEscape]="true"
   [dismissableMask]="true"
-  header="Helper Page"
-  [style]="{ width: '2000px', maxWidth: '90vw', height: '80vh', maxHeight: '90vh' }"
+  header="FedSim Helper"
+  [style]="{ width: '1260px', maxWidth: '96vw' }"
+  [contentStyle]="{ padding: '0', overflow: 'hidden' }"
   (onHide)="onClose()"
 >
-  <div class="help-body">
-    <section class="help-section">
-      <h2>Getting Started</h2>
-      <p>Das ist ein Bespiel wie es am Ende aussehen könnte.</p>
+  <div class="help-shell">
+    <section class="help-hero">
+      <div class="help-hero__copy">
+        <span class="help-hero__eyebrow">Reference Guide</span>
+        <h2>Node, edge, and run parameters</h2>
+        <p>
+          This page explains the fields used across the configurator. Shared parameters are listed once,
+          then mapped to the node types that use them, so the same attribute is not repeated in multiple places.
+        </p>
+      </div>
+      <div class="help-hero__badges">
+        <span class="help-badge help-badge--hier">Hierarchical</span>
+        <span class="help-badge help-badge--spyker">Spyker</span>
+        <span class="help-badge help-badge--shared">Shared parameters</span>
+      </div>
     </section>
 
-    <section class="help-section">
-      <h2>Bulletpoints</h2>
-      <ul>
-        <li>1.</li>
-        <li>2.</li>
-        <li>3.</li>
-      </ul>
-    </section>
+    <div class="help-scroll">
+      <section class="help-panel">
+        <div class="help-panel__header">
+          <div>
+            <span class="help-kicker">Quick orientation</span>
+            <h3>What this helper is optimized for</h3>
+          </div>
+        </div>
+        <div class="fact-grid">
+          @for (fact of quickFacts; track fact.label) {
+          <article class="fact-card">
+            <span class="fact-card__label">{{ fact.label }}</span>
+            <p>{{ fact.value }}</p>
+          </article>
+          }
+        </div>
+      </section>
+
+      <section class="help-panel">
+        <div class="help-panel__header">
+          <div>
+            <span class="help-kicker">Node roles</span>
+            <h3>What each node is for</h3>
+          </div>
+        </div>
+        <div class="role-grid">
+          @for (role of roleCards; track role.title) {
+          <article
+            class="role-card"
+            [class.role-card--hier]="role.accent === 'hier'"
+            [class.role-card--spyker]="role.accent === 'spyker'"
+            [class.role-card--shared]="role.accent === 'shared'"
+          >
+            <div class="applicability-boxes applicability-boxes--corner">
+              @for (line of role.architecture; track line) {
+              <span
+                class="applicability-box"
+                [class.applicability-box--hier]="line === 'Hierarchical'"
+                [class.applicability-box--spyker]="line === 'Spyker'"
+                [class.applicability-box--shared]="line !== 'Hierarchical' && line !== 'Spyker'"
+              >
+                {{ line }}
+              </span>
+              }
+            </div>
+            <div class="role-card__header">
+              <div>
+                <h4>{{ role.title }}</h4>
+              </div>
+            </div>
+            <p class="role-card__summary">{{ role.summary }}</p>
+            <p class="role-card__detail">{{ role.detail }}</p>
+          </article>
+          }
+        </div>
+      </section>
+
+      <section class="help-panel">
+        <div class="help-panel__header">
+          <div>
+            <span class="help-kicker">Shared node parameters</span>
+            <h3>Performance and bandwidth fields</h3>
+          </div>
+        </div>
+        <div class="parameter-grid parameter-grid--shared">
+          @for (item of sharedNodeParameters; track item.key) {
+          <article class="parameter-card parameter-card--with-tags">
+            <div class="parameter-card__header">
+              <div>
+                <h4>{{ item.label }}</h4>
+                <code>{{ item.key }}</code>
+              </div>
+              <div class="applicability-boxes applicability-boxes--header">
+                @for (line of item.appliesTo; track line) {
+                <span
+                  class="applicability-box"
+                  [class.applicability-box--hier]="line === 'Hierarchical'"
+                  [class.applicability-box--spyker]="line === 'Spyker'"
+                  [class.applicability-box--shared]="line !== 'Hierarchical' && line !== 'Spyker'"
+                >
+                  {{ line }}
+                </span>
+                }
+              </div>
+            </div>
+            <p>{{ item.description }}</p>
+            <p class="parameter-card__effect">{{ item.effect }}</p>
+            <div class="parameter-card__meta">
+              @if (item.format) {
+              <span><strong>Format:</strong> {{ item.format }}</span>
+              }
+              @if (item.note) {
+              <span><strong>Note:</strong> {{ item.note }}</span>
+              }
+            </div>
+          </article>
+          }
+        </div>
+      </section>
+
+      <section class="help-panel">
+        <div class="help-panel__header">
+          <div>
+            <span class="help-kicker">Node-specific parameters</span>
+            <h3>Fields that are not shared by every node</h3>
+          </div>
+        </div>
+        <div class="parameter-grid">
+          @for (item of nodeSpecificParameters; track item.key) {
+          <article class="parameter-card parameter-card--with-tags">
+            <div class="parameter-card__header">
+              <div>
+                <h4>{{ item.label }}</h4>
+                <code>{{ item.key }}</code>
+              </div>
+              <div class="applicability-boxes applicability-boxes--header">
+                @for (line of item.appliesTo; track line) {
+                <span
+                  class="applicability-box"
+                  [class.applicability-box--hier]="line === 'Hierarchical'"
+                  [class.applicability-box--spyker]="line === 'Spyker'"
+                  [class.applicability-box--shared]="line !== 'Hierarchical' && line !== 'Spyker'"
+                >
+                  {{ line }}
+                </span>
+                }
+              </div>
+            </div>
+            <p>{{ item.description }}</p>
+            <p class="parameter-card__effect">{{ item.effect }}</p>
+            <div class="parameter-card__meta">
+              @if (item.format) {
+              <span><strong>Format:</strong> {{ item.format }}</span>
+              }
+              @if (item.note) {
+              <span><strong>Note:</strong> {{ item.note }}</span>
+              }
+            </div>
+          </article>
+          }
+        </div>
+      </section>
+
+      <section class="help-panel">
+        <div class="help-panel__header">
+          <div>
+            <span class="help-kicker">Edge parameters</span>
+            <h3>Network behavior between connected nodes</h3>
+          </div>
+          <p class="help-panel__intro">
+            The edge editor uses two paired inputs: <strong>Latency +/- Jitter</strong> and <strong>Pktloss +/- Stddev</strong>.
+          </p>
+        </div>
+        <div class="parameter-grid">
+          @for (item of edgeParameters; track item.key) {
+          <article class="parameter-card">
+            <div class="parameter-card__header">
+              <div>
+                <h4>{{ item.label }}</h4>
+                <code>{{ item.key }}</code>
+              </div>
+            </div>
+            <p>{{ item.description }}</p>
+            <p class="parameter-card__effect">{{ item.effect }}</p>
+            <div class="parameter-card__meta">
+              @if (item.format) {
+              <span><strong>Format:</strong> {{ item.format }}</span>
+              }
+              @if (item.note) {
+              <span><strong>Note:</strong> {{ item.note }}</span>
+              }
+            </div>
+          </article>
+          }
+        </div>
+      </section>
+
+      <section class="help-panel">
+        <div class="help-panel__header">
+          <div>
+            <span class="help-kicker">Run settings</span>
+            <h3>Parameters used in the start simulation dialog</h3>
+          </div>
+        </div>
+        <div class="parameter-grid">
+          @for (item of commonRunParameters; track item.key) {
+          <article class="parameter-card parameter-card--with-tags">
+            <div class="parameter-card__header">
+              <div>
+                <h4>{{ item.label }}</h4>
+                <code>{{ item.key }}</code>
+              </div>
+              <div class="applicability-boxes applicability-boxes--header">
+                @for (line of item.appliesTo; track line) {
+                <span
+                  class="applicability-box"
+                  [class.applicability-box--hier]="line === 'Hierarchical'"
+                  [class.applicability-box--spyker]="line === 'Spyker'"
+                  [class.applicability-box--shared]="line !== 'Hierarchical' && line !== 'Spyker'"
+                >
+                  {{ line }}
+                </span>
+                }
+              </div>
+            </div>
+            <p>{{ item.description }}</p>
+            <p class="parameter-card__effect">{{ item.effect }}</p>
+            <div class="parameter-card__meta">
+              @if (item.format) {
+              <span><strong>Format:</strong> {{ item.format }}</span>
+              }
+              @if (item.note) {
+              <span><strong>Note:</strong> {{ item.note }}</span>
+              }
+            </div>
+          </article>
+          }
+        </div>
+      </section>
+
+      <section class="help-panel help-panel--split">
+        <div class="help-panel__column">
+          <div class="help-panel__header">
+            <div>
+              <span class="help-kicker">Hierarchical</span>
+              <h3>Extra Hierarchical parameter</h3>
+            </div>
+          </div>
+          <div class="parameter-grid parameter-grid--single">
+            @for (item of hierarchicalParameters; track item.key) {
+            <article class="parameter-card parameter-card--with-tags">
+              <div class="parameter-card__header">
+                <div>
+                  <h4>{{ item.label }}</h4>
+                  <code>{{ item.key }}</code>
+                </div>
+                <div class="applicability-boxes applicability-boxes--header">
+                  @for (line of item.appliesTo; track line) {
+                  <span
+                    class="applicability-box"
+                    [class.applicability-box--hier]="line === 'Hierarchical'"
+                    [class.applicability-box--spyker]="line === 'Spyker'"
+                    [class.applicability-box--shared]="line !== 'Hierarchical' && line !== 'Spyker'"
+                  >
+                    {{ line }}
+                  </span>
+                  }
+                </div>
+              </div>
+              <p>{{ item.description }}</p>
+              <p class="parameter-card__effect">{{ item.effect }}</p>
+              <div class="parameter-card__meta">
+                @if (item.format) {
+                <span><strong>Format:</strong> {{ item.format }}</span>
+                }
+              </div>
+            </article>
+            }
+          </div>
+        </div>
+
+        <div class="help-panel__column">
+          <div class="help-panel__header">
+            <div>
+              <span class="help-kicker">Spyker</span>
+              <h3>Extra Spyker run parameter</h3>
+            </div>
+          </div>
+          <div class="parameter-grid parameter-grid--single">
+            @for (item of spykerRuntimeParameters; track item.key) {
+            <article class="parameter-card parameter-card--with-tags">
+              <div class="parameter-card__header">
+                <div>
+                  <h4>{{ item.label }}</h4>
+                  <code>{{ item.key }}</code>
+                </div>
+                <div class="applicability-boxes applicability-boxes--header">
+                  @for (line of item.appliesTo; track line) {
+                  <span
+                    class="applicability-box"
+                    [class.applicability-box--hier]="line === 'Hierarchical'"
+                    [class.applicability-box--spyker]="line === 'Spyker'"
+                    [class.applicability-box--shared]="line !== 'Hierarchical' && line !== 'Spyker'"
+                  >
+                    {{ line }}
+                  </span>
+                  }
+                </div>
+              </div>
+              <p>{{ item.description }}</p>
+              <p class="parameter-card__effect">{{ item.effect }}</p>
+              <div class="parameter-card__meta">
+                @if (item.format) {
+                <span><strong>Format:</strong> {{ item.format }}</span>
+                }
+              </div>
+            </article>
+            }
+          </div>
+        </div>
+      </section>
+
+      <section class="help-panel">
+        <div class="help-panel__header">
+          <div>
+            <span class="help-kicker">Spyker algorithm</span>
+            <h3>Parameters that shape Spyker synchronization behavior</h3>
+          </div>
+        </div>
+        <div class="parameter-grid">
+          @for (item of spykerAlgorithmParameters; track item.key) {
+          <article class="parameter-card parameter-card--with-tags">
+            <div class="parameter-card__header">
+              <div>
+                <h4>{{ item.label }}</h4>
+                <code>{{ item.key }}</code>
+              </div>
+              <div class="applicability-boxes applicability-boxes--header">
+                @for (line of item.appliesTo; track line) {
+                <span
+                  class="applicability-box"
+                  [class.applicability-box--hier]="line === 'Hierarchical'"
+                  [class.applicability-box--spyker]="line === 'Spyker'"
+                  [class.applicability-box--shared]="line !== 'Hierarchical' && line !== 'Spyker'"
+                >
+                  {{ line }}
+                </span>
+                }
+              </div>
+            </div>
+            <p>{{ item.description }}</p>
+            <p class="parameter-card__effect">{{ item.effect }}</p>
+            <div class="parameter-card__meta">
+              @if (item.format) {
+              <span><strong>Format:</strong> {{ item.format }}</span>
+              }
+            </div>
+          </article>
+          }
+        </div>
+      </section>
+
+      <section class="help-panel help-panel--notes">
+        <div class="help-panel__header">
+          <div>
+            <span class="help-kicker">Implementation notes</span>
+            <h3>Small details that help avoid confusion</h3>
+          </div>
+        </div>
+        <ul class="notes-list">
+          @for (note of implementationNotes; track note) {
+          <li>{{ note }}</li>
+          }
+        </ul>
+      </section>
+    </div>
   </div>
 
-  <p>Normaler Text ohne Checkboxen: </p>
-  - jjj
 </p-dialog>
