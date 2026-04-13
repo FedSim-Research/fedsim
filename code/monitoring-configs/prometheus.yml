@@ -2,8 +2,8 @@
 
 # global config
 global:
-  scrape_interval: 2s
-  evaluation_interval: 2s
+  scrape_interval: 5s
+  evaluation_interval: 5s
 
 # Scrape from Ray.
 scrape_configs:

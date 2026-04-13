@@ -24,7 +24,7 @@ export class DashboardViewComponent {
 
   private grafanaBaseUrl = ((window as any).FEDSIM_GRAFANA_BASE_URL as string | undefined) ?? 'http://localhost:3000';
   private grafanaUrlCache = new Map<string, SafeResourceUrl>();
-  private readonly defaultRangeMs = 60 * 60 * 1000;
+  private readonly defaultRangeMs = 15 * 60 * 1000;
 
   @Input() public sidebarOpen = true;
 
