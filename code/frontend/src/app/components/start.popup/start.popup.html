@@ -18,15 +18,15 @@
             <ng-template #content>
               <p class="section-hint">Choose which architecture to run.</p>
               <div class="popup-actions">
-                <button class="cta-option" [class.active]="selectedMode === 'hierfl'" (click)="selectMode('hierfl')">
+                <button class="cta-option cta-option--hier" [class.active]="selectedMode === 'hierfl'" (click)="selectMode('hierfl')">
                   <span class="dot hier-dot"></span>
                   Hierarchical
                 </button>
-                <button class="cta-option" [class.active]="selectedMode === 'spyker'" (click)="selectMode('spyker')">
+                <button class="cta-option cta-option--spyker" [class.active]="selectedMode === 'spyker'" (click)="selectMode('spyker')">
                   <span class="dot spyker-dot"></span>
                   Spyker
                 </button>
-                <button class="cta-option both" [class.active]="selectedMode === 'both'" (click)="selectMode('both')">
+                <button class="cta-option cta-option--both" [class.active]="selectedMode === 'both'" (click)="selectMode('both')">
                   <span class="dot both-dot"></span>
                   Spyker & Hierarchical
                 </button>

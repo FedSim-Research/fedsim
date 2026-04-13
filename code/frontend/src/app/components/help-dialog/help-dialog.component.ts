@@ -71,7 +71,7 @@ export class HelpDialog {
     {
       title: 'Client',
       architecture: ['Hierarchical', 'Spyker'],
-      accent: 'spyker',
+      accent: 'shared',
       summary: 'Represents the end devices that train on local data.',
       detail: 'A single client entry can represent many simulated devices through the count field, so you can model a whole client group with one visual item.',
     },
