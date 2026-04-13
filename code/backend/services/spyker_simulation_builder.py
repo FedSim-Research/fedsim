@@ -167,6 +167,14 @@ def _require_training_config(training_config: dict[str, Any] | None) -> dict[str
     if lr <= 0:
         raise ValueError("spyker_invalid_training_lr")
     result = {"local_epochs": epochs, "learning_rate": lr}
+    if "batch_size" in training_config and training_config["batch_size"] is not None:
+        try:
+            batch_size = int(training_config["batch_size"])
+        except (TypeError, ValueError):
+            raise ValueError("spyker_invalid_batch_size")
+        if batch_size < 1:
+            raise ValueError("spyker_invalid_batch_size")
+        result["batch_size"] = batch_size
     if "model_complexity" in training_config and training_config["model_complexity"] is not None:
         try:
             model_complexity = float(training_config["model_complexity"])

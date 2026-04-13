@@ -1,5 +1,14 @@
 :host {
   display: contents;
+  --start-hier: #ff8c42;
+  --start-hier-soft: rgba(255, 140, 66, 0.18);
+  --start-hier-strong: rgba(255, 140, 66, 0.3);
+  --start-spyker: #20c997;
+  --start-spyker-soft: rgba(32, 201, 151, 0.18);
+  --start-spyker-strong: rgba(32, 201, 151, 0.3);
+  --start-shared: #4ecdc4;
+  --start-shared-soft: rgba(78, 205, 196, 0.18);
+  --start-shared-strong: rgba(78, 205, 196, 0.3);
 }
 
 .popup-backdrop {
@@ -18,7 +27,7 @@
 
 .popup-card {
   width: 94%;
-  max-width: 760px;
+  max-width: 570px;
   max-height: 90vh;
   overflow: auto;
   background: #0f0f0f;
@@ -116,15 +125,51 @@
   background: rgba(255, 255, 255, 0.18);
 }
 
+.cta-option--hier {
+  border-color: rgba(255, 140, 66, 0.28);
+  background: var(--start-hier-soft);
+  color: #ffe8d6;
+}
+
+.cta-option--hier:hover,
+.cta-option--hier.active {
+  border-color: rgba(255, 140, 66, 0.68);
+  background: var(--start-hier-strong);
+}
+
+.cta-option--spyker {
+  border-color: rgba(32, 201, 151, 0.28);
+  background: var(--start-spyker-soft);
+  color: #dcfff3;
+}
+
+.cta-option--spyker:hover,
+.cta-option--spyker.active {
+  border-color: rgba(32, 201, 151, 0.68);
+  background: var(--start-spyker-strong);
+}
+
+.cta-option--both {
+  border-color: rgba(78, 205, 196, 0.28);
+  background: var(--start-shared-soft);
+  color: #ddfffc;
+}
+
+.cta-option--both:hover,
+.cta-option--both.active {
+  border-color: rgba(78, 205, 196, 0.68);
+  background: var(--start-shared-strong);
+}
+
 .dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
 }
 
-.spyker-dot { background-color: #3b82f6; }
-.hier-dot { background-color: #10b981; }
-.both-dot { background-color: #f59e0b; }
+.spyker-dot { background-color: var(--start-spyker); box-shadow: 0 0 8px rgba(32, 201, 151, 0.45); }
+.hier-dot { background-color: var(--start-hier); box-shadow: 0 0 8px rgba(255, 140, 66, 0.45); }
+.both-dot { background-color: var(--start-shared); box-shadow: 0 0 8px rgba(78, 205, 196, 0.45); }
 
 .step-actions {
   margin-top: 12px;

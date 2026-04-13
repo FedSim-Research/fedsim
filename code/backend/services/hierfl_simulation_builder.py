@@ -175,6 +175,14 @@ def _require_training_config(training_config: dict[str, Any] | None) -> dict[str
     if lr <= 0:
         raise ValueError("hierfl_invalid_training_lr")
     result = {"epochs": epochs, "lr": lr}
+    if "batch_size" in training_config and training_config["batch_size"] is not None:
+        try:
+            batch_size = int(training_config["batch_size"])
+        except (TypeError, ValueError):
+            raise ValueError("hierfl_invalid_batch_size")
+        if batch_size < 1:
+            raise ValueError("hierfl_invalid_batch_size")
+        result["batch_size"] = batch_size
     if "model_complexity" in training_config and training_config["model_complexity"] is not None:
         try:
             model_complexity = float(training_config["model_complexity"])
