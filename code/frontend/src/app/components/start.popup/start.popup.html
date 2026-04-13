@@ -124,6 +124,10 @@
                       <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.modelComplexity)" (ngModelChange)="spykerSettings.modelComplexity = parseDecimalInput($event, spykerSettings.modelComplexity); onSettingsChanged()" />
                     </label>
                     <label class="field">
+                      <span class="field-label">Batch size <span class="help-dot" title="Mini-batch size used for local client training in Spyker.">?</span></span>
+                      <input type="number" min="1" step="1" [(ngModel)]="spykerSettings.batchSize" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
                       <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>
                       <input type="number" min="1" step="1" [(ngModel)]="spykerSettings.runTimeLimit" (ngModelChange)="onSettingsChanged()" />
                     </label>

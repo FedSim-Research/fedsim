@@ -80,6 +80,7 @@ export class StartPopup implements OnInit {
     epochs: 1,
     lr: 0.005,
     modelComplexity: 1.0,
+    batchSize: 32,
     runTimeLimit: 5000,
     evalInterval: 500,
     gpuBudget: 0,
@@ -175,6 +176,7 @@ export class StartPopup implements OnInit {
           epochs: this.spykerSettings.epochs,
           lr: this.spykerSettings.lr,
           modelComplexity: this.spykerSettings.modelComplexity,
+          batchSize: this.spykerSettings.batchSize,
         },
         simulationSettings: {
           runTimeLimit: this.spykerSettings.runTimeLimit,
