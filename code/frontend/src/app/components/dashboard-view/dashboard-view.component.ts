@@ -69,7 +69,7 @@ export class DashboardViewComponent {
     const runId = run?.run_id ?? '';
     const architecture = run?.architecture ? String(run.architecture) : '';
     return this.getGrafanaPanelUrl({
-      uid: '0dd000cc-2774-4007-b7a3-cf5fe5c5e07d',
+      uid: '01956efd-3d1e-478b-8b07-e1d59541628f',
       panelId: 1007,
       rangeFrom: range.from,
       rangeTo: range.to,
