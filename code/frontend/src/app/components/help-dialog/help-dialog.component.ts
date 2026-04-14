@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Output, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DialogModule } from 'primeng/dialog';
 
@@ -25,6 +25,12 @@ type ParameterSpec = {
   note?: string;
 };
 
+type HelpSection = {
+  id: string;
+  kicker: string;
+  title: string;
+};
+
 @Component({
   selector: 'app-help-dialog',
   standalone: true,
@@ -33,7 +39,22 @@ type ParameterSpec = {
   imports: [CommonModule, DialogModule],
 })
 export class HelpDialog {
+  @ViewChild('scrollContainer') private scrollContainer?: ElementRef<HTMLDivElement>;
+
   public visible = true;
+  public showBackToTop = false;
+  public readonly tableOfContents: HelpSection[] = [
+    { id: 'quick-orientation', kicker: 'Quick orientation', title: 'What this helper is optimized for' },
+    { id: 'node-roles', kicker: 'Node roles', title: 'What each node is for' },
+    { id: 'shared-node-parameters', kicker: 'Shared node parameters', title: 'Performance and bandwidth fields' },
+    { id: 'node-specific-parameters', kicker: 'Node-specific parameters', title: 'Fields that are not shared by every node' },
+    { id: 'edge-parameters', kicker: 'Edge parameters', title: 'Network behavior between connected nodes' },
+    { id: 'run-settings', kicker: 'Run settings', title: 'Parameters used in the start simulation dialog' },
+    { id: 'hierarchical-parameter', kicker: 'Hierarchical', title: 'Extra Hierarchical parameter' },
+    { id: 'spyker-runtime-parameter', kicker: 'Spyker', title: 'Extra Spyker run parameter' },
+    { id: 'spyker-algorithm', kicker: 'Spyker algorithm', title: 'Parameters that shape Spyker synchronization behavior' },
+    { id: 'implementation-notes', kicker: 'Implementation notes', title: 'Small details that help avoid confusion' },
+  ];
   public readonly quickFacts: QuickFact[] = [
     {
       label: 'Shared fields',
@@ -318,7 +339,7 @@ export class HelpDialog {
       format: 'Positive decimal number',
     },
     {
-      label: 'Server learning rate',
+      label: 'Server\nlearning rate',
       key: 'server_learning_rate',
       appliesTo: ['Spyker'],
       description: 'Aggregation learning rate on the server side.',
@@ -345,7 +366,33 @@ export class HelpDialog {
 
   @Output() close = new EventEmitter<void>();
 
+  public onScroll(event: Event): void {
+    const scrollContainer = event.target as HTMLDivElement | null;
+    this.showBackToTop = (scrollContainer?.scrollTop ?? 0) > 320;
+  }
+
+  public scrollToSection(sectionId: string): void {
+    const scrollContainer = this.scrollContainer?.nativeElement;
+    const target = scrollContainer?.querySelector<HTMLElement>(`#${sectionId}`);
+
+    if (!scrollContainer || !target) {
+      return;
+    }
+
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const top = scrollContainer.scrollTop + targetRect.top - containerRect.top - 12;
+
+    scrollContainer.scrollTo({ top, behavior: 'smooth' });
+  }
+
+  public scrollToTop(): void {
+    this.scrollContainer?.nativeElement.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   public onClose(): void {
+    this.scrollContainer?.nativeElement.scrollTo({ top: 0 });
+    this.showBackToTop = false;
     this.visible = false;
     this.close.emit();
   }
