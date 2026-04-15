@@ -8,6 +8,7 @@ import { SuperServerNode } from '../components/nodes/super-server-node/super-ser
 import { MessageService } from 'primeng/api';
 import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'selecto';
 import { GraphPersistenceService } from '../services/graph-persistence.service';
+import { v4 as uuidv4 } from 'uuid';
 
 
 @Directive({
@@ -336,7 +337,7 @@ export class Shortcuts{
 
     return {
       ...clone,
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       type: typeString ? this.nodeTypeMap[typeString] : undefined,
       point: { x: (sourceNode.point?.x ?? 0) + 50, y: (sourceNode.point?.y ?? 0) + 50 },
       data: nextData,

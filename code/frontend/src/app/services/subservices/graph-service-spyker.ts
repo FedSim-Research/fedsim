@@ -3,6 +3,7 @@ import { GraphService } from '../graph-service';
 import { GraphHistoryServiceSpyker } from './graph-history-service-spyker';
 import { Node } from 'ngx-vflow';
 import { ServerNode } from '../../components/nodes/server-node/server-node';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable({
   providedIn: 'root',
@@ -27,7 +28,7 @@ export class GraphServiceSpyker extends GraphService<GraphHistoryServiceSpyker> 
           (e.source === newNode.id && e.target === s.id)
       );
       if (!exists){
-      super.addEdge({id: crypto.randomUUID(),
+      super.addEdge({id: uuidv4(),
             source: s.id,
             target: newNode.id,
             reconnectable: true,
