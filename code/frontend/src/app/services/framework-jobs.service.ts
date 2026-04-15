@@ -1,4 +1,5 @@
 import { Injectable, computed, signal } from '@angular/core';
+import { v4 as uuidv4 } from 'uuid';
 
 export type FrameworkJobStatus = 'queued' | 'running' | 'completed' | 'failed';
 
@@ -19,7 +20,7 @@ export class FrameworkJobsService {
   );
 
   public startJob(title: string): string {
-    const id = crypto.randomUUID();
+    const id = uuidv4();
     const next: FrameworkJob = {
       id,
       title,
