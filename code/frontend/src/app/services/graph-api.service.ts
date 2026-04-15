@@ -115,6 +115,8 @@ export interface SimulationStartRequest {
     idle_token_delay?: number;
     gpu_budget?: number;
     seed?: number;
+    seed_set?: number[];
+    repetitions?: number;
     output_filename?: string | null;
     evaluate_model?: boolean;
   };
@@ -140,6 +142,9 @@ export interface SimulationRunResponse {
   graph_id: number;
   architecture: 'spyker' | 'hierfl' | 'both';
   seed?: number | null;
+  seed_set?: number[] | null;
+  repetitions?: number | null;
+  completed_repetitions?: number | null;
   queued_at: string;
   started_at?: string | null;
   finished_at?: string | null;
@@ -149,14 +154,52 @@ export interface SimulationRunResponse {
     accuracy: number;
     avg_loss: number;
   } | null;
+  evaluation_summary?: {
+    evaluated_repetitions: number;
+    mean_accuracy: number;
+    variance_accuracy: number;
+    mean_avg_loss: number;
+    variance_avg_loss: number;
+  } | null;
+  runs?: Array<{
+    seed: number;
+    repetition_index: number;
+    duration_seconds?: number | null;
+    output_filename?: string | null;
+    evaluation?: {
+      accuracy: number;
+      avg_loss: number;
+    } | null;
+  }> | null;
   results_by_architecture?: Record<
     string,
     {
+      seed?: number | null;
+      seed_set?: number[] | null;
+      repetitions?: number | null;
+      completed_repetitions?: number | null;
       output_filename?: string | null;
       evaluation?: {
         accuracy: number;
         avg_loss: number;
       } | null;
+      evaluation_summary?: {
+        evaluated_repetitions: number;
+        mean_accuracy: number;
+        variance_accuracy: number;
+        mean_avg_loss: number;
+        variance_avg_loss: number;
+      } | null;
+      runs?: Array<{
+        seed: number;
+        repetition_index: number;
+        duration_seconds?: number | null;
+        output_filename?: string | null;
+        evaluation?: {
+          accuracy: number;
+          avg_loss: number;
+        } | null;
+      }> | null;
     }
   > | null;
   error?: string | null;

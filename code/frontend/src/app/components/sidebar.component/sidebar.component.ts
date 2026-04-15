@@ -112,11 +112,11 @@ export class SidebarComponent implements OnInit, OnDestroy {
     mode: 'spyker' | 'hierfl' | 'both';
     hierfl: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
-      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seedSet: number[]; repetitions: number; outputFilename: string; evaluateModel: boolean };
     };
     spyker: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
-      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seedSet: number[]; repetitions: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
       spykerConfig: {
         decayBeta: number;
         minLearningRate: number;
@@ -968,11 +968,11 @@ export class SidebarComponent implements OnInit, OnDestroy {
     mode: 'spyker' | 'hierfl' | 'both';
     hierfl: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seedSet: number[]; repetitions: number; outputFilename: string; evaluateModel: boolean };
     };
     spyker: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seedSet: number[]; repetitions: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
       spykerConfig: {
         decayBeta: number;
         minLearningRate: number;

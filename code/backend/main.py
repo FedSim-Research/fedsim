@@ -1,15 +1,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse, Response
 from contextlib import asynccontextmanager
 import ray
 from backend.api.api import router
 from backend.db import database
+from backend.services.default_graph_seed import ensure_default_graphs
 from backend.services.simulation_run_queue import run_queue
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     database.init_db()
+    ensure_default_graphs()
     run_queue.start()
     yield
     run_queue.stop()
@@ -27,4 +30,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    return RedirectResponse(url="/docs", status_code=307)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return Response(status_code=204)
+
+
 app.include_router(router)

@@ -73,8 +73,12 @@
                       <input type="text" inputmode="decimal" [ngModel]="formatDecimal(hierflSettings.gpuBudget)" (ngModelChange)="hierflSettings.gpuBudget = parseDecimalInput($event, hierflSettings.gpuBudget); onSettingsChanged()" />
                     </label>
                     <label class="field">
-                      <span class="field-label">Seed <span class="help-dot" title="Controls random operations for reproducible runs.">?</span></span>
-                      <input type="number" min="0" step="1" [(ngModel)]="hierflSettings.seed" (ngModelChange)="onSettingsChanged()" />
+                      <span class="field-label">Seed set <span class="help-dot" title="Fixed list of seeds used for reproducible benchmark repetitions, for example 42, 43, 44, 45, 46.">?</span></span>
+                      <input type="text" [(ngModel)]="hierflSettings.seedSetText" (ngModelChange)="updateSeedSet('hierfl', $event)" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Repetitions <span class="help-dot" title="Automatically derived from the number of seeds in the seed set.">?</span></span>
+                      <input type="number" [ngModel]="hierflSettings.repetitions" readonly />
                     </label>
                     <label class="field">
                       <span class="field-label">Output filename <span class="help-dot" title="Target file path/name used to store the final model checkpoint.">?</span></span>
@@ -140,8 +144,12 @@
                       <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.gpuBudget)" (ngModelChange)="spykerSettings.gpuBudget = parseDecimalInput($event, spykerSettings.gpuBudget); onSettingsChanged()" />
                     </label>
                     <label class="field">
-                      <span class="field-label">Seed <span class="help-dot" title="Controls random operations for reproducible runs.">?</span></span>
-                      <input type="number" min="0" step="1" [(ngModel)]="spykerSettings.seed" (ngModelChange)="onSettingsChanged()" />
+                      <span class="field-label">Seed set <span class="help-dot" title="Fixed list of seeds used for reproducible benchmark repetitions, for example 42, 43, 44, 45, 46.">?</span></span>
+                      <input type="text" [(ngModel)]="spykerSettings.seedSetText" (ngModelChange)="updateSeedSet('spyker', $event)" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Repetitions <span class="help-dot" title="Automatically derived from the number of seeds in the seed set.">?</span></span>
+                      <input type="number" [ngModel]="spykerSettings.repetitions" readonly />
                     </label>
                     <label class="field">
                       <span class="field-label">Idle token delay (s) <span class="help-dot" title="Delay before token forwarding when no immediate sync is triggered.">?</span></span>

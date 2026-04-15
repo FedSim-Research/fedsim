@@ -168,6 +168,7 @@ export class App implements OnInit{
     const after = history.getState();
     if (before === after) return;
     this.activeGraph().applyHistoryState(after);
+    this.shortcuts?.clearSelectionState();
     try {
       await this.graphPersistence.syncGraphState(this.activeGraph(), this.activeMode(), false);
     } catch {
@@ -182,6 +183,7 @@ export class App implements OnInit{
     const after = history.getState();
     if (before === after) return;
     this.activeGraph().applyHistoryState(after);
+    this.shortcuts?.clearSelectionState();
     try {
       await this.graphPersistence.syncGraphState(this.activeGraph(), this.activeMode(), false);
     } catch {
@@ -544,11 +546,11 @@ export class App implements OnInit{
     mode: 'spyker' | 'hierfl' | 'both';
     hierfl: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
-      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seedSet: number[]; repetitions: number; outputFilename: string; evaluateModel: boolean };
     };
     spyker: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
-      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seed: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
+      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; seedSet: number[]; repetitions: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
       spykerConfig: {
         decayBeta: number;
         minLearningRate: number;
@@ -589,7 +591,7 @@ export class App implements OnInit{
 
       const jobId = this.frameworkJobs.startJob(`${architecture.toUpperCase()} simulation`);
       try {
-        this.showInfoToast(`${architecture} simulation queued...`);
+        this.showInfoToast(`${architecture} simulation queued with ${archConfig.simulationSettings.repetitions} repetitions...`);
         const queuedRun = await this.graphApi.startSimulation({
           graph_id: graphId,
           training_config: {
@@ -603,7 +605,8 @@ export class App implements OnInit{
             eval_interval: archConfig.simulationSettings.evalInterval,
             gpu_budget: archConfig.simulationSettings.gpuBudget,
             idle_token_delay: architecture === 'spyker' ? payload.spyker.simulationSettings.idleTokenDelay : undefined,
-            seed: archConfig.simulationSettings.seed,
+            seed_set: archConfig.simulationSettings.seedSet,
+            repetitions: archConfig.simulationSettings.repetitions,
             output_filename: archConfig.simulationSettings.outputFilename || null,
             evaluate_model: archConfig.simulationSettings.evaluateModel,
           },
@@ -668,8 +671,13 @@ export class App implements OnInit{
           this.frameworkJobs.markFailed(jobId);
           return;
         }
+        if (!this.haveMatchingSeedSet(payload.hierfl.simulationSettings.seedSet, payload.spyker.simulationSettings.seedSet)) {
+          this.showErrorToast('Combined runs require identical seed sets for HierFL and Spyker.');
+          this.frameworkJobs.markFailed(jobId);
+          return;
+        }
 
-        this.showInfoToast('Combined simulation queued...');
+        this.showInfoToast(`Combined simulation queued with ${payload.hierfl.simulationSettings.repetitions} repetitions...`);
         const queuedRun = await this.graphApi.startSimulationBoth({
           hierfl: {
             graph_id: hierGraphId,
@@ -683,7 +691,8 @@ export class App implements OnInit{
               run_time_limit: payload.hierfl.simulationSettings.runTimeLimit,
               eval_interval: payload.hierfl.simulationSettings.evalInterval,
               gpu_budget: payload.hierfl.simulationSettings.gpuBudget,
-              seed: payload.hierfl.simulationSettings.seed,
+              seed_set: payload.hierfl.simulationSettings.seedSet,
+              repetitions: payload.hierfl.simulationSettings.repetitions,
               output_filename: payload.hierfl.simulationSettings.outputFilename || null,
               evaluate_model: payload.hierfl.simulationSettings.evaluateModel,
             },
@@ -701,7 +710,8 @@ export class App implements OnInit{
               eval_interval: payload.spyker.simulationSettings.evalInterval,
               gpu_budget: payload.spyker.simulationSettings.gpuBudget,
               idle_token_delay: payload.spyker.simulationSettings.idleTokenDelay,
-              seed: payload.spyker.simulationSettings.seed,
+              seed_set: payload.spyker.simulationSettings.seedSet,
+              repetitions: payload.spyker.simulationSettings.repetitions,
               output_filename: payload.spyker.simulationSettings.outputFilename || null,
               evaluate_model: payload.spyker.simulationSettings.evaluateModel,
             },
@@ -771,20 +781,44 @@ export class App implements OnInit{
 
   private formatSimulationResult(
     architecture: 'spyker' | 'hierfl',
-    result: { output_filename?: string | null; evaluation?: { accuracy: number; avg_loss: number } | null }
+    result: {
+      repetitions?: number | null;
+      output_filename?: string | null;
+      evaluation?: { accuracy: number; avg_loss: number } | null;
+      evaluation_summary?: {
+        evaluated_repetitions: number;
+        mean_accuracy: number;
+        variance_accuracy: number;
+        mean_avg_loss: number;
+        variance_avg_loss: number;
+      } | null;
+    }
   ): string {
     const parts: string[] = [];
-    if (result.output_filename) {
+    const repetitions = result.repetitions ?? 1;
+    if (repetitions > 1) {
+      parts.push(`${repetitions} repetitions completed`);
+    } else if (result.output_filename) {
       parts.push(`Saved to ${result.output_filename}`);
     } else {
       parts.push('Completed');
     }
-    if (result.evaluation) {
+    if (result.evaluation_summary) {
+      const meanAccuracyPct = (result.evaluation_summary.mean_accuracy * 100).toFixed(2);
+      const varianceAccuracy = result.evaluation_summary.variance_accuracy.toFixed(6);
+      const meanLoss = result.evaluation_summary.mean_avg_loss.toFixed(4);
+      const varianceLoss = result.evaluation_summary.variance_avg_loss.toFixed(6);
+      parts.push(`Mean accuracy ${meanAccuracyPct}%`);
+      parts.push(`Accuracy variance ${varianceAccuracy}`);
+      parts.push(`Mean loss ${meanLoss}`);
+      parts.push(`Loss variance ${varianceLoss}`);
+    } else if (result.evaluation) {
       const accuracyPct = (result.evaluation.accuracy * 100).toFixed(2);
       const loss = result.evaluation.avg_loss.toFixed(4);
       parts.push(`Accuracy ${accuracyPct}%`);
       parts.push(`Loss ${loss}`);
     }
+    return `${architecture}: ${parts.join(', ')}`;
     return `${architecture}: ${parts.join(' • ')}`;
   }
 
@@ -860,6 +894,10 @@ export class App implements OnInit{
       }
       await this.sleep(2000);
     }
+  }
+
+  private haveMatchingSeedSet(first: number[], second: number[]): boolean {
+    return first.length === second.length && first.every((value, index) => value === second[index]);
   }
 
   public async handleGraphSelected(event: { graphId: number; architecture: 'spyker' | 'hierfl' }): Promise<void> {

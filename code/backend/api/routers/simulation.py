@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from backend.services import graph_service
 from backend.services.simulation_run_queue import run_queue
+from backend.services.simulation_seed_sets import normalize_simulation_settings, shared_seed_set_or_raise
 from backend.services.simulation_validation import validate_start_payload
 
 router = APIRouter(tags=["simulation"])
@@ -23,6 +24,8 @@ class SimulationSettings(BaseModel):
     idle_token_delay: float | None = None
     gpu_budget: float | None = None
     seed: int | None = None
+    seed_set: list[int] | None = None
+    repetitions: int | None = None
     output_filename: str | None = None
     evaluate_model: bool = False
 
@@ -55,12 +58,17 @@ class SimulationRunResponse(BaseModel):
     graph_id: int
     architecture: str
     seed: int | None = None
+    seed_set: list[int] | None = None
+    repetitions: int | None = None
+    completed_repetitions: int | None = None
     queued_at: str
     started_at: str | None = None
     finished_at: str | None = None
     duration_seconds: float | None = None
     output_filename: str | None = None
     evaluation: SimulationEvaluationResult | None = None
+    evaluation_summary: dict[str, float | int] | None = None
+    runs: list[dict] | None = None
     results_by_architecture: dict[str, dict] | None = None
     error: str | None = None
 
@@ -85,11 +93,13 @@ def start_simulation(payload: SimulationStartRequest):
         logger.warning("start_simulation_graph_not_found graph_id=%s", payload.graph_id)
         raise HTTPException(status_code=404, detail="Graph not found")
 
-    training_config = payload.training_config.model_dump() if payload.training_config else None
-    simulation_settings = payload.simulation_settings.model_dump() if payload.simulation_settings else None
-    spyker_config = payload.spyker_config.model_dump() if payload.spyker_config else None
-
     try:
+        training_config = payload.training_config.model_dump() if payload.training_config else None
+        simulation_settings = normalize_simulation_settings(
+            payload.simulation_settings.model_dump() if payload.simulation_settings else None,
+            error_prefix=graph.architecture,
+        )
+        spyker_config = payload.spyker_config.model_dump() if payload.spyker_config else None
         validate_start_payload(
             architecture=graph.architecture,
             graph=graph,
@@ -132,13 +142,19 @@ def start_simulation_both(payload: SimulationStartBothRequest):
     if spyker_graph is None or spyker_graph.architecture != "spyker":
         raise HTTPException(status_code=404, detail="Spyker graph not found")
 
-    hierfl_training = payload.hierfl.training_config.model_dump() if payload.hierfl.training_config else None
-    hierfl_settings = payload.hierfl.simulation_settings.model_dump() if payload.hierfl.simulation_settings else None
-    spyker_training = payload.spyker.training_config.model_dump() if payload.spyker.training_config else None
-    spyker_settings = payload.spyker.simulation_settings.model_dump() if payload.spyker.simulation_settings else None
-    spyker_algo = payload.spyker.spyker_config.model_dump() if payload.spyker.spyker_config else None
-
     try:
+        hierfl_training = payload.hierfl.training_config.model_dump() if payload.hierfl.training_config else None
+        hierfl_settings = normalize_simulation_settings(
+            payload.hierfl.simulation_settings.model_dump() if payload.hierfl.simulation_settings else None,
+            error_prefix="hierfl",
+        )
+        spyker_training = payload.spyker.training_config.model_dump() if payload.spyker.training_config else None
+        spyker_settings = normalize_simulation_settings(
+            payload.spyker.simulation_settings.model_dump() if payload.spyker.simulation_settings else None,
+            error_prefix="spyker",
+        )
+        spyker_algo = payload.spyker.spyker_config.model_dump() if payload.spyker.spyker_config else None
+        shared_seed_set_or_raise(hierfl_settings, spyker_settings)
         validate_start_payload(
             architecture="hierfl",
             graph=hierfl_graph,
