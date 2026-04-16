@@ -81,7 +81,6 @@
           @for (role of roleCards; track role.title) {
           <article
             class="role-card"
-            style="margin-left: 2px;"
             [class.role-card--hier]="role.accent === 'hier'"
             [class.role-card--spyker]="role.accent === 'spyker'"
             [class.role-card--shared]="role.accent === 'shared'"
@@ -367,7 +366,7 @@
           <article class="parameter-card parameter-card--with-tags">
             <div class="parameter-card__header">
               <div>
-                <h4 style="white-space: pre-line">{{ item.label }}</h4>
+                <h4>{{ item.label }}</h4>
                 <code>{{ item.key }}</code>
               </div>
               <div class="applicability-boxes applicability-boxes--header">

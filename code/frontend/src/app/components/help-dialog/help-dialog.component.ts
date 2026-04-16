@@ -348,7 +348,7 @@ export class HelpDialog {
       format: 'Positive decimal number',
     },
     {
-      label: 'Server\nlearning rate',
+      label: 'Server learning rate',
       key: 'server_learning_rate',
       appliesTo: ['Spyker'],
       description: 'Aggregation learning rate on the server side.',

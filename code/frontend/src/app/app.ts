@@ -17,6 +17,7 @@ import { MessageService } from 'primeng/api';
 import { FrameworkJobsPopupComponent } from './components/framework-jobs-popup/framework-jobs-popup.component';
 import { FrameworkJobsService } from './services/framework-jobs.service';
 import { DashboardViewComponent } from './components/dashboard-view/dashboard-view.component';
+import { v4 as uuidv4 } from 'uuid';
 
 export type modes = 'spyker' | 'hierfl';
 export type workspaceView = 'editor' | 'dashboard';
@@ -142,7 +143,7 @@ export class App implements OnInit{
           return;
       }
       const newNode: Node = {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         point: mousePosition,
         type: nodeType,
         data: {
@@ -217,7 +218,7 @@ export class App implements OnInit{
       ? this.normalizeHierConnection(connection)
       : this.normalizeSpykerConnection(connection);
     const newEdge: Edge = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       source: resolved.source,
       target: resolved.target,
       sourceHandle: resolved.sourceHandle,
