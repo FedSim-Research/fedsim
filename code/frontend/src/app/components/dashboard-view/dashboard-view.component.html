@@ -26,7 +26,13 @@
           <div class="kv"><span>Run ID</span><strong>{{ run.run_id }}</strong></div>
           <div class="kv"><span>Architecture</span><strong>{{ run.architecture }}</strong></div>
           <div class="kv"><span>Status</span><strong>{{ run.status }}</strong></div>
-          <div class="kv"><span>Graph ID</span><strong>{{ run.graph_id }}</strong></div>
+          @if (isCombinedRun(run)) {
+            @let graphIds = getCombinedGraphIds(run);
+            <div class="kv"><span>HierFL Graph ID</span><strong>{{ graphIds.hierfl ?? '-' }}</strong></div>
+            <div class="kv"><span>Spyker Graph ID</span><strong>{{ graphIds.spyker ?? '-' }}</strong></div>
+          } @else {
+            <div class="kv"><span>Graph ID</span><strong>{{ run.graph_id }}</strong></div>
+          }
           <div class="kv"><span>Seed</span><strong>{{ run.seed ?? '-' }}</strong></div>
           <div class="kv"><span>Duration</span><strong>{{ formatDuration(run.duration_seconds) }}</strong></div>
         </article>
@@ -56,15 +62,32 @@
                 </div>
               }
             </div>
-            <section class="mini-telemetry-card">
-              <iframe
-                [src]="modelQualityTrendEmbed()"
-                width="100%"
-                height="150"
-                frameborder="0"
-                loading="lazy"
-              ></iframe>
-            </section>
+            @if (isCombinedRun(run)) {
+              <div class="mini-telemetry-grid">
+                @for (embed of modelQualityTrendEmbedsForBoth(); track embed.architecture) {
+                  <section class="mini-telemetry-card">
+                    <div class="mini-telemetry-title">{{ architectureLabel(embed.architecture) }} Trend</div>
+                    <iframe
+                      [src]="embed.src"
+                      width="100%"
+                      height="150"
+                      frameborder="0"
+                      loading="lazy"
+                    ></iframe>
+                  </section>
+                }
+              </div>
+            } @else {
+              <section class="mini-telemetry-card">
+                <iframe
+                  [src]="modelQualityTrendEmbed()"
+                  width="100%"
+                  height="150"
+                  frameborder="0"
+                  loading="lazy"
+                ></iframe>
+              </section>
+            }
           </div>
         </article>
       </div>

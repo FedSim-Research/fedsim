@@ -55,7 +55,7 @@ class SimulationEvaluationResult(BaseModel):
 class SimulationRunResponse(BaseModel):
     run_id: str
     status: str
-    graph_id: int
+    graph_id: int | None = None
     architecture: str
     seed: int | None = None
     seed_set: list[int] | None = None
@@ -71,6 +71,8 @@ class SimulationRunResponse(BaseModel):
     runs: list[dict] | None = None
     results_by_architecture: dict[str, dict] | None = None
     error: str | None = None
+    run_metadata: dict | None = None
+    final_run_summary: dict | None = None
 
 
 class SimulationSingleConfig(BaseModel):
@@ -192,14 +194,14 @@ def start_simulation_both(payload: SimulationStartBothRequest):
 
 @router.get("/runs/{run_id}", response_model=SimulationRunResponse)
 def get_run_status(run_id: str):
-    run = run_queue.get(run_id)
+    run = run_queue.get_run_api(run_id)
     if run is None:
         logger.warning("get_run_status_not_found run_id=%s", run_id)
         raise HTTPException(status_code=404, detail="Run not found")
-    logger.debug("get_run_status run_id=%s status=%s", run_id, run.status)
-    return run.to_api_dict()
+    logger.debug("get_run_status run_id=%s status=%s", run_id, run.get("status"))
+    return run
 
 
 @router.get("/runs", response_model=list[SimulationRunResponse])
 def list_runs():
-    return [run.to_api_dict() for run in run_queue.list_runs()]
+    return run_queue.list_runs_api()

@@ -15,6 +15,11 @@ type ArchitectureMetrics = {
   metrics: ComparableMetrics;
 };
 
+type ArchitectureEmbed = {
+  architecture: 'hierfl' | 'spyker';
+  src: SafeResourceUrl;
+};
+
 @Component({
   selector: 'app-dashboard-view',
   standalone: true,
@@ -54,7 +59,7 @@ export class DashboardViewComponent {
     const run = this.selectedRun();
     const range = this.runTimeRange(run);
     const runId = run?.run_id ?? '';
-    const architecture = run?.architecture ? String(run.architecture) : '';
+    const architecture = this.toGrafanaArchitectureParam(run?.architecture ? String(run.architecture) : '');
     return this.telemetryPanels.map((panel) => ({
       ...panel,
       src: this.getGrafanaPanelUrl({
@@ -72,7 +77,7 @@ export class DashboardViewComponent {
     const run = this.selectedRun();
     const range = this.runTimeRange(run);
     const runId = run?.run_id ?? '';
-    const architecture = run?.architecture ? String(run.architecture) : '';
+    const architecture = this.toGrafanaArchitectureParam(run?.architecture ? String(run.architecture) : '');
     return this.getGrafanaPanelUrl({
       uid: 'fedsimFrontendDashboard',
       panelId: 1007,
@@ -81,6 +86,26 @@ export class DashboardViewComponent {
       runId,
       architecture,
     });
+  });
+
+  public modelQualityTrendEmbedsForBoth = computed<ArchitectureEmbed[]>(() => {
+    const run = this.selectedRun();
+    if (!run || String(run.architecture) !== 'both') {
+      return [];
+    }
+    const range = this.runTimeRange(run);
+    const runId = run.run_id ?? '';
+    return (['hierfl', 'spyker'] as const).map((architecture) => ({
+      architecture,
+      src: this.getGrafanaPanelUrl({
+        uid: 'fedsimFrontendDashboard',
+        panelId: 1007,
+        rangeFrom: range.from,
+        rangeTo: range.to,
+        runId,
+        architecture: this.toGrafanaArchitectureParam(architecture),
+      }),
+    }));
   });
 
   public getStatusClass(status: SimulationRunResponse['status']): string {
@@ -169,6 +194,16 @@ export class DashboardViewComponent {
     return value.toFixed(4);
   }
 
+  public getCombinedGraphIds(run: SimulationRunResponse): { hierfl: number | null; spyker: number | null } {
+    const metadata = run.run_metadata as Record<string, unknown> | null | undefined;
+    const combinedPayload = (metadata?.['combined_payload'] as Record<string, unknown> | undefined) ?? {};
+    const hierfl = combinedPayload['hierfl'] as Record<string, unknown> | undefined;
+    const spyker = combinedPayload['spyker'] as Record<string, unknown> | undefined;
+    const hierflGraphId = typeof hierfl?.['graph_id'] === 'number' ? (hierfl['graph_id'] as number) : null;
+    const spykerGraphId = typeof spyker?.['graph_id'] === 'number' ? (spyker['graph_id'] as number) : null;
+    return { hierfl: hierflGraphId, spyker: spykerGraphId };
+  }
+
   private runTimeRange(run: SimulationRunResponse | null): { from: number; to: number } {
     const now = Date.now();
     const queuedAt = run?.queued_at ? new Date(run.queued_at).getTime() : NaN;
@@ -213,5 +248,15 @@ export class DashboardViewComponent {
     const safe = this.sanitizer.bypassSecurityTrustResourceUrl(url);
     this.grafanaUrlCache.set(cacheKey, safe);
     return safe;
+  }
+
+  private toGrafanaArchitectureParam(value: string): string {
+    if (value === 'hierfl') {
+      return 'hierarchical';
+    }
+    if (value === 'both') {
+      return 'spyker|hierarchical';
+    }
+    return value;
   }
 }

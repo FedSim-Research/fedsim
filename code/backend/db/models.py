@@ -1,4 +1,4 @@
-from sqlalchemy import String, Text, DateTime, func, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Text, DateTime, Float, func, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.db.database import Base
@@ -107,5 +107,37 @@ class NodePreset(Base):
     created_at: Mapped[str] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
+        nullable=False,
+    )
+
+
+class SimulationRun(Base):
+    """
+    Persisted simulation run lifecycle, metadata, and final summary.
+    """
+
+    __tablename__ = "simulation_runs"
+
+    run_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    graph_id: Mapped[int | None] = mapped_column(nullable=True)
+    architecture: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    queued_at: Mapped[str] = mapped_column(DateTime(timezone=True), nullable=False)
+    started_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[str | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    final_summary_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[str] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[str] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False,
     )

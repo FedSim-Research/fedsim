@@ -239,6 +239,8 @@ export interface SimulationRunResponse {
     } | null;
   }> | null;
   results_by_architecture?: Record<string, SimulationRunResult> | null;
+  run_metadata?: Record<string, unknown> | null;
+  final_run_summary?: Record<string, unknown> | null;
 }
 
 export interface PresetResponse {

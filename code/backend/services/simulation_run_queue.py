@@ -14,6 +14,7 @@ import ray
 
 from backend.services import graph_service
 from backend.services.simulation_seed_sets import build_seeded_output_filename, shared_seed_set_or_raise
+from backend.services import simulation_run_store
 from backend.simulation_controller import SimulationController
 
 RunStatus = Literal["queued", "running", "completed", "failed"]
@@ -89,7 +90,7 @@ def _build_series_result(seed_set: list[int], runs: list[dict[str, Any]]) -> dic
 @dataclass
 class RunJob:
     run_id: str
-    graph_id: int
+    graph_id: int | None
     architecture: str
     training_config: dict[str, Any] | None
     simulation_settings: dict[str, Any] | None
@@ -144,6 +145,12 @@ class SimulationRunQueue:
         self._stop_event = Event()
         self._worker: Thread | None = None
 
+    def _persist_final_run_safe(self, job: RunJob) -> None:
+        try:
+            simulation_run_store.persist_final_run(job)
+        except Exception:
+            logger.exception("simulation_run_persist_failed run_id=%s", job.run_id)
+
     def start(self) -> None:
         with self._lock:
             if self._worker is not None and self._worker.is_alive():
@@ -195,7 +202,7 @@ class SimulationRunQueue:
         run_id = str(uuid4())
         job = RunJob(
             run_id=run_id,
-            graph_id=-1,
+            graph_id=None,
             architecture="both",
             training_config=None,
             simulation_settings=None,
@@ -219,6 +226,35 @@ class SimulationRunQueue:
     def list_runs(self) -> list[RunJob]:
         with self._lock:
             return sorted(self._jobs.values(), key=lambda run: run.queued_at, reverse=True)
+
+    def get_run_api(self, run_id: str) -> dict[str, Any] | None:
+        persisted = simulation_run_store.get_run_api(run_id)
+        with self._lock:
+            job = self._jobs.get(run_id)
+        if job is None:
+            return persisted
+        runtime = job.to_api_dict()
+        if persisted is None:
+            return runtime
+        merged = {**persisted, **runtime}
+        merged["run_metadata"] = persisted.get("run_metadata")
+        merged["final_run_summary"] = persisted.get("final_run_summary")
+        return merged
+
+    def list_runs_api(self) -> list[dict[str, Any]]:
+        persisted = {item["run_id"]: item for item in simulation_run_store.list_runs_api()}
+        with self._lock:
+            for job in self._jobs.values():
+                runtime = job.to_api_dict()
+                existing = persisted.get(job.run_id)
+                if existing is None:
+                    persisted[job.run_id] = runtime
+                    continue
+                merged = {**existing, **runtime}
+                merged["run_metadata"] = existing.get("run_metadata")
+                merged["final_run_summary"] = existing.get("final_run_summary")
+                persisted[job.run_id] = merged
+        return sorted(persisted.values(), key=lambda item: item.get("queued_at") or "", reverse=True)
 
     def _worker_loop(self) -> None:
         while not self._stop_event.is_set():
@@ -288,6 +324,7 @@ class SimulationRunQueue:
             job.error = error
             job.finished_at = finished_at.isoformat()
             job.duration_seconds = duration_seconds
+        self._persist_final_run_safe(job)
         if status == "completed":
             logger.info(
                 "simulation_run_completed run_id=%s graph_id=%s architecture=%s duration_seconds=%.3f",
