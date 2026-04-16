@@ -1,0 +1,126 @@
+<section class="dashboard-shell" [class.dashboard-shell--sidebar-open]="sidebarOpen" [class.dashboard-shell--sidebar-closed]="!sidebarOpen">
+  <main class="details-panel">
+    <section class="cockpit-grid">
+      <article class="summary-card">
+        <h3>Total Runs</h3>
+        <div class="metric-value metric-value--large">{{ runStats().total }}</div>
+      </article>
+      <article class="summary-card">
+        <h3>Queued</h3>
+        <div class="metric-value metric-value--large">{{ runStats().queued }}</div>
+      </article>
+      <article class="summary-card">
+        <h3>Completed</h3>
+        <div class="metric-value metric-value--large">{{ runStats().completed }}</div>
+      </article>
+      <article class="summary-card">
+        <h3>Failed</h3>
+        <div class="metric-value metric-value--large">{{ runStats().failed }}</div>
+      </article>
+    </section>
+
+    @if (selectedRun(); as run) {
+      <div class="summary-grid">
+        <article class="summary-card">
+          <h3>Run Summary</h3>
+          <div class="kv"><span>Run ID</span><strong>{{ run.run_id }}</strong></div>
+          <div class="kv"><span>Architecture</span><strong>{{ run.architecture }}</strong></div>
+          <div class="kv"><span>Status</span><strong>{{ run.status }}</strong></div>
+          <div class="kv"><span>Graph ID</span><strong>{{ run.graph_id }}</strong></div>
+          <div class="kv"><span>Seed</span><strong>{{ run.seed ?? '-' }}</strong></div>
+          <div class="kv"><span>Duration</span><strong>{{ formatDuration(run.duration_seconds) }}</strong></div>
+        </article>
+
+        <article class="summary-card">
+          <h3>Model Quality</h3>
+          @let metrics = getRunMetrics(run);
+          <div class="model-quality-grid">
+            <div class="model-quality-metrics">
+              <div class="metric-block">
+                <span class="metric-label">Accuracy</span>
+                <strong class="metric-value">{{ formatPercent(metrics.accuracy) }}</strong>
+              </div>
+              <div class="metric-block">
+                <span class="metric-label">Loss</span>
+                <strong class="metric-value">{{ formatLoss(metrics.loss) }}</strong>
+              </div>
+            </div>
+            <section class="mini-telemetry-card">
+              <iframe
+                [src]="modelQualityTrendEmbed()"
+                width="100%"
+                height="150"
+                frameborder="0"
+                loading="lazy"
+              ></iframe>
+            </section>
+          </div>
+        </article>
+      </div>
+    } @else {
+      <div class="empty-details">
+        @if (pollingSupported()) {
+          Select a run to inspect details.
+        } @else {
+          Run details are unavailable without <code>/runs</code>. System telemetry and local job history are still available below.
+        }
+      </div>
+    }
+
+    @if (recentJobs().length) {
+      <article class="summary-card">
+        <h3>Recent Framework Jobs (Local Session)</h3>
+        <ul class="jobs-list">
+          @for (job of recentJobs(); track job.id) {
+            <li class="job-row">
+              <div class="job-main">
+                <strong>{{ job.title }}</strong>
+                <span [class]="getStatusClass(job.status)">{{ job.status }}</span>
+              </div>
+              <div class="job-meta">Started: {{ formatEpoch(job.startedAt) }}</div>
+            </li>
+          }
+        </ul>
+      </article>
+    }
+
+    @if (compareRuns().length === 2) {
+      <article class="summary-card compare-card">
+        <h3>Run Comparison</h3>
+        <div class="compare-grid">
+          @for (run of compareRuns(); track run.run_id) {
+            @let metrics = getRunMetrics(run);
+            <div class="compare-col">
+              <div class="compare-id">{{ run.run_id }}</div>
+              <div class="compare-kv"><span>Architecture</span><strong>{{ run.architecture }}</strong></div>
+              <div class="compare-kv"><span>Status</span><strong>{{ run.status }}</strong></div>
+              <div class="compare-kv"><span>Accuracy</span><strong>{{ formatPercent(metrics.accuracy) }}</strong></div>
+              <div class="compare-kv"><span>Loss</span><strong>{{ formatLoss(metrics.loss) }}</strong></div>
+              <div class="compare-kv"><span>Duration</span><strong>{{ formatDuration(run.duration_seconds) }}</strong></div>
+            </div>
+          }
+        </div>
+      </article>
+    }
+
+    <article class="summary-card">
+      <h3>Grafana Research Telemetry</h3>
+      <p class="telemetry-note">
+        Panels are filtered to the selected run time window when a run is selected.
+      </p>
+      <div class="telemetry-grid">
+        @for (panel of telemetryEmbeds(); track panel.uid + '-' + panel.panelId) {
+          <section class="telemetry-card">
+            <iframe
+              [src]="panel.src"
+              width="100%"
+              [height]="panel.height"
+              frameborder="0"
+o              loading="lazy"
+            ></iframe>
+          </section>
+        }
+      </div>
+    </article>
+  </main>
+</section>

@@ -16,8 +16,10 @@ import { GraphValidatorService } from './services/graph-validator-service';
 import { MessageService } from 'primeng/api';
 import { FrameworkJobsPopupComponent } from './components/framework-jobs-popup/framework-jobs-popup.component';
 import { FrameworkJobsService } from './services/framework-jobs.service';
+import { DashboardViewComponent } from './components/dashboard-view/dashboard-view.component';
 
 export type modes = 'spyker' | 'hierfl';
+export type workspaceView = 'editor' | 'dashboard';
 
 @Component({
   selector: 'app-root',
@@ -32,6 +34,7 @@ export type modes = 'spyker' | 'hierfl';
     NgxSelectoModule,
     EdgeMetricsBoxComponent,
     FrameworkJobsPopupComponent,
+    DashboardViewComponent,
   ],
 })
 export class App implements OnInit{
@@ -46,6 +49,8 @@ export class App implements OnInit{
   private messageService = inject(MessageService);
   private frameworkJobs = inject(FrameworkJobsService);
   public activeMode = signal<modes>('hierfl');
+  public activeView = signal<workspaceView>('editor');
+  public sidebarOpen = signal(true);
   public simulationRunning = signal(false);
   public activeGraph = computed(() => {
     if (this.activeMode() === 'spyker') {
@@ -159,6 +164,17 @@ export class App implements OnInit{
     if (this.activeMode() === mode) return;
     this.activeMode.set(mode);
     console.log("changed mode to:" + mode);
+  }
+
+  public changeView(view: workspaceView): void {
+    if (this.activeView() === view) {
+      return;
+    }
+    this.activeView.set(view);
+  }
+
+  public onSidebarOpenChange(isOpen: boolean): void {
+    this.sidebarOpen.set(isOpen);
   }
 
   public async undo(){

@@ -61,7 +61,7 @@ class SimulationRunResponse(BaseModel):
     seed_set: list[int] | None = None
     repetitions: int | None = None
     completed_repetitions: int | None = None
-    queued_at: str
+    queued_at: str | None = None
     started_at: str | None = None
     finished_at: str | None = None
     duration_seconds: float | None = None
