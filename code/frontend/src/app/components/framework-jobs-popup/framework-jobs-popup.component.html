@@ -1,32 +1,30 @@
 <div class="jobs-popup" [class.jobs-popup--open]="isOpen()">
   <button class="jobs-toggle" type="button" (click)="toggle()" aria-label="Framework jobs anzeigen">
-    <span>Jobs</span>
-    <span class="jobs-count">{{ runningCount() }}/{{ jobs().length }}</span>
+    <span>Active Runs</span>
+    <span class="jobs-count">{{ activeRuns().length }}</span>
   </button>
 
   <div class="jobs-panel" *ngIf="isOpen()">
     <div class="jobs-header">
       <span>Running: {{ runningCount() }}</span>
-      <span>Completed: {{ completedCount() }}</span>
+      <span>Queued: {{ queuedCount() }}</span>
     </div>
 
-    <div class="jobs-empty" *ngIf="!jobs().length">
-      No jobs yet.
+    <div class="jobs-empty" *ngIf="!activeRuns().length">
+      No active runs.
     </div>
 
-    <ul class="jobs-list" *ngIf="jobs().length">
-      <li class="jobs-item" *ngFor="let job of jobs()">
+    <ul class="jobs-list" *ngIf="activeRuns().length">
+      <li class="jobs-item" *ngFor="let run of activeRuns()">
         <span
           class="status-icon"
-          [class.status-icon--completed]="job.status === 'completed'"
-          [class.status-icon--failed]="job.status === 'failed'"
+          [class.status-icon--running]="run.status === 'running'"
+          [class.status-icon--queued]="run.status === 'queued'"
         >
-          <i *ngIf="job.status === 'completed'" class="pi pi-check-circle"></i>
-          <i *ngIf="job.status === 'failed'" class="pi pi-times-circle"></i>
-          <i *ngIf="job.status === 'running'" class="pi pi-spinner pi-spin"></i>
-          <i *ngIf="job.status === 'queued'" class="pi pi-clock"></i>
+          <i *ngIf="run.status === 'running'" class="pi pi-spinner pi-spin"></i>
+          <i *ngIf="run.status === 'queued'" class="pi pi-clock"></i>
         </span>
-        <span class="jobs-title">{{ job.title }}</span>
+        <span class="jobs-title">{{ formatRunTitle(run) }}</span>
       </li>
     </ul>
   </div>

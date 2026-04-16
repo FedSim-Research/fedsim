@@ -10,6 +10,11 @@ type ComparableMetrics = {
   loss: number | null;
 };
 
+type ArchitectureMetrics = {
+  architecture: 'hierfl' | 'spyker';
+  metrics: ComparableMetrics;
+};
+
 @Component({
   selector: 'app-dashboard-view',
   standalone: true,
@@ -69,7 +74,7 @@ export class DashboardViewComponent {
     const runId = run?.run_id ?? '';
     const architecture = run?.architecture ? String(run.architecture) : '';
     return this.getGrafanaPanelUrl({
-      uid: '01956efd-3d1e-478b-8b07-e1d59541628f',
+      uid: 'fedsimFrontendDashboard',
       panelId: 1007,
       rangeFrom: range.from,
       rangeTo: range.to,
@@ -125,6 +130,29 @@ export class DashboardViewComponent {
     }
 
     return { accuracy: null, loss: null };
+  }
+
+  public isCombinedRun(run: SimulationRunResponse): boolean {
+    return String(run.architecture) === 'both' && !!run.results_by_architecture;
+  }
+
+  public getCombinedRunMetrics(run: SimulationRunResponse): ArchitectureMetrics[] {
+    const byArchitecture = run.results_by_architecture;
+    if (!byArchitecture) {
+      return [];
+    }
+
+    return (['hierfl', 'spyker'] as const).map((architecture) => ({
+      architecture,
+      metrics: {
+        accuracy: byArchitecture[architecture]?.evaluation?.accuracy ?? null,
+        loss: byArchitecture[architecture]?.evaluation?.avg_loss ?? null,
+      },
+    }));
+  }
+
+  public architectureLabel(architecture: 'hierfl' | 'spyker'): string {
+    return architecture === 'hierfl' ? 'HierFL' : 'Spyker';
   }
 
   public formatPercent(value: number | null): string {

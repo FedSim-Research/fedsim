@@ -40,7 +40,7 @@ services:
     volumes:
       - ../monitoring-configs/grafana.ini:/etc/grafana/grafana.ini:ro
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ../frontend/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ../frontend/grafana-dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
       - loki

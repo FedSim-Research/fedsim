@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
-import { FrameworkJobsService } from '../../services/framework-jobs.service';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { DashboardRunsService } from '../../services/dashboard-runs.service';
+import { SimulationRunResponse } from '../../services/graph-api.service';
 
 @Component({
   selector: 'app-framework-jobs-popup',
@@ -9,16 +10,34 @@ import { FrameworkJobsService } from '../../services/framework-jobs.service';
   templateUrl: './framework-jobs-popup.component.html',
   styleUrl: './framework-jobs-popup.component.css',
 })
-export class FrameworkJobsPopupComponent {
-  private jobsService = inject(FrameworkJobsService);
+export class FrameworkJobsPopupComponent implements OnInit, OnDestroy {
+  private runsService = inject(DashboardRunsService);
   public isOpen = signal(false);
-  public jobs = this.jobsService.jobs;
-  public runningCount = this.jobsService.runningCount;
-  public completedCount = computed(
-    () => this.jobs().filter((job) => job.status === 'completed').length
+  public activeRuns = computed(() =>
+    this.runsService.runs().filter((run) => run.status === 'queued' || run.status === 'running')
   );
+  public runningCount = computed(() =>
+    this.activeRuns().filter((run) => run.status === 'running').length
+  );
+  public queuedCount = computed(() =>
+    this.activeRuns().filter((run) => run.status === 'queued').length
+  );
+
+  public ngOnInit(): void {
+    this.runsService.startPolling();
+  }
+
+  public ngOnDestroy(): void {
+    this.runsService.stopPolling();
+  }
 
   public toggle(): void {
     this.isOpen.update((value) => !value);
+  }
+
+  public formatRunTitle(run: SimulationRunResponse): string {
+    const architecture = String(run.architecture ?? 'unknown').toUpperCase();
+    const graphId = run.graph_id ?? '-';
+    return `${architecture} run · graph ${graphId}`;
   }
 }

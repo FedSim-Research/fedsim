@@ -149,7 +149,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{component=\"ray\", job=\"ray-actors\"} |= `spyker Eval`",
+          "expr": "{component=\"ray\", job=\"ray-actors\"} |= \"Eval\" | regexp `T=\\s*(?P<T>[0-9]+(?:\\.[0-9]+)?)s.*Acc:\\s*(?P<Acc>[0-9]+(?:\\.[0-9]+)?)\\s*\\|\\s*Loss:\\s*(?P<Loss>[0-9]+(?:\\.[0-9]+)?)` | line_format `T={{.T}},Acc={{.Acc}},Loss={{.Loss}}`",
           "queryType": "range",
           "datasource": {
             "type": "loki",
@@ -375,6 +375,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "Frontend Dashboard",
+  "uid": "fedsimFrontendDashboard",
   "version": 1,
   "weekStart": ""
 }

@@ -33,17 +33,28 @@
 
         <article class="summary-card">
           <h3>Model Quality</h3>
-          @let metrics = getRunMetrics(run);
           <div class="model-quality-grid">
             <div class="model-quality-metrics">
-              <div class="metric-block">
-                <span class="metric-label">Accuracy</span>
-                <strong class="metric-value">{{ formatPercent(metrics.accuracy) }}</strong>
-              </div>
-              <div class="metric-block">
-                <span class="metric-label">Loss</span>
-                <strong class="metric-value">{{ formatLoss(metrics.loss) }}</strong>
-              </div>
+              @if (isCombinedRun(run)) {
+                @for (entry of getCombinedRunMetrics(run); track entry.architecture) {
+                  <div class="metric-block metric-block--combined">
+                    <span class="metric-label">{{ architectureLabel(entry.architecture) }} Accuracy</span>
+                    <strong class="metric-value">{{ formatPercent(entry.metrics.accuracy) }}</strong>
+                    <span class="metric-label">{{ architectureLabel(entry.architecture) }} Loss</span>
+                    <strong class="metric-value">{{ formatLoss(entry.metrics.loss) }}</strong>
+                  </div>
+                }
+              } @else {
+                @let metrics = getRunMetrics(run);
+                <div class="metric-block">
+                  <span class="metric-label">Accuracy</span>
+                  <strong class="metric-value">{{ formatPercent(metrics.accuracy) }}</strong>
+                </div>
+                <div class="metric-block">
+                  <span class="metric-label">Loss</span>
+                  <strong class="metric-value">{{ formatLoss(metrics.loss) }}</strong>
+                </div>
+              }
             </div>
             <section class="mini-telemetry-card">
               <iframe
@@ -89,13 +100,20 @@
         <h3>Run Comparison</h3>
         <div class="compare-grid">
           @for (run of compareRuns(); track run.run_id) {
-            @let metrics = getRunMetrics(run);
             <div class="compare-col">
               <div class="compare-id">{{ run.run_id }}</div>
               <div class="compare-kv"><span>Architecture</span><strong>{{ run.architecture }}</strong></div>
               <div class="compare-kv"><span>Status</span><strong>{{ run.status }}</strong></div>
-              <div class="compare-kv"><span>Accuracy</span><strong>{{ formatPercent(metrics.accuracy) }}</strong></div>
-              <div class="compare-kv"><span>Loss</span><strong>{{ formatLoss(metrics.loss) }}</strong></div>
+              @if (isCombinedRun(run)) {
+                @for (entry of getCombinedRunMetrics(run); track entry.architecture) {
+                  <div class="compare-kv"><span>{{ architectureLabel(entry.architecture) }} Accuracy</span><strong>{{ formatPercent(entry.metrics.accuracy) }}</strong></div>
+                  <div class="compare-kv"><span>{{ architectureLabel(entry.architecture) }} Loss</span><strong>{{ formatLoss(entry.metrics.loss) }}</strong></div>
+                }
+              } @else {
+                @let metrics = getRunMetrics(run);
+                <div class="compare-kv"><span>Accuracy</span><strong>{{ formatPercent(metrics.accuracy) }}</strong></div>
+                <div class="compare-kv"><span>Loss</span><strong>{{ formatLoss(metrics.loss) }}</strong></div>
+              }
               <div class="compare-kv"><span>Duration</span><strong>{{ formatDuration(run.duration_seconds) }}</strong></div>
             </div>
           }
@@ -116,7 +134,7 @@
               width="100%"
               [height]="panel.height"
               frameborder="0"
-o              loading="lazy"
+              loading="lazy"
             ></iframe>
           </section>
         }
