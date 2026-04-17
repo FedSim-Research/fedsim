@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
@@ -7,6 +8,21 @@ from backend.api.api import router
 from backend.db import database
 from backend.services.default_graph_seed import ensure_default_graphs
 from backend.services.simulation_run_queue import run_queue
+
+
+class _SuppressRunsAccessLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        return (
+            '"GET /runs ' not in message
+            and '"GET /runs/' not in message
+        )
+
+
+def _install_access_log_filter() -> None:
+    access_logger = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, _SuppressRunsAccessLogFilter) for f in access_logger.filters):
+        access_logger.addFilter(_SuppressRunsAccessLogFilter())
 
 
 @asynccontextmanager
@@ -22,6 +38,7 @@ async def lifespan(app: FastAPI):
 # This initializes the main backend server.
 # Start the backend from the code root with: uvicorn backend.main:app --reload
 # Swagger UI: http://127.0.0.1:8000/docs
+_install_access_log_filter()
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
