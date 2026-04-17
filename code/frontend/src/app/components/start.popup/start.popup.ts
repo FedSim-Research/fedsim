@@ -431,16 +431,14 @@ export class StartPopup implements OnInit {
     }
 
     const seeds: number[] = [];
-    const seen = new Set<number>();
     for (const token of tokens) {
       if (!/^\d+$/.test(token)) {
         return null;
       }
       const seed = Number(token);
-      if (!Number.isInteger(seed) || seed < 0 || seen.has(seed)) {
+      if (!Number.isInteger(seed) || seed < 0) {
         return null;
       }
-      seen.add(seed);
       seeds.push(seed);
     }
 

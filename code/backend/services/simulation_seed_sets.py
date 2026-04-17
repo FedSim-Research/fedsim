@@ -76,13 +76,9 @@ def _normalize_seed_set(
         raise ValueError(f"{error_prefix}_invalid_seed_set")
 
     normalized: list[int] = []
-    seen: set[int] = set()
     for value in raw_seed_set:
         seed = _parse_seed(value, error_prefix=error_prefix)
-        if seed in seen:
-            raise ValueError(f"{error_prefix}_duplicate_seed")
         normalized.append(seed)
-        seen.add(seed)
 
     if not normalized:
         raise ValueError(f"{error_prefix}_invalid_seed_set")

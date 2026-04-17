@@ -101,17 +101,11 @@ export class GraphValidatorService {
     if (!Array.isArray(seedSet) || seedSet.length === 0) {
       errors.push(`${architecture}: seed set must contain at least one integer seed`);
     } else {
-      const seen = new Set<number>();
       for (const seed of seedSet) {
         if (!Number.isInteger(seed) || seed < 0) {
           errors.push(`${architecture}: seed set entries must be integers >= 0`);
           break;
         }
-        if (seen.has(seed)) {
-          errors.push(`${architecture}: seed set must not contain duplicate seeds`);
-          break;
-        }
-        seen.add(seed);
       }
     }
     if (!Number.isInteger(config.simulationSettings.repetitions) || config.simulationSettings.repetitions < 1) {

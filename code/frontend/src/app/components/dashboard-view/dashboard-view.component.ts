@@ -20,6 +20,19 @@ type ArchitectureEmbed = {
   src: SafeResourceUrl;
 };
 
+type RunDashboardEmbed = {
+  key: string;
+  title: string;
+  src: SafeResourceUrl;
+};
+
+type CompletedRunDashboard = {
+  runId: string;
+  architecture: string;
+  finishedAtEpoch: number | null;
+  embeds: RunDashboardEmbed[];
+};
+
 @Component({
   selector: 'app-dashboard-view',
   standalone: true,
@@ -42,6 +55,7 @@ export class DashboardViewComponent {
   public selectedRun = this.runsService.selectedRun;
   public compareRuns = this.runsService.compareRuns;
   public runStats = this.runsService.runStats;
+  public runs = this.runsService.runs;
 
   public frameworkJobs = this.frameworkJobsService.jobs;
   public recentJobs = computed(() => this.frameworkJobs().slice(0, 8));
@@ -106,6 +120,57 @@ export class DashboardViewComponent {
         architecture: this.toGrafanaArchitectureParam(architecture),
       }),
     }));
+  });
+
+  public completedRunDashboards = computed<CompletedRunDashboard[]>(() => {
+    const completed = this.runs().filter((run: SimulationRunResponse) => run.status === 'completed');
+    const sorted = [...completed].sort((left, right) => this.toEpoch(right.finished_at) - this.toEpoch(left.finished_at));
+
+    return sorted.slice(0, 8).map((run) => {
+      const runId = run.run_id ?? '';
+      const architecture = String(run.architecture ?? 'unknown');
+      const range = this.runTimeRange(run);
+
+      if (architecture === 'both') {
+        return {
+          runId,
+          architecture,
+          finishedAtEpoch: Number.isFinite(this.toEpoch(run.finished_at)) ? this.toEpoch(run.finished_at) : null,
+          embeds: (['hierfl', 'spyker'] as const).map((singleArchitecture) => ({
+            key: `${runId}-${singleArchitecture}`,
+            title: `${this.architectureLabel(singleArchitecture)} Accuracy & Loss`,
+            src: this.getGrafanaPanelUrl({
+              uid: 'fedsimFrontendDashboard',
+              panelId: 1007,
+              rangeFrom: range.from,
+              rangeTo: range.to,
+              runId,
+              architecture: this.toGrafanaArchitectureParam(singleArchitecture),
+            }),
+          })),
+        };
+      }
+
+      return {
+        runId,
+        architecture,
+        finishedAtEpoch: Number.isFinite(this.toEpoch(run.finished_at)) ? this.toEpoch(run.finished_at) : null,
+        embeds: [
+          {
+            key: `${runId}-${architecture || 'single'}`,
+            title: 'Accuracy & Loss',
+            src: this.getGrafanaPanelUrl({
+              uid: 'fedsimFrontendDashboard',
+              panelId: 1007,
+              rangeFrom: range.from,
+              rangeTo: range.to,
+              runId,
+              architecture: this.toGrafanaArchitectureParam(architecture),
+            }),
+          },
+        ],
+      };
+    });
   });
 
   public getStatusClass(status: SimulationRunResponse['status']): string {
@@ -252,11 +317,18 @@ export class DashboardViewComponent {
 
   private toGrafanaArchitectureParam(value: string): string {
     if (value === 'hierfl') {
-      return 'hierarchical';
+      return 'hierfl';
     }
     if (value === 'both') {
-      return 'spyker|hierarchical';
+      return 'spyker|hierfl';
     }
     return value;
+  }
+
+  private toEpoch(value: string | null | undefined): number {
+    if (!value) {
+      return Number.NaN;
+    }
+    return new Date(value).getTime();
   }
 }

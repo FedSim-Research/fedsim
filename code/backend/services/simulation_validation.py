@@ -162,12 +162,8 @@ def _validate_seed_controls(simulation_settings: dict, prefix: str) -> None:
     if seed_set is not None:
         if not isinstance(seed_set, list) or not seed_set:
             raise ValueError(f"{prefix}_invalid_seed_set")
-        seen: set[int] = set()
         for seed in seed_set:
-            parsed = _parse_int_ge_zero(seed, f"{prefix}_invalid_seed")
-            if parsed in seen:
-                raise ValueError(f"{prefix}_duplicate_seed")
-            seen.add(parsed)
+            _parse_int_ge_zero(seed, f"{prefix}_invalid_seed")
 
     repetitions = simulation_settings.get("repetitions")
     if repetitions is not None:
