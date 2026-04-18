@@ -115,6 +115,8 @@ export interface SimulationStartRequest {
     idle_token_delay?: number;
     gpu_budget?: number;
     seed?: number;
+    seed_set?: number[];
+    repetitions?: number;
     output_filename?: string | null;
     evaluate_model?: boolean;
   };
@@ -134,13 +136,14 @@ export interface SimulationStartBothRequest {
   spyker: SimulationStartRequest;
 }
 
-export interface SimulationRunResponse {
-  run_id: string;
-  status: 'queued' | 'running' | 'completed' | 'failed';
-  graph_id: number;
-  architecture: 'spyker' | 'hierfl' | 'both';
+export interface SimulationRunResult {
+  architecture?: 'spyker' | 'hierfl' | string;
+  graph_id?: number | null;
   seed?: number | null;
-  queued_at: string;
+  seed_set?: number[] | null;
+  repetitions?: number | null;
+  completed_repetitions?: number | null;
+  queued_at?: string | null;
   started_at?: string | null;
   finished_at?: string | null;
   duration_seconds?: number | null;
@@ -149,17 +152,95 @@ export interface SimulationRunResponse {
     accuracy: number;
     avg_loss: number;
   } | null;
+  evaluation_summary?: {
+    evaluated_repetitions: number;
+    mean_accuracy: number;
+    variance_accuracy: number;
+    mean_avg_loss: number;
+    variance_avg_loss: number;
+  } | null;
+  runs?: Array<{
+    seed: number;
+    repetition_index: number;
+    duration_seconds?: number | null;
+    output_filename?: string | null;
+    evaluation?: {
+      accuracy: number;
+      avg_loss: number;
+    } | null;
+  }> | null;
   results_by_architecture?: Record<
     string,
     {
+      seed?: number | null;
+      seed_set?: number[] | null;
+      repetitions?: number | null;
+      completed_repetitions?: number | null;
       output_filename?: string | null;
       evaluation?: {
         accuracy: number;
         avg_loss: number;
       } | null;
+      evaluation_summary?: {
+        evaluated_repetitions: number;
+        mean_accuracy: number;
+        variance_accuracy: number;
+        mean_avg_loss: number;
+        variance_avg_loss: number;
+      } | null;
+      runs?: Array<{
+        seed: number;
+        repetition_index: number;
+        duration_seconds?: number | null;
+        output_filename?: string | null;
+        evaluation?: {
+          accuracy: number;
+          avg_loss: number;
+        } | null;
+      }> | null;
     }
   > | null;
+}
+
+export interface SimulationRunResponse {
+  run_id: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  architecture?: 'spyker' | 'hierfl' | 'both';
+  graph_id?: number | null;
+  seed?: number | null;
+  queued_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  duration_seconds?: number | null;
+  output_filename?: string | null;
+  seed_set?: number[] | null;
+  repetitions?: number | null;
+  completed_repetitions?: number | null;
   error?: string | null;
+  evaluation?: {
+    accuracy: number;
+    avg_loss: number;
+  } | null;
+  evaluation_summary?: {
+    evaluated_repetitions: number;
+    mean_accuracy: number;
+    variance_accuracy: number;
+    mean_avg_loss: number;
+    variance_avg_loss: number;
+  } | null;
+  runs?: Array<{
+    seed: number;
+    repetition_index: number;
+    duration_seconds?: number | null;
+    output_filename?: string | null;
+    evaluation?: {
+      accuracy: number;
+      avg_loss: number;
+    } | null;
+  }> | null;
+  results_by_architecture?: Record<string, SimulationRunResult> | null;
+  run_metadata?: Record<string, unknown> | null;
+  final_run_summary?: Record<string, unknown> | null;
 }
 
 export interface PresetResponse {
@@ -246,6 +327,10 @@ export class GraphApiService {
 
   public async getRunStatus(runId: string): Promise<SimulationRunResponse> {
     return firstValueFrom(this.http.get<SimulationRunResponse>(this.url(`/runs/${runId}`)));
+  }
+
+  public async listRuns(): Promise<SimulationRunResponse[]> {
+    return firstValueFrom(this.http.get<SimulationRunResponse[]>(this.url('/runs')));
   }
 
   public async replaceGraphState(graphId: number, payload: VflowGraph): Promise<GraphDetail> {

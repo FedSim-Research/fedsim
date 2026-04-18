@@ -95,7 +95,11 @@ class PeriodicEvaluator:
         }
         
         self.logger.info("Evaluation Complete", extra={"extra_data": extra_data})
-        print(f"[{self.architecture} Eval] T={current_virtual_time:>6.1f}s | Round: {round_val} | Acc: {accuracy*100:>5.2f} | Loss: {avg_loss:.4f}")
+        print(
+            f"[{self.architecture} Eval] run_id={self.run_id} "
+            f"T={current_virtual_time:>6.1f}s | Round: {round_val} | "
+            f"Acc: {accuracy*100:>5.2f} | Loss: {avg_loss:.4f}"
+        )
 
         # Schedule Next Evaluation
         if self.self_ref:

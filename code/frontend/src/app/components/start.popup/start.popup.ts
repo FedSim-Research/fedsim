@@ -16,7 +16,8 @@ type CommonSimulationConfig = {
   runTimeLimit: number;
   evalInterval: number;
   gpuBudget: number;
-  seed: number;
+  seedSet: number[];
+  repetitions: number;
   outputFilename: string;
   evaluateModel: boolean;
 };
@@ -71,7 +72,8 @@ export class StartPopup implements OnInit {
     runTimeLimit: 5000,
     evalInterval: 500,
     gpuBudget: 0,
-    seed: 42,
+    seedSetText: '42, 43, 44, 45, 46',
+    repetitions: 5,
     outputFilename: 'final_model_hierarchical.pth',
     evaluateModel: false,
   };
@@ -84,7 +86,8 @@ export class StartPopup implements OnInit {
     runTimeLimit: 5000,
     evalInterval: 500,
     gpuBudget: 0,
-    seed: 42,
+    seedSetText: '42, 43, 44, 45, 46',
+    repetitions: 5,
     idleTokenDelay: 0.5,
     outputFilename: 'final_model_spyker.pth',
     evaluateModel: false,
@@ -153,6 +156,9 @@ export class StartPopup implements OnInit {
       return;
     }
 
+    const hierflSeedSet = this.parseSeedSetInput(this.hierflSettings.seedSetText) ?? [];
+    const spykerSeedSet = this.parseSeedSetInput(this.spykerSettings.seedSetText) ?? [];
+
     this.run.emit({
       mode: this.selectedMode,
       hierfl: {
@@ -166,7 +172,8 @@ export class StartPopup implements OnInit {
           runTimeLimit: this.hierflSettings.runTimeLimit,
           evalInterval: this.hierflSettings.evalInterval,
           gpuBudget: this.hierflSettings.gpuBudget,
-          seed: this.hierflSettings.seed,
+          seedSet: hierflSeedSet,
+          repetitions: hierflSeedSet.length,
           outputFilename: this.hierflSettings.outputFilename,
           evaluateModel: this.evaluateAfterRunByArchitecture.hierfl,
         },
@@ -182,7 +189,8 @@ export class StartPopup implements OnInit {
           runTimeLimit: this.spykerSettings.runTimeLimit,
           evalInterval: this.spykerSettings.evalInterval,
           gpuBudget: this.spykerSettings.gpuBudget,
-          seed: this.spykerSettings.seed,
+          seedSet: spykerSeedSet,
+          repetitions: spykerSeedSet.length,
           idleTokenDelay: this.spykerSettings.idleTokenDelay,
           outputFilename: this.spykerSettings.outputFilename,
           evaluateModel: this.evaluateAfterRunByArchitecture.spyker,
@@ -247,6 +255,13 @@ export class StartPopup implements OnInit {
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
+  public updateSeedSet(architecture: 'hierfl' | 'spyker', value: string): void {
+    const target = architecture === 'hierfl' ? this.hierflSettings : this.spykerSettings;
+    target.seedSetText = value;
+    target.repetitions = this.countSeeds(value);
+    this.onSettingsChanged();
+  }
+
   private persistSettingsIfChanged(): void {
     const signature = JSON.stringify({
       selectedMode: this.selectedMode,
@@ -283,8 +298,9 @@ export class StartPopup implements OnInit {
     }
     this.hierflSettings = {
       ...this.hierflSettings,
-      ...params.settings,
+      ...this.normalizeSavedSettings(params.settings, this.hierflSettings.seedSetText),
     };
+    this.hierflSettings.repetitions = this.countSeeds(this.hierflSettings.seedSetText);
     this.evaluateAfterRunByArchitecture.hierfl = params.evaluateAfterRun === true;
   }
 
@@ -295,8 +311,9 @@ export class StartPopup implements OnInit {
     }
     this.spykerSettings = {
       ...this.spykerSettings,
-      ...params.settings,
+      ...this.normalizeSavedSettings(params.settings, this.spykerSettings.seedSetText),
     };
+    this.spykerSettings.repetitions = this.countSeeds(this.spykerSettings.seedSetText);
     this.evaluateAfterRunByArchitecture.spyker = params.evaluateAfterRun === true;
   }
 
@@ -358,5 +375,73 @@ export class StartPopup implements OnInit {
 
   private storageKey(architecture: 'hierfl' | 'spyker', graphId: number): string {
     return `fedsim.start-params.${architecture}.${graphId}`;
+  }
+
+  private normalizeSavedSettings(
+    settings: Record<string, unknown> | undefined,
+    fallbackSeedSetText: string,
+  ): Record<string, unknown> {
+    const normalized = { ...(settings ?? {}) };
+    normalized['seedSetText'] = this.extractSeedSetText(settings, fallbackSeedSetText);
+    normalized['repetitions'] = this.countSeeds(String(normalized['seedSetText']));
+    delete normalized['seed'];
+    delete normalized['seedSet'];
+    return normalized;
+  }
+
+  private extractSeedSetText(
+    settings: Record<string, unknown> | undefined,
+    fallbackSeedSetText: string,
+  ): string {
+    const rawSeedSetText = settings?.['seedSetText'];
+    if (typeof rawSeedSetText === 'string' && rawSeedSetText.trim()) {
+      return rawSeedSetText;
+    }
+
+    const rawSeedSet = settings?.['seedSet'];
+    if (Array.isArray(rawSeedSet)) {
+      const values = rawSeedSet
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value >= 0);
+      if (values.length) {
+        return values.join(', ');
+      }
+    }
+
+    const rawSeed = settings?.['seed'];
+    if (Number.isInteger(rawSeed) && Number(rawSeed) >= 0) {
+      return String(rawSeed);
+    }
+
+    return fallbackSeedSetText;
+  }
+
+  private countSeeds(value: string): number {
+    const parsed = this.parseSeedSetInput(value);
+    return parsed?.length ?? 0;
+  }
+
+  private parseSeedSetInput(value: string): number[] | null {
+    const tokens = value
+      .split(/[\s,;]+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length > 0);
+    if (!tokens.length) {
+      return null;
+    }
+
+    const seeds: number[] = [];
+    for (const token of tokens) {
+      if (!/^\d+$/.test(token)) {
+        return null;
+      }
+      const seed = Number(token);
+      if (!Number.isInteger(seed) || seed < 0) {
+        return null;
+      }
+      seeds.push(seed);
+    }
+
+    return seeds;
   }
 }

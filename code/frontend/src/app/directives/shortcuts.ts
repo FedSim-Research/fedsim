@@ -171,8 +171,6 @@ export class Shortcuts{
 
   private applySelection(selected: Set<string>) {
     this.selectedNodeIds = new Set(selected);
-    const selectedEdges = this.collectSelectedEdges(selected);
-    this.selectedEdgeIds = selectedEdges;
     const spykerNodes = this.graphServiceSpyker.nodes().map((n) => {
       const data = ((n as any).data as any) || {};
       const selectedFlag = selected.has(n.id);
@@ -186,20 +184,7 @@ export class Shortcuts{
       return { ...n, data: { ...data, selected: selectedFlag } } as Node;
     });
     this.graphServiceHierach.nodes.set(hierNodes);
-
-    const spykerEdges = this.graphServiceSpyker.edges().map((e) => {
-      const data = ((e as any).data as any) || {};
-      const selectedFlag = selectedEdges.has(e.id);
-      return { ...e, data: { ...data, selected: selectedFlag } } as any;
-    });
-    this.graphServiceSpyker.edges.set(spykerEdges);
-
-    const hierEdges = this.graphServiceHierach.edges().map((e) => {
-      const data = ((e as any).data as any) || {};
-      const selectedFlag = selectedEdges.has(e.id);
-      return { ...e, data: { ...data, selected: selectedFlag } } as any;
-    });
-    this.graphServiceHierach.edges.set(hierEdges);
+    this.applyEdgeSelection(this.collectSelectedEdges(selected));
   }
 
   private applySelectionFromElements(elements: Array<HTMLElement | SVGElement>) {
@@ -255,7 +240,6 @@ export class Shortcuts{
 
   private clearNodeSelection() {
     this.selectedNodeIds.clear();
-    this.selectedEdgeIds.clear();
     const spykerCleared = this.graphServiceSpyker.nodes().map((n) => {
       const data = ((n as any).data as any) || {};
       if (data.selected) return { ...n, data: { ...data, selected: false } } as Node;
@@ -269,6 +253,12 @@ export class Shortcuts{
       return n;
     });
     this.graphServiceHierach.nodes.set(hierCleared);
+    this.applyEdgeSelection(new Set());
+  }
+
+  public clearSelectionState(): void {
+    this.clearNodeSelection();
+    this.resetBoxSelectionState();
   }
 
   public copySelectedNodes() {
@@ -357,6 +347,7 @@ export class Shortcuts{
     const snapshot = history.getState();
     if (before === snapshot) return;
     service.applyHistoryState(snapshot);
+    this.clearSelectionState();
     const architecture = service instanceof GraphServiceHierach ? 'hierfl' : 'spyker';
     try {
       await this.graphPersistence.syncGraphState(service, architecture, false);
@@ -380,7 +371,25 @@ export class Shortcuts{
         next.delete(change.id);
       }
     }
-    this.selectedEdgeIds = next;
+    this.applyEdgeSelection(next);
+  }
+
+  private applyEdgeSelection(selectedEdges: Set<string>): void {
+    this.selectedEdgeIds = new Set(selectedEdges);
+
+    const spykerEdges = this.graphServiceSpyker.edges().map((e) => {
+      const data = ((e as any).data as any) || {};
+      const selectedFlag = selectedEdges.has(e.id);
+      return { ...e, data: { ...data, selected: selectedFlag } } as any;
+    });
+    this.graphServiceSpyker.edges.set(spykerEdges);
+
+    const hierEdges = this.graphServiceHierach.edges().map((e) => {
+      const data = ((e as any).data as any) || {};
+      const selectedFlag = selectedEdges.has(e.id);
+      return { ...e, data: { ...data, selected: selectedFlag } } as any;
+    });
+    this.graphServiceHierach.edges.set(hierEdges);
   }
 
   public exportGraph(options?: {

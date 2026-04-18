@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Output, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DialogModule } from 'primeng/dialog';
 
@@ -25,6 +25,12 @@ type ParameterSpec = {
   note?: string;
 };
 
+type HelpSection = {
+  id: string;
+  kicker: string;
+  title: string;
+};
+
 @Component({
   selector: 'app-help-dialog',
   standalone: true,
@@ -33,7 +39,22 @@ type ParameterSpec = {
   imports: [CommonModule, DialogModule],
 })
 export class HelpDialog {
+  @ViewChild('scrollContainer') private scrollContainer?: ElementRef<HTMLDivElement>;
+
   public visible = true;
+  public showBackToTop = false;
+  public readonly tableOfContents: HelpSection[] = [
+    { id: 'quick-orientation', kicker: 'Quick orientation', title: 'What this helper is optimized for' },
+    { id: 'node-roles', kicker: 'Node roles', title: 'What each node is for' },
+    { id: 'shared-node-parameters', kicker: 'Shared node parameters', title: 'Performance and bandwidth fields' },
+    { id: 'node-specific-parameters', kicker: 'Node-specific parameters', title: 'Fields that are not shared by every node' },
+    { id: 'edge-parameters', kicker: 'Edge parameters', title: 'Network behavior between connected nodes' },
+    { id: 'run-settings', kicker: 'Run settings', title: 'Parameters used in the start simulation dialog' },
+    { id: 'hierarchical-parameter', kicker: 'Hierarchical', title: 'Extra Hierarchical parameter' },
+    { id: 'spyker-runtime-parameter', kicker: 'Spyker', title: 'Extra Spyker run parameter' },
+    { id: 'spyker-algorithm', kicker: 'Spyker algorithm', title: 'Parameters that shape Spyker synchronization behavior' },
+    { id: 'implementation-notes', kicker: 'Implementation notes', title: 'Small details that help avoid confusion' },
+  ];
   public readonly quickFacts: QuickFact[] = [
     {
       label: 'Shared fields',
@@ -231,12 +252,21 @@ export class HelpDialog {
       note: 'If both architectures run together, the backend may scale the requested budgets down to fit available GPU capacity.',
     },
     {
-      label: 'Seed',
-      key: 'seed',
+      label: 'Seed set',
+      key: 'seed_set',
       appliesTo: ['Hierarchical', 'Spyker'],
-      description: 'Base random seed used to make stochastic parts of the run reproducible.',
-      effect: 'Keeping the seed fixed makes repeated experiments easier to compare.',
-      format: 'Integer, minimum 0',
+      description: 'Fixed list of integer seeds used for reproducible benchmark repetitions.',
+      effect: 'Using the same seed set across scenarios and architectures makes repeated experiments fair and directly comparable.',
+      format: 'Comma-separated integers, each minimum 0',
+    },
+    {
+      label: 'Repetitions',
+      key: 'repetitions',
+      appliesTo: ['Hierarchical', 'Spyker'],
+      description: 'Number of runs generated from the configured seed set.',
+      effect: 'This is derived from the number of listed seeds, so a five-seed benchmark produces five repetitions.',
+      format: 'Integer, minimum 1',
+      note: 'The start dialog derives this automatically from the seed set.',
     },
     {
       label: 'Output filename',
@@ -345,7 +375,33 @@ export class HelpDialog {
 
   @Output() close = new EventEmitter<void>();
 
+  public onScroll(event: Event): void {
+    const scrollContainer = event.target as HTMLDivElement | null;
+    this.showBackToTop = (scrollContainer?.scrollTop ?? 0) > 320;
+  }
+
+  public scrollToSection(sectionId: string): void {
+    const scrollContainer = this.scrollContainer?.nativeElement;
+    const target = scrollContainer?.querySelector<HTMLElement>(`#${sectionId}`);
+
+    if (!scrollContainer || !target) {
+      return;
+    }
+
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const top = scrollContainer.scrollTop + targetRect.top - containerRect.top - 12;
+
+    scrollContainer.scrollTo({ top, behavior: 'smooth' });
+  }
+
+  public scrollToTop(): void {
+    this.scrollContainer?.nativeElement.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   public onClose(): void {
+    this.scrollContainer?.nativeElement.scrollTo({ top: 0 });
+    this.showBackToTop = false;
     this.visible = false;
     this.close.emit();
   }

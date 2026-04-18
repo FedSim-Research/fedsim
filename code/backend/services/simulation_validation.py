@@ -52,6 +52,7 @@ def _validate_hierfl_payload(
         seed = simulation_settings.get("seed")
         if seed is not None:
             _parse_int_ge_zero(seed, "hierfl_invalid_seed")
+        _validate_seed_controls(simulation_settings, "hierfl")
 
 
 def _validate_spyker_payload(
@@ -87,6 +88,7 @@ def _validate_spyker_payload(
         seed = simulation_settings.get("seed")
         if seed is not None:
             _parse_int_ge_zero(seed, "spyker_invalid_seed")
+        _validate_seed_controls(simulation_settings, "spyker")
 
     if not spyker_config:
         return
@@ -153,3 +155,18 @@ def _parse_int_ge_zero(value: object, error_code: str) -> int:
     if isinstance(value, float) and not value.is_integer():
         raise ValueError(error_code)
     return parsed
+
+
+def _validate_seed_controls(simulation_settings: dict, prefix: str) -> None:
+    seed_set = simulation_settings.get("seed_set")
+    if seed_set is not None:
+        if not isinstance(seed_set, list) or not seed_set:
+            raise ValueError(f"{prefix}_invalid_seed_set")
+        for seed in seed_set:
+            _parse_int_ge_zero(seed, f"{prefix}_invalid_seed")
+
+    repetitions = simulation_settings.get("repetitions")
+    if repetitions is not None:
+        parsed_repetitions = _parse_int_min_one(repetitions, f"{prefix}_invalid_repetitions")
+        if seed_set is not None and parsed_repetitions != len(seed_set):
+            raise ValueError(f"{prefix}_seed_repetitions_mismatch")

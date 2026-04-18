@@ -24,7 +24,8 @@ export class GraphValidatorService {
         runTimeLimit: number;
         evalInterval: number;
         gpuBudget: number;
-        seed: number;
+        seedSet: number[];
+        repetitions: number;
         outputFilename: string;
         evaluateModel: boolean;
         idleTokenDelay?: number;
@@ -54,7 +55,8 @@ export class GraphValidatorService {
         runTimeLimit: number;
         evalInterval: number;
         gpuBudget: number;
-        seed: number;
+        seedSet: number[];
+        repetitions: number;
         outputFilename: string;
         evaluateModel: boolean;
         idleTokenDelay?: number;
@@ -95,8 +97,21 @@ export class GraphValidatorService {
     if (!Number.isFinite(config.simulationSettings.gpuBudget) || config.simulationSettings.gpuBudget < 0) {
       errors.push(`${architecture}: gpu budget must be >= 0`);
     }
-    if (!Number.isInteger(config.simulationSettings.seed) || config.simulationSettings.seed < 0) {
-      errors.push(`${architecture}: seed must be an integer >= 0`);
+    const seedSet = config.simulationSettings.seedSet;
+    if (!Array.isArray(seedSet) || seedSet.length === 0) {
+      errors.push(`${architecture}: seed set must contain at least one integer seed`);
+    } else {
+      for (const seed of seedSet) {
+        if (!Number.isInteger(seed) || seed < 0) {
+          errors.push(`${architecture}: seed set entries must be integers >= 0`);
+          break;
+        }
+      }
+    }
+    if (!Number.isInteger(config.simulationSettings.repetitions) || config.simulationSettings.repetitions < 1) {
+      errors.push(`${architecture}: repetitions must be an integer >= 1`);
+    } else if (Array.isArray(seedSet) && seedSet.length > 0 && config.simulationSettings.repetitions !== seedSet.length) {
+      errors.push(`${architecture}: repetitions must match the number of seeds in the seed set`);
     }
     if (config.simulationSettings.evaluateModel && !config.simulationSettings.outputFilename?.trim()) {
       errors.push(`${architecture}: output filename is required for evaluation`);

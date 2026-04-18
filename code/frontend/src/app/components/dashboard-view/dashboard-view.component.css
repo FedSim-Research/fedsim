@@ -1,0 +1,357 @@
+:host {
+  display: block;
+  height: 100%;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.dashboard-shell {
+  position: absolute;
+  inset: 0 0 0 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  gap: 12px;
+  padding: 16px;
+  transition: padding-left 220ms ease;
+  background: radial-gradient(1200px 420px at 100% -10%, rgba(32, 144, 255, 0.12), transparent), #090909;
+}
+
+.dashboard-shell--sidebar-open {
+  padding-left: 336px;
+}
+
+.dashboard-shell--sidebar-closed {
+  padding-left: 16px;
+}
+
+.summary-card {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(16, 16, 16, 0.88);
+  backdrop-filter: blur(4px);
+}
+
+.status-pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-pill--queued {
+  background: rgba(234, 179, 8, 0.22);
+  color: #facc15;
+}
+
+.status-pill--running {
+  background: rgba(34, 211, 238, 0.22);
+  color: #22d3ee;
+}
+
+.status-pill--completed {
+  background: rgba(34, 197, 94, 0.22);
+  color: #22c55e;
+}
+
+.status-pill--failed {
+  background: rgba(239, 68, 68, 0.22);
+  color: #ef4444;
+}
+
+.details-panel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary-card {
+  padding: 14px;
+}
+
+.summary-card h3 {
+  margin: 0 0 12px 0;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.kv,
+.compare-kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.78rem;
+}
+
+.kv strong,
+.compare-kv strong {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 700;
+}
+
+.metric-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.metric-block--combined {
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.model-quality-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: start;
+  min-width: 0;
+}
+
+.model-quality-metrics {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mini-telemetry-card {
+  padding: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.mini-telemetry-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mini-telemetry-title {
+  margin: 0 0 4px 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.72rem;
+}
+
+.mini-telemetry-card iframe {
+  border: 0;
+  border-radius: 8px;
+  display: block;
+}
+
+.metric-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.78rem;
+}
+
+.metric-value {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 1.45rem;
+  letter-spacing: 0.02em;
+}
+
+.chart-card iframe {
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.compare-card .compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.compare-col {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.compare-id {
+  color: rgba(255, 255, 255, 0.92);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.76rem;
+  margin-bottom: 6px;
+}
+
+.empty,
+.error-box,
+.empty-details {
+  margin: 12px;
+  padding: 10px;
+  border-radius: 9px;
+  font-size: 0.82rem;
+}
+
+.empty,
+.empty-details {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.error-box {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fda4af;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.cockpit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric-value--large {
+  font-size: 2rem;
+  line-height: 1.05;
+}
+
+.jobs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.job-row {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 9px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.job-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.job-main strong {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.82rem;
+}
+
+.job-meta {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 0.74rem;
+}
+
+.telemetry-note {
+  margin: -2px 0 12px 0;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.78rem;
+}
+
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.telemetry-card {
+  padding: 0;
+}
+
+.telemetry-card iframe {
+  border-radius: 8px;
+  border: 0;
+}
+
+.run-dashboards-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.run-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.run-dashboard-item {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px;
+}
+
+.run-dashboard-header {
+  margin-bottom: 8px;
+}
+
+.run-dashboard-id {
+  color: rgba(255, 255, 255, 0.92);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+
+.run-dashboard-meta {
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 0.73rem;
+  margin-top: 4px;
+}
+
+.run-dashboard-embeds {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.run-dashboard-embeds--dual {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 1080px) {
+  .cockpit-grid,
+  .summary-grid,
+  .compare-card .compare-grid,
+  .telemetry-grid,
+  .run-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .model-quality-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .model-quality-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .run-dashboard-embeds--dual {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .dashboard-shell {
+    padding-top: 86px;
+  }
+
+  .dashboard-shell--sidebar-open {
+    padding-left: 16px;
+  }
+}

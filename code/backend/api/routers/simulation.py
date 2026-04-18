@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from backend.services import graph_service
 from backend.services.simulation_run_queue import run_queue
+from backend.services.simulation_seed_sets import normalize_simulation_settings, shared_seed_set_or_raise
 from backend.services.simulation_validation import validate_start_payload
 
 router = APIRouter(tags=["simulation"])
@@ -23,6 +24,8 @@ class SimulationSettings(BaseModel):
     idle_token_delay: float | None = None
     gpu_budget: float | None = None
     seed: int | None = None
+    seed_set: list[int] | None = None
+    repetitions: int | None = None
     output_filename: str | None = None
     evaluate_model: bool = False
 
@@ -52,17 +55,24 @@ class SimulationEvaluationResult(BaseModel):
 class SimulationRunResponse(BaseModel):
     run_id: str
     status: str
-    graph_id: int
+    graph_id: int | None = None
     architecture: str
     seed: int | None = None
-    queued_at: str
+    seed_set: list[int] | None = None
+    repetitions: int | None = None
+    completed_repetitions: int | None = None
+    queued_at: str | None = None
     started_at: str | None = None
     finished_at: str | None = None
     duration_seconds: float | None = None
     output_filename: str | None = None
     evaluation: SimulationEvaluationResult | None = None
+    evaluation_summary: dict[str, float | int] | None = None
+    runs: list[dict] | None = None
     results_by_architecture: dict[str, dict] | None = None
     error: str | None = None
+    run_metadata: dict | None = None
+    final_run_summary: dict | None = None
 
 
 class SimulationSingleConfig(BaseModel):
@@ -85,11 +95,13 @@ def start_simulation(payload: SimulationStartRequest):
         logger.warning("start_simulation_graph_not_found graph_id=%s", payload.graph_id)
         raise HTTPException(status_code=404, detail="Graph not found")
 
-    training_config = payload.training_config.model_dump() if payload.training_config else None
-    simulation_settings = payload.simulation_settings.model_dump() if payload.simulation_settings else None
-    spyker_config = payload.spyker_config.model_dump() if payload.spyker_config else None
-
     try:
+        training_config = payload.training_config.model_dump() if payload.training_config else None
+        simulation_settings = normalize_simulation_settings(
+            payload.simulation_settings.model_dump() if payload.simulation_settings else None,
+            error_prefix=graph.architecture,
+        )
+        spyker_config = payload.spyker_config.model_dump() if payload.spyker_config else None
         validate_start_payload(
             architecture=graph.architecture,
             graph=graph,
@@ -132,13 +144,19 @@ def start_simulation_both(payload: SimulationStartBothRequest):
     if spyker_graph is None or spyker_graph.architecture != "spyker":
         raise HTTPException(status_code=404, detail="Spyker graph not found")
 
-    hierfl_training = payload.hierfl.training_config.model_dump() if payload.hierfl.training_config else None
-    hierfl_settings = payload.hierfl.simulation_settings.model_dump() if payload.hierfl.simulation_settings else None
-    spyker_training = payload.spyker.training_config.model_dump() if payload.spyker.training_config else None
-    spyker_settings = payload.spyker.simulation_settings.model_dump() if payload.spyker.simulation_settings else None
-    spyker_algo = payload.spyker.spyker_config.model_dump() if payload.spyker.spyker_config else None
-
     try:
+        hierfl_training = payload.hierfl.training_config.model_dump() if payload.hierfl.training_config else None
+        hierfl_settings = normalize_simulation_settings(
+            payload.hierfl.simulation_settings.model_dump() if payload.hierfl.simulation_settings else None,
+            error_prefix="hierfl",
+        )
+        spyker_training = payload.spyker.training_config.model_dump() if payload.spyker.training_config else None
+        spyker_settings = normalize_simulation_settings(
+            payload.spyker.simulation_settings.model_dump() if payload.spyker.simulation_settings else None,
+            error_prefix="spyker",
+        )
+        spyker_algo = payload.spyker.spyker_config.model_dump() if payload.spyker.spyker_config else None
+        shared_seed_set_or_raise(hierfl_settings, spyker_settings)
         validate_start_payload(
             architecture="hierfl",
             graph=hierfl_graph,
@@ -176,14 +194,14 @@ def start_simulation_both(payload: SimulationStartBothRequest):
 
 @router.get("/runs/{run_id}", response_model=SimulationRunResponse)
 def get_run_status(run_id: str):
-    run = run_queue.get(run_id)
+    run = run_queue.get_run_api(run_id)
     if run is None:
         logger.warning("get_run_status_not_found run_id=%s", run_id)
         raise HTTPException(status_code=404, detail="Run not found")
-    logger.debug("get_run_status run_id=%s status=%s", run_id, run.status)
-    return run.to_api_dict()
+    logger.debug("get_run_status run_id=%s status=%s", run_id, run.get("status"))
+    return run
 
 
 @router.get("/runs", response_model=list[SimulationRunResponse])
 def list_runs():
-    return [run.to_api_dict() for run in run_queue.list_runs()]
+    return run_queue.list_runs_api()

@@ -5,13 +5,16 @@ from datetime import datetime, timezone
 import importlib
 import logging
 from queue import Queue, Empty
+import statistics
 from threading import Event, Lock, Thread
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
 import ray
 
 from backend.services import graph_service
+from backend.services.simulation_seed_sets import build_seeded_output_filename, shared_seed_set_or_raise
+from backend.services import simulation_run_store
 from backend.simulation_controller import SimulationController
 
 RunStatus = Literal["queued", "running", "completed", "failed"]
@@ -48,10 +51,46 @@ def _get_cluster_gpu_capacity() -> float:
         return 0.0
 
 
+def _variance_or_zero(values: list[float]) -> float:
+    if len(values) <= 1:
+        return 0.0
+    return float(statistics.variance(values))
+
+
+def _single_seed_or_none(seed_set: list[int]) -> int | None:
+    return seed_set[0] if len(seed_set) == 1 else None
+
+
+def _build_series_result(seed_set: list[int], runs: list[dict[str, Any]]) -> dict[str, Any]:
+    evaluation_runs = [run["evaluation"] for run in runs if run.get("evaluation") is not None]
+    evaluation_summary: dict[str, float | int] | None = None
+    if evaluation_runs:
+        accuracy_values = [float(item["accuracy"]) for item in evaluation_runs]
+        loss_values = [float(item["avg_loss"]) for item in evaluation_runs]
+        evaluation_summary = {
+            "evaluated_repetitions": len(evaluation_runs),
+            "mean_accuracy": float(sum(accuracy_values) / len(accuracy_values)),
+            "variance_accuracy": _variance_or_zero(accuracy_values),
+            "mean_avg_loss": float(sum(loss_values) / len(loss_values)),
+            "variance_avg_loss": _variance_or_zero(loss_values),
+        }
+
+    return {
+        "seed": _single_seed_or_none(seed_set),
+        "seed_set": list(seed_set),
+        "repetitions": len(seed_set),
+        "completed_repetitions": len(runs),
+        "output_filename": runs[0].get("output_filename") if len(seed_set) == 1 and runs else None,
+        "evaluation": runs[0].get("evaluation") if len(seed_set) == 1 and runs else None,
+        "evaluation_summary": evaluation_summary,
+        "runs": runs,
+    }
+
+
 @dataclass
 class RunJob:
     run_id: str
-    graph_id: int
+    graph_id: int | None
     architecture: str
     training_config: dict[str, Any] | None
     simulation_settings: dict[str, Any] | None
@@ -67,21 +106,33 @@ class RunJob:
 
     def to_api_dict(self) -> dict[str, Any]:
         result = self.result or {}
+        primary_settings = self._primary_simulation_settings()
         return {
             "run_id": self.run_id,
             "status": self.status,
             "graph_id": self.graph_id,
             "architecture": self.architecture,
-            "seed": (self.simulation_settings or {}).get("seed"),
+            "seed": result.get("seed", primary_settings.get("seed")),
+            "seed_set": result.get("seed_set", primary_settings.get("seed_set")),
+            "repetitions": result.get("repetitions", primary_settings.get("repetitions")),
+            "completed_repetitions": result.get("completed_repetitions"),
             "queued_at": self.queued_at,
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "duration_seconds": self.duration_seconds,
             "output_filename": result.get("output_filename"),
             "evaluation": result.get("evaluation"),
+            "evaluation_summary": result.get("evaluation_summary"),
+            "runs": result.get("runs"),
             "results_by_architecture": result.get("results_by_architecture"),
             "error": self.error,
         }
+
+    def _primary_simulation_settings(self) -> dict[str, Any]:
+        if self.architecture == "both":
+            payload = self.combined_payload or {}
+            return (payload.get("hierfl") or {}).get("simulation_settings") or {}
+        return self.simulation_settings or {}
 
 
 class SimulationRunQueue:
@@ -93,6 +144,12 @@ class SimulationRunQueue:
         self._lock = Lock()
         self._stop_event = Event()
         self._worker: Thread | None = None
+
+    def _persist_final_run_safe(self, job: RunJob) -> None:
+        try:
+            simulation_run_store.persist_final_run(job)
+        except Exception:
+            logger.exception("simulation_run_persist_failed run_id=%s", job.run_id)
 
     def start(self) -> None:
         with self._lock:
@@ -145,7 +202,7 @@ class SimulationRunQueue:
         run_id = str(uuid4())
         job = RunJob(
             run_id=run_id,
-            graph_id=-1,
+            graph_id=None,
             architecture="both",
             training_config=None,
             simulation_settings=None,
@@ -169,6 +226,35 @@ class SimulationRunQueue:
     def list_runs(self) -> list[RunJob]:
         with self._lock:
             return sorted(self._jobs.values(), key=lambda run: run.queued_at, reverse=True)
+
+    def get_run_api(self, run_id: str) -> dict[str, Any] | None:
+        persisted = simulation_run_store.get_run_api(run_id)
+        with self._lock:
+            job = self._jobs.get(run_id)
+        if job is None:
+            return persisted
+        runtime = job.to_api_dict()
+        if persisted is None:
+            return runtime
+        merged = {**persisted, **runtime}
+        merged["run_metadata"] = persisted.get("run_metadata")
+        merged["final_run_summary"] = persisted.get("final_run_summary")
+        return merged
+
+    def list_runs_api(self) -> list[dict[str, Any]]:
+        persisted = {item["run_id"]: item for item in simulation_run_store.list_runs_api()}
+        with self._lock:
+            for job in self._jobs.values():
+                runtime = job.to_api_dict()
+                existing = persisted.get(job.run_id)
+                if existing is None:
+                    persisted[job.run_id] = runtime
+                    continue
+                merged = {**existing, **runtime}
+                merged["run_metadata"] = existing.get("run_metadata")
+                merged["final_run_summary"] = existing.get("final_run_summary")
+                persisted[job.run_id] = merged
+        return sorted(persisted.values(), key=lambda item: item.get("queued_at") or "", reverse=True)
 
     def _worker_loop(self) -> None:
         while not self._stop_event.is_set():
@@ -207,15 +293,15 @@ class SimulationRunQueue:
                 graph = graph_service.get_graph(job.graph_id)
                 if graph is None:
                     raise ValueError("graph_not_found")
-                controller = SimulationController(
-                    job.architecture,
+                result = self._run_architecture_series(
+                    architecture=job.architecture,
                     graph=graph,
                     training_config=job.training_config,
                     simulation_settings=job.simulation_settings,
                     spyker_config=job.spyker_config,
-                    run_id=job.run_id,
+                    run_id_prefix=job.run_id,
+                    progress_callback=lambda partial_result: self._update_job_partial_result(job.run_id, partial_result),
                 )
-                result = controller.start()
             status: RunStatus = "completed"
             error = None
         except Exception as exc:
@@ -238,6 +324,7 @@ class SimulationRunQueue:
             job.error = error
             job.finished_at = finished_at.isoformat()
             job.duration_seconds = duration_seconds
+        self._persist_final_run_safe(job)
         if status == "completed":
             logger.info(
                 "simulation_run_completed run_id=%s graph_id=%s architecture=%s duration_seconds=%.3f",
@@ -246,6 +333,95 @@ class SimulationRunQueue:
                 job.architecture,
                 duration_seconds,
             )
+
+    def _run_architecture_series(
+        self,
+        *,
+        architecture: str,
+        graph,
+        training_config: dict[str, Any] | None,
+        simulation_settings: dict[str, Any] | None,
+        spyker_config: dict[str, Any] | None,
+        run_id_prefix: str,
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    ) -> dict[str, Any]:
+        settings = dict(simulation_settings or {})
+        seed_set = list(settings.get("seed_set") or [])
+        if not seed_set:
+            seed = settings.get("seed")
+            if seed is None:
+                raise ValueError(f"{architecture}_missing_seed_set")
+            seed_set = [int(seed)]
+
+        runs: list[dict[str, Any]] = []
+        total_repetitions = len(seed_set)
+        for repetition_index, seed in enumerate(seed_set, start=1):
+            run_result = self._run_architecture_once(
+                architecture=architecture,
+                graph=graph,
+                training_config=training_config,
+                simulation_settings=settings,
+                spyker_config=spyker_config,
+                run_id=f"{run_id_prefix}:{architecture}:{seed}:{repetition_index}",
+                seed=seed,
+                seed_set=seed_set,
+                repetition_index=repetition_index,
+                total_repetitions=total_repetitions,
+            )
+            runs.append(run_result)
+            if progress_callback is not None:
+                progress_callback(_build_series_result(seed_set, runs))
+
+        return _build_series_result(seed_set, runs)
+
+    def _run_architecture_once(
+        self,
+        *,
+        architecture: str,
+        graph,
+        training_config: dict[str, Any] | None,
+        simulation_settings: dict[str, Any],
+        spyker_config: dict[str, Any] | None,
+        run_id: str,
+        seed: int,
+        seed_set: list[int],
+        repetition_index: int,
+        total_repetitions: int,
+    ) -> dict[str, Any]:
+        per_run_settings = dict(simulation_settings)
+        per_run_settings["seed"] = seed
+        per_run_settings["seed_set"] = list(seed_set)
+        per_run_settings["repetitions"] = total_repetitions
+        per_run_settings["output_filename"] = build_seeded_output_filename(
+            simulation_settings.get("output_filename"),
+            seed=seed,
+            repetition_index=repetition_index,
+            total_repetitions=total_repetitions,
+        )
+
+        controller = SimulationController(
+            architecture,
+            graph=graph,
+            training_config=training_config,
+            simulation_settings=per_run_settings,
+            spyker_config=spyker_config,
+            run_id=run_id,
+        )
+
+        started_at = datetime.now(timezone.utc)
+        result = controller.start()
+        duration_seconds = (datetime.now(timezone.utc) - started_at).total_seconds()
+        result["seed"] = seed
+        result["repetition_index"] = repetition_index
+        result["duration_seconds"] = duration_seconds
+        return result
+
+    def _update_job_partial_result(self, run_id: str, partial_result: dict[str, Any]) -> None:
+        with self._lock:
+            job = self._jobs.get(run_id)
+            if job is None:
+                return
+            job.result = partial_result
 
     def _run_combined_job(self, job: RunJob) -> dict[str, Any]:
         if not job.combined_payload:
@@ -281,33 +457,67 @@ class SimulationRunQueue:
         if spyker_graph is None or spyker_graph.architecture != "spyker":
             raise ValueError("spyker_graph_not_found")
 
-        hier_controller = SimulationController(
-            "hierfl",
-            graph=hier_graph,
-            training_config=hier_cfg.get("training_config"),
-            simulation_settings=hier_cfg.get("simulation_settings"),
-            spyker_config=None,
-            run_id=f"{job.run_id}:hierfl",
-        )
-        spyker_controller = SimulationController(
-            "spyker",
-            graph=spyker_graph,
-            training_config=spyker_cfg.get("training_config"),
-            simulation_settings=spyker_cfg.get("simulation_settings"),
-            spyker_config=spyker_cfg.get("spyker_config"),
-            run_id=f"{job.run_id}:spyker",
-        )
+        hier_settings = dict(hier_cfg.get("simulation_settings") or {})
+        spyker_settings = dict(spyker_cfg.get("simulation_settings") or {})
+        seed_set = shared_seed_set_or_raise(hier_settings, spyker_settings)
 
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            fut_hier = pool.submit(hier_controller.start)
-            fut_spyker = pool.submit(spyker_controller.start)
-            hier_result = fut_hier.result()
-            spyker_result = fut_spyker.result()
+        hier_results: list[dict[str, Any]] = []
+        spyker_results: list[dict[str, Any]] = []
+        total_repetitions = len(seed_set)
+
+        for repetition_index, seed in enumerate(seed_set, start=1):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                fut_hier = pool.submit(
+                    self._run_architecture_once,
+                    architecture="hierfl",
+                    graph=hier_graph,
+                    training_config=hier_cfg.get("training_config"),
+                    simulation_settings=hier_settings,
+                    spyker_config=None,
+                    run_id=f"{job.run_id}:hierfl:{seed}:{repetition_index}",
+                    seed=seed,
+                    seed_set=seed_set,
+                    repetition_index=repetition_index,
+                    total_repetitions=total_repetitions,
+                )
+                fut_spyker = pool.submit(
+                    self._run_architecture_once,
+                    architecture="spyker",
+                    graph=spyker_graph,
+                    training_config=spyker_cfg.get("training_config"),
+                    simulation_settings=spyker_settings,
+                    spyker_config=spyker_cfg.get("spyker_config"),
+                    run_id=f"{job.run_id}:spyker:{seed}:{repetition_index}",
+                    seed=seed,
+                    seed_set=seed_set,
+                    repetition_index=repetition_index,
+                    total_repetitions=total_repetitions,
+                )
+                hier_results.append(fut_hier.result())
+                spyker_results.append(fut_spyker.result())
+
+            self._update_job_partial_result(
+                job.run_id,
+                {
+                    "seed": _single_seed_or_none(seed_set),
+                    "seed_set": list(seed_set),
+                    "repetitions": total_repetitions,
+                    "completed_repetitions": repetition_index,
+                    "results_by_architecture": {
+                        "hierfl": _build_series_result(seed_set, hier_results),
+                        "spyker": _build_series_result(seed_set, spyker_results),
+                    },
+                },
+            )
 
         return {
+            "seed": _single_seed_or_none(seed_set),
+            "seed_set": list(seed_set),
+            "repetitions": total_repetitions,
+            "completed_repetitions": total_repetitions,
             "results_by_architecture": {
-                "hierfl": hier_result,
-                "spyker": spyker_result,
+                "hierfl": _build_series_result(seed_set, hier_results),
+                "spyker": _build_series_result(seed_set, spyker_results),
             }
         }
 

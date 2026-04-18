@@ -71,18 +71,17 @@
 }
 
 .status-icon {
-  color: #22d3ee;
   width: 16px;
   display: inline-flex;
   justify-content: center;
 }
 
-.status-icon--completed {
-  color: #22c55e;
+.status-icon--running {
+  color: #22d3ee;
 }
 
-.status-icon--failed {
-  color: #ef4444;
+.status-icon--queued {
+  color: #facc15;
 }
 
 .jobs-title {

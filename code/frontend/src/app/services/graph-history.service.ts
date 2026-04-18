@@ -36,7 +36,7 @@ export abstract class GraphHistoryService {
     this.state.set(newState);
     stack.pop();
     this.undoStack.update((undoStack) => stack);
-    this.redoStack.update((redoStack) => [...redoStack, oldState]);
+    this.redoStack.update((redoStack) => [...redoStack, this.sanitizeState(oldState)]);
   }
 
   public redo() {
@@ -49,23 +49,59 @@ export abstract class GraphHistoryService {
     this.state.set(newState);
     stack.pop();
     this.redoStack.update(() => stack);
-    this.undoStack.update((undoStack) => [...undoStack, oldState]);
+    this.undoStack.update((undoStack) => [...undoStack, this.sanitizeState(oldState)]);
   }
 
   public saveState(newState: State) {
     const oldState = this.state();
-    this.undoStack.update((undoStack) => [...undoStack, oldState]);
+    this.undoStack.update((undoStack) => [...undoStack, this.sanitizeState(oldState)]);
     this.redoStack.set([]);
-    this.state.set(newState);
+    this.state.set(this.sanitizeState(newState));
   }
 
   public replaceCurrentState(newState: State): void {
-    this.state.set(newState);
+    this.state.set(this.sanitizeState(newState));
   }
 
   public resetHistory(newState: State) {
-    this.state.set(newState);
+    this.state.set(this.sanitizeState(newState));
     this.undoStack.set([]);
     this.redoStack.set([]);
+  }
+
+  private sanitizeState(state: State): State {
+    return {
+      nodes: state.nodes.map((node) => {
+        const data = ((node as any).data as Record<string, unknown> | undefined) ?? undefined;
+        const config = data?.['config'];
+        return {
+          ...node,
+          point: node.point ? { ...node.point } : node.point,
+          data: data
+            ? {
+                ...data,
+                config: config && typeof config === 'object' ? { ...(config as Record<string, unknown>) } : config,
+                selected: false,
+              }
+            : data,
+        } as Node;
+      }),
+      edges: state.edges.map((edge) => {
+        const data = ((edge as any).data as Record<string, unknown> | undefined) ?? undefined;
+        const metrics = data?.['metrics'];
+        return {
+          ...edge,
+          data: data
+            ? {
+                ...data,
+                metrics: metrics && typeof metrics === 'object'
+                  ? { ...(metrics as Record<string, unknown>) }
+                  : metrics,
+                selected: false,
+              }
+            : data,
+        } as Edge;
+      }),
+    };
   }
 }
