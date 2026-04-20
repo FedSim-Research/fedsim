@@ -24,6 +24,7 @@ export class GraphValidatorService {
         runTimeLimit: number;
         evalInterval: number;
         gpuBudget: number;
+        dataset: string;
         seedSet: number[];
         repetitions: number;
         outputFilename: string;
@@ -55,6 +56,7 @@ export class GraphValidatorService {
         runTimeLimit: number;
         evalInterval: number;
         gpuBudget: number;
+        dataset: string;
         seedSet: number[];
         repetitions: number;
         outputFilename: string;
@@ -96,6 +98,9 @@ export class GraphValidatorService {
     }
     if (!Number.isFinite(config.simulationSettings.gpuBudget) || config.simulationSettings.gpuBudget < 0) {
       errors.push(`${architecture}: gpu budget must be >= 0`);
+    }
+    if (typeof config.simulationSettings.dataset !== 'string' || config.simulationSettings.dataset.trim().length === 0) {
+      errors.push(`${architecture}: dataset must be a non-empty dataset id`);
     }
     const seedSet = config.simulationSettings.seedSet;
     if (!Array.isArray(seedSet) || seedSet.length === 0) {

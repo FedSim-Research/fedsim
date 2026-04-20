@@ -16,6 +16,7 @@ type CommonSimulationConfig = {
   runTimeLimit: number;
   evalInterval: number;
   gpuBudget: number;
+  dataset: string;
   seedSet: number[];
   repetitions: number;
   outputFilename: string;
@@ -72,6 +73,7 @@ export class StartPopup implements OnInit {
     runTimeLimit: 5000,
     evalInterval: 500,
     gpuBudget: 0,
+    dataset: 'uoft-cs/cifar10',
     seedSetText: '42, 43, 44, 45, 46',
     repetitions: 5,
     outputFilename: 'final_model_hierarchical.pth',
@@ -86,6 +88,7 @@ export class StartPopup implements OnInit {
     runTimeLimit: 5000,
     evalInterval: 500,
     gpuBudget: 0,
+    dataset: 'uoft-cs/cifar10',
     seedSetText: '42, 43, 44, 45, 46',
     repetitions: 5,
     idleTokenDelay: 0.5,
@@ -172,6 +175,7 @@ export class StartPopup implements OnInit {
           runTimeLimit: this.hierflSettings.runTimeLimit,
           evalInterval: this.hierflSettings.evalInterval,
           gpuBudget: this.hierflSettings.gpuBudget,
+          dataset: this.hierflSettings.dataset,
           seedSet: hierflSeedSet,
           repetitions: hierflSeedSet.length,
           outputFilename: this.hierflSettings.outputFilename,
@@ -189,6 +193,7 @@ export class StartPopup implements OnInit {
           runTimeLimit: this.spykerSettings.runTimeLimit,
           evalInterval: this.spykerSettings.evalInterval,
           gpuBudget: this.spykerSettings.gpuBudget,
+          dataset: this.spykerSettings.dataset,
           seedSet: spykerSeedSet,
           repetitions: spykerSeedSet.length,
           idleTokenDelay: this.spykerSettings.idleTokenDelay,

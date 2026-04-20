@@ -23,6 +23,7 @@ class SimulationSettings(BaseModel):
     eval_interval: float | None = None
     idle_token_delay: float | None = None
     gpu_budget: float | None = None
+    dataset: str | None = None
     seed: int | None = None
     seed_set: list[int] | None = None
     repetitions: int | None = None
@@ -66,6 +67,10 @@ class SimulationRunResponse(BaseModel):
     finished_at: str | None = None
     duration_seconds: float | None = None
     output_filename: str | None = None
+    dataset: str | None = None
+    datasets_by_architecture: dict[str, str | None] | None = None
+    accuracy_loss_snapshot_url: str | None = None
+    accuracy_loss_snapshot_urls_by_architecture: dict[str, str | None] | None = None
     evaluation: SimulationEvaluationResult | None = None
     evaluation_summary: dict[str, float | int] | None = None
     runs: list[dict] | None = None

@@ -22,7 +22,13 @@ from main.task import Net, load_data, train, test
 
 
 class SimulationFlowerClient(flwr.client.Client):
-    def __init__(self, partition_id: int, num_partitions: int, seed: int | None = None):
+    def __init__(
+        self,
+        partition_id: int,
+        num_partitions: int,
+        dataset_id: str | None = None,
+        seed: int | None = None,
+    ):
         self.partition_id = partition_id
         self.num_partitions = num_partitions
         self.device = torch.device("cpu")
@@ -35,8 +41,13 @@ class SimulationFlowerClient(flwr.client.Client):
         self.net = Net().to(self.device)
 
         # 2. Load Data (Using the FederatedDataset logic from task.py)
-        # This will download/cache CIFAR-10 on the first run
-        self.trainloader, self.testloader = load_data(partition_id, num_partitions, seed=seed)
+        # This will download/cache dataset partitions on the first run.
+        self.trainloader, self.testloader = load_data(
+            partition_id,
+            num_partitions,
+            seed=seed,
+            dataset_id=dataset_id,
+        )
 
     def get_parameters(self, config: Dict[str, Scalar]) -> Parameters:
         # Convert PyTorch parameters to Flower Parameters

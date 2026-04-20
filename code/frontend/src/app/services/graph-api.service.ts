@@ -114,6 +114,7 @@ export interface SimulationStartRequest {
     eval_interval?: number;
     idle_token_delay?: number;
     gpu_budget?: number;
+    dataset?: string;
     seed?: number;
     seed_set?: number[];
     repetitions?: number;
@@ -213,6 +214,10 @@ export interface SimulationRunResponse {
   finished_at?: string | null;
   duration_seconds?: number | null;
   output_filename?: string | null;
+  dataset?: string | null;
+  datasets_by_architecture?: Record<string, string | null> | null;
+  accuracy_loss_snapshot_url?: string | null;
+  accuracy_loss_snapshot_urls_by_architecture?: Record<string, string | null> | null;
   seed_set?: number[] | null;
   repetitions?: number | null;
   completed_repetitions?: number | null;

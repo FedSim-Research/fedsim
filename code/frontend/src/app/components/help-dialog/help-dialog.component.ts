@@ -252,6 +252,14 @@ export class HelpDialog {
       note: 'If both architectures run together, the backend may scale the requested budgets down to fit available GPU capacity.',
     },
     {
+      label: 'Dataset',
+      key: 'dataset',
+      appliesTo: ['Hierarchical', 'Spyker'],
+      description: 'Hugging Face dataset identifier used to load and partition training data.',
+      effect: 'Lets you benchmark the same topology against different datasets by changing only the dataset id.',
+      format: 'Dataset id string, for example uoft-cs/cifar10',
+    },
+    {
       label: 'Seed set',
       key: 'seed_set',
       appliesTo: ['Hierarchical', 'Spyker'],

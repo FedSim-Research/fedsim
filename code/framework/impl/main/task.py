@@ -10,6 +10,9 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Normalize, ToTensor
 
 
+DEFAULT_DATASET_ID = "uoft-cs/cifar10"
+
+
 class Net(nn.Module):
     """Model (simple CNN adapted from 'PyTorch: A 60 Minute Blitz')"""
 
@@ -31,7 +34,7 @@ class Net(nn.Module):
         return self.fc3(x)
 
 
-_fds_cache: dict[int, FederatedDataset] = {}
+_fds_cache: dict[tuple[str, int], FederatedDataset] = {}
 _fds_lock = Lock()
 
 pytorch_transforms = Compose([ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -43,23 +46,32 @@ def apply_transforms(batch):
     return batch
 
 
-def load_data(partition_id: int, num_partitions: int, seed: int | None = None):
-    """Load partition CIFAR10 data."""
+def load_data(
+    partition_id: int,
+    num_partitions: int,
+    seed: int | None = None,
+    dataset_id: str | None = None,
+):
+    """Load one partition for the selected dataset."""
     if partition_id < 0 or partition_id >= num_partitions:
         raise ValueError(
             f"partition_id={partition_id} out of range for num_partitions={num_partitions}"
         )
+    normalized_dataset_id = (dataset_id or DEFAULT_DATASET_ID).strip()
+    if not normalized_dataset_id:
+        normalized_dataset_id = DEFAULT_DATASET_ID
 
-    # Cache one dataset instance per partition count.
+    # Cache one dataset instance per (dataset_id, partition_count).
+    cache_key = (normalized_dataset_id, num_partitions)
     with _fds_lock:
-        fds = _fds_cache.get(num_partitions)
+        fds = _fds_cache.get(cache_key)
         if fds is None:
             partitioner = IidPartitioner(num_partitions=num_partitions)
             fds = FederatedDataset(
-                dataset="uoft-cs/cifar10",
+                dataset=normalized_dataset_id,
                 partitioners={"train": partitioner},
             )
-            _fds_cache[num_partitions] = fds
+            _fds_cache[cache_key] = fds
     partition = fds.load_partition(partition_id)
     # Divide data on each node: 80% train, 20% test
     split_seed = 42 if seed is None else int(seed)

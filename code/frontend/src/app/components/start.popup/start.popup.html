@@ -73,6 +73,10 @@
                       <input type="text" inputmode="decimal" [ngModel]="formatDecimal(hierflSettings.gpuBudget)" (ngModelChange)="hierflSettings.gpuBudget = parseDecimalInput($event, hierflSettings.gpuBudget); onSettingsChanged()" />
                     </label>
                     <label class="field">
+                      <span class="field-label">Dataset <span class="help-dot" title="Hugging Face dataset id used for partition loading, for example uoft-cs/cifar10.">?</span></span>
+                      <input type="text" [(ngModel)]="hierflSettings.dataset" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
                       <span class="field-label">Seed set <span class="help-dot" title="Fixed list of seeds used for reproducible benchmark repetitions, for example 42, 43, 44, 45, 46.">?</span></span>
                       <input type="text" [(ngModel)]="hierflSettings.seedSetText" (ngModelChange)="updateSeedSet('hierfl', $event)" />
                     </label>
@@ -142,6 +146,10 @@
                     <label class="field">
                       <span class="field-label">GPU budget <span class="help-dot" title="Total GPU share for this run. 0 means CPU only.">?</span></span>
                       <input type="text" inputmode="decimal" [ngModel]="formatDecimal(spykerSettings.gpuBudget)" (ngModelChange)="spykerSettings.gpuBudget = parseDecimalInput($event, spykerSettings.gpuBudget); onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Dataset <span class="help-dot" title="Hugging Face dataset id used for partition loading, for example uoft-cs/cifar10.">?</span></span>
+                      <input type="text" [(ngModel)]="spykerSettings.dataset" (ngModelChange)="onSettingsChanged()" />
                     </label>
                     <label class="field">
                       <span class="field-label">Seed set <span class="help-dot" title="Fixed list of seeds used for reproducible benchmark repetitions, for example 42, 43, 44, 45, 46.">?</span></span>
