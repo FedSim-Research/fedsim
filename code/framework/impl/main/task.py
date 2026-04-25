@@ -57,9 +57,7 @@ def load_data(
         raise ValueError(
             f"partition_id={partition_id} out of range for num_partitions={num_partitions}"
         )
-    normalized_dataset_id = (dataset_id or DEFAULT_DATASET_ID).strip()
-    if not normalized_dataset_id:
-        normalized_dataset_id = DEFAULT_DATASET_ID
+    normalized_dataset_id = (dataset_id or "").strip() or DEFAULT_DATASET_ID
 
     # Cache one dataset instance per (dataset_id, partition_count).
     cache_key = (normalized_dataset_id, num_partitions)

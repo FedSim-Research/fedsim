@@ -59,8 +59,6 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.listen-address=:9010'
-      - '--web.external-url=/prometheus/'
-      - '--web.route-prefix=/prometheus/'
     volumes:
       - ./monitoring-configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     depends_on:

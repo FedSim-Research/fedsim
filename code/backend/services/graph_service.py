@@ -61,6 +61,38 @@ def rename_graph(graph_id: int, payload: GraphRename) -> Graph | None:
     finally:
         session.close()
 
+
+def patch_graph_metadata(graph_id: int, patch: dict) -> Graph | None:
+    session = SessionLocal()
+    try:
+        stmt = select(Graph).where(Graph.id == graph_id)
+        graph = session.execute(stmt).scalar_one_or_none()
+        if graph is None:
+            return None
+
+        current_metadata = {}
+        if graph.metadata_json:
+            try:
+                parsed = json.loads(graph.metadata_json)
+                if isinstance(parsed, dict):
+                    current_metadata = parsed
+            except json.JSONDecodeError:
+                current_metadata = {}
+
+        merged = dict(current_metadata)
+        for key, value in patch.items():
+            if value is None:
+                merged.pop(key, None)
+            else:
+                merged[key] = value
+
+        graph.metadata_json = json.dumps(merged) if merged else None
+        session.commit()
+        session.refresh(graph)
+        return graph
+    finally:
+        session.close()
+
 def list_graphs() -> list[Graph]:
     session = SessionLocal()
     try:

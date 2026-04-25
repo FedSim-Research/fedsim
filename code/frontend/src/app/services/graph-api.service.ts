@@ -47,6 +47,10 @@ export interface GraphRename {
   name: string;
 }
 
+export interface GraphMetadataPatch {
+  patch: Record<string, unknown>;
+}
+
 
 export interface NodeCreate {
   type: 'ClientNode' | 'ServerNode' | 'SuperServerNode';
@@ -296,6 +300,10 @@ export class GraphApiService {
 
   public async renameGraph(graphId: number, payload: GraphRename): Promise<GraphResponse> {
     return firstValueFrom(this.http.put<GraphResponse>(this.url(`/graphs/${graphId}/name`), payload));
+  }
+
+  public async patchGraphMetadata(graphId: number, payload: GraphMetadataPatch): Promise<GraphResponse> {
+    return firstValueFrom(this.http.patch<GraphResponse>(this.url(`/graphs/${graphId}/metadata`), payload));
   }
 
   public async createNode(graphId: number, payload: NodeCreate): Promise<NodeResponse> {

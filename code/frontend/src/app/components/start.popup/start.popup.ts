@@ -1,7 +1,8 @@
-import { Component, EventEmitter, Input, OnInit, Output, SimpleChanges } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, SimpleChanges, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StepperModule } from 'primeng/stepper';
+import { GraphApiService } from '../../services/graph-api.service';
 
 type StartMode = 'spyker' | 'hierfl' | 'both';
 
@@ -42,6 +43,12 @@ type RunPayload = {
       tcpRtoDelay: number;
     };
   };
+};
+
+type PersistedStartParams = {
+  evaluateAfterRun?: boolean;
+  settings?: Record<string, unknown>;
+  updatedAt?: number;
 };
 
 @Component({
@@ -104,6 +111,8 @@ export class StartPopup implements OnInit {
   };
 
   private lastPersistedSignature: string | null = null;
+  private api = inject(GraphApiService);
+  private backendSyncTimers: Partial<Record<'hierfl' | 'spyker', ReturnType<typeof setTimeout>>> = {};
 
   public onClose(): void {
     this.close.emit();
@@ -299,27 +308,21 @@ export class StartPopup implements OnInit {
   private restoreHierflSettings(): void {
     const params = this.readSavedParams('hierfl', this.hierflGraphId);
     if (!params) {
+      void this.reconcileWithBackend('hierfl', this.hierflGraphId, null);
       return;
     }
-    this.hierflSettings = {
-      ...this.hierflSettings,
-      ...this.normalizeSavedSettings(params.settings, this.hierflSettings.seedSetText),
-    };
-    this.hierflSettings.repetitions = this.countSeeds(this.hierflSettings.seedSetText);
-    this.evaluateAfterRunByArchitecture.hierfl = params.evaluateAfterRun === true;
+    this.applyPersistedParams('hierfl', params);
+    void this.reconcileWithBackend('hierfl', this.hierflGraphId, params);
   }
 
   private restoreSpykerSettings(): void {
     const params = this.readSavedParams('spyker', this.spykerGraphId);
     if (!params) {
+      void this.reconcileWithBackend('spyker', this.spykerGraphId, null);
       return;
     }
-    this.spykerSettings = {
-      ...this.spykerSettings,
-      ...this.normalizeSavedSettings(params.settings, this.spykerSettings.seedSetText),
-    };
-    this.spykerSettings.repetitions = this.countSeeds(this.spykerSettings.seedSetText);
-    this.evaluateAfterRunByArchitecture.spyker = params.evaluateAfterRun === true;
+    this.applyPersistedParams('spyker', params);
+    void this.reconcileWithBackend('spyker', this.spykerGraphId, params);
   }
 
   private applyEvaluateFlagForMode(mode: StartMode | null): void {
@@ -347,19 +350,22 @@ export class StartPopup implements OnInit {
     if (graphId === null || !Number.isFinite(graphId)) {
       return;
     }
+    const payload: PersistedStartParams = {
+      evaluateAfterRun,
+      settings,
+      updatedAt: Date.now(),
+    };
     localStorage.setItem(
       this.storageKey(architecture, graphId),
-      JSON.stringify({
-        evaluateAfterRun,
-        settings,
-      }),
+      JSON.stringify(payload),
     );
+    this.scheduleBackendSync(architecture, graphId, payload);
   }
 
   private readSavedParams(
     architecture: 'hierfl' | 'spyker',
     graphId: number | null
-  ): { evaluateAfterRun?: boolean; settings?: Record<string, unknown> } | null {
+  ): PersistedStartParams | null {
     if (graphId === null || !Number.isFinite(graphId)) {
       return null;
     }
@@ -368,7 +374,7 @@ export class StartPopup implements OnInit {
       return null;
     }
     try {
-      const parsed = JSON.parse(raw) as { evaluateAfterRun?: boolean; settings?: Record<string, unknown> };
+      const parsed = JSON.parse(raw) as PersistedStartParams;
       if (parsed && typeof parsed === 'object') {
         return parsed;
       }
@@ -380,6 +386,105 @@ export class StartPopup implements OnInit {
 
   private storageKey(architecture: 'hierfl' | 'spyker', graphId: number): string {
     return `fedsim.start-params.${architecture}.${graphId}`;
+  }
+
+  private scheduleBackendSync(
+    architecture: 'hierfl' | 'spyker',
+    graphId: number,
+    payload: PersistedStartParams,
+  ): void {
+    const existingTimer = this.backendSyncTimers[architecture];
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    this.backendSyncTimers[architecture] = setTimeout(() => {
+      void this.syncArchitectureParamsToBackend(graphId, payload);
+    }, 500);
+  }
+
+  private async syncArchitectureParamsToBackend(
+    graphId: number,
+    payload: PersistedStartParams,
+  ): Promise<void> {
+    try {
+      await this.api.patchGraphMetadata(graphId, {
+        patch: {
+          start_params: payload,
+        },
+      });
+    } catch {
+      // Keep local persistence as fallback; the next settings change retries sync.
+    }
+  }
+
+  private extractBackendStartParams(
+    graphMetadata: Record<string, unknown> | null | undefined,
+  ): PersistedStartParams | null {
+    if (!graphMetadata || typeof graphMetadata !== 'object') {
+      return null;
+    }
+    const candidate = graphMetadata['start_params'];
+    if (!candidate || typeof candidate !== 'object') {
+      return null;
+    }
+    return candidate as PersistedStartParams;
+  }
+
+  private applyPersistedParams(architecture: 'hierfl' | 'spyker', params: PersistedStartParams): void {
+    if (architecture === 'hierfl') {
+      this.hierflSettings = {
+        ...this.hierflSettings,
+        ...this.normalizeSavedSettings(params.settings, this.hierflSettings.seedSetText),
+      };
+      this.hierflSettings.repetitions = this.countSeeds(this.hierflSettings.seedSetText);
+      this.evaluateAfterRunByArchitecture.hierfl = params.evaluateAfterRun === true;
+      return;
+    }
+
+    this.spykerSettings = {
+      ...this.spykerSettings,
+      ...this.normalizeSavedSettings(params.settings, this.spykerSettings.seedSetText),
+    };
+    this.spykerSettings.repetitions = this.countSeeds(this.spykerSettings.seedSetText);
+    this.evaluateAfterRunByArchitecture.spyker = params.evaluateAfterRun === true;
+  }
+
+  private async reconcileWithBackend(
+    architecture: 'hierfl' | 'spyker',
+    graphId: number | null,
+    localParams: PersistedStartParams | null,
+  ): Promise<void> {
+    if (graphId === null || !Number.isFinite(graphId)) {
+      return;
+    }
+
+    try {
+      const graph = await this.api.getGraph(graphId);
+      const backendParams = this.extractBackendStartParams(graph.metadata);
+
+      if (!backendParams) {
+        if (localParams) {
+          this.scheduleBackendSync(architecture, graphId, localParams);
+        }
+        return;
+      }
+
+      const localTs = typeof localParams?.updatedAt === 'number' ? localParams.updatedAt : 0;
+      const backendTs = typeof backendParams.updatedAt === 'number' ? backendParams.updatedAt : 0;
+
+      if (backendTs >= localTs) {
+        this.applyPersistedParams(architecture, backendParams);
+        localStorage.setItem(this.storageKey(architecture, graphId), JSON.stringify(backendParams));
+      } else if (localParams) {
+        this.scheduleBackendSync(architecture, graphId, localParams);
+      }
+
+      this.applyEvaluateFlagForMode(this.selectedMode);
+      this.persistSettingsIfChanged();
+    } catch {
+      // Local settings remain authoritative if backend cannot be reached.
+    }
   }
 
   private normalizeSavedSettings(
