@@ -37,15 +37,17 @@ export class Shortcuts{
 
   @HostListener('window:keydown', ['$event'])
   public onKeyDown(event: KeyboardEvent): void {
+    const isTypingTarget = this.isEditableTarget(event.target);
+
     if (event.key === 'Shift') {
       this.shiftDown = true;
     }
-    if (event.key === 'Escape') {
+    if (!isTypingTarget && event.key === 'Escape') {
       event.preventDefault();
       this.clearNodeSelection();
       return;
     }
-    if (event.ctrlKey || event.metaKey) {
+    if ((event.ctrlKey || event.metaKey) && !isTypingTarget) {
       const key = event.key.toLowerCase();
       if (key === 'z') {
         event.preventDefault();
@@ -67,6 +69,9 @@ export class Shortcuts{
         this.pasteCopiedNodes();
         return;
       }
+    }
+    if (isTypingTarget) {
+      return;
     }
     if (event.key === 'Delete' || event.key === 'Backspace') {
       if (!this.selectedEdgeIds.size && !this.selectedNodeIds.size) return;
@@ -90,6 +95,16 @@ export class Shortcuts{
       }
       this.selectedNodeIds.clear();
     }
+  }
+
+  private isEditableTarget(target: EventTarget | null): boolean {
+    const element = target instanceof Element ? target : null;
+    if (!element) {
+      return false;
+    }
+    return Boolean(
+      element.closest('input, textarea, [contenteditable="true"], [contenteditable=""]')
+    );
   }
 
   @HostListener('document:keyup', ['$event'])

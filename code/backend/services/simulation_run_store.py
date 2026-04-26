@@ -63,6 +63,8 @@ def _build_final_summary(job: Any) -> dict[str, Any] | None:
         "duration_seconds": job.duration_seconds,
         "error": job.error,
         "output_filename": result.get("output_filename"),
+        "accuracy_loss_snapshot_url": result.get("accuracy_loss_snapshot_url"),
+        "accuracy_loss_snapshot_urls_by_architecture": result.get("accuracy_loss_snapshot_urls_by_architecture"),
         "evaluation": result.get("evaluation"),
         "evaluation_summary": result.get("evaluation_summary"),
         "seed": result.get("seed"),
@@ -116,6 +118,27 @@ def _to_api_dict(record: SimulationRun) -> dict[str, Any]:
         combined_payload = metadata.get("combined_payload") or {}
         primary_settings = (combined_payload.get("hierfl") or {}).get("simulation_settings") or {}
 
+    dataset = primary_settings.get("dataset") if isinstance(primary_settings, dict) else None
+    if not isinstance(dataset, str) or not dataset.strip():
+        dataset = None
+
+    datasets_by_architecture: dict[str, str | None] | None = None
+    if record.architecture == "both":
+        combined_payload = metadata.get("combined_payload") or {}
+        hierfl_settings = (combined_payload.get("hierfl") or {}).get("simulation_settings") or {}
+        spyker_settings = (combined_payload.get("spyker") or {}).get("simulation_settings") or {}
+
+        def _dataset_from(settings: dict[str, Any]) -> str | None:
+            value = settings.get("dataset")
+            if isinstance(value, str) and value.strip():
+                return value
+            return None
+
+        datasets_by_architecture = {
+            "hierfl": _dataset_from(hierfl_settings),
+            "spyker": _dataset_from(spyker_settings),
+        }
+
     return {
         "run_id": record.run_id,
         "status": record.status,
@@ -130,6 +153,10 @@ def _to_api_dict(record: SimulationRun) -> dict[str, Any]:
         "finished_at": _datetime_to_iso(record.finished_at),
         "duration_seconds": record.duration_seconds,
         "output_filename": result.get("output_filename"),
+        "dataset": dataset,
+        "datasets_by_architecture": datasets_by_architecture,
+        "accuracy_loss_snapshot_url": result.get("accuracy_loss_snapshot_url"),
+        "accuracy_loss_snapshot_urls_by_architecture": result.get("accuracy_loss_snapshot_urls_by_architecture"),
         "evaluation": result.get("evaluation"),
         "evaluation_summary": result.get("evaluation_summary"),
         "runs": result.get("runs"),

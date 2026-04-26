@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 import ray
 
 from backend.services import graph_service
+from backend.services.grafana_snapshot_service import create_accuracy_loss_snapshot_url
 from backend.services.simulation_seed_sets import build_seeded_output_filename, shared_seed_set_or_raise
 from backend.services import simulation_run_store
 from backend.simulation_controller import SimulationController
@@ -121,6 +122,10 @@ class RunJob:
             "finished_at": self.finished_at,
             "duration_seconds": self.duration_seconds,
             "output_filename": result.get("output_filename"),
+            "dataset": self._dataset_for_architecture(),
+            "datasets_by_architecture": self._datasets_by_architecture(),
+            "accuracy_loss_snapshot_url": result.get("accuracy_loss_snapshot_url"),
+            "accuracy_loss_snapshot_urls_by_architecture": result.get("accuracy_loss_snapshot_urls_by_architecture"),
             "evaluation": result.get("evaluation"),
             "evaluation_summary": result.get("evaluation_summary"),
             "runs": result.get("runs"),
@@ -133,6 +138,31 @@ class RunJob:
             payload = self.combined_payload or {}
             return (payload.get("hierfl") or {}).get("simulation_settings") or {}
         return self.simulation_settings or {}
+
+    def _dataset_for_architecture(self) -> str | None:
+        if self.architecture == "both":
+            return None
+        settings = self.simulation_settings or {}
+        dataset = settings.get("dataset")
+        return dataset if isinstance(dataset, str) and dataset.strip() else None
+
+    def _datasets_by_architecture(self) -> dict[str, str | None] | None:
+        if self.architecture != "both":
+            return None
+        payload = self.combined_payload or {}
+        hierfl_settings = (payload.get("hierfl") or {}).get("simulation_settings") or {}
+        spyker_settings = (payload.get("spyker") or {}).get("simulation_settings") or {}
+
+        def _dataset_from(settings: dict[str, Any]) -> str | None:
+            value = settings.get("dataset")
+            if isinstance(value, str) and value.strip():
+                return value
+            return None
+
+        return {
+            "hierfl": _dataset_from(hierfl_settings),
+            "spyker": _dataset_from(spyker_settings),
+        }
 
 
 class SimulationRunQueue:
@@ -318,6 +348,14 @@ class SimulationRunQueue:
 
         finished_at = datetime.now(timezone.utc)
         duration_seconds = (finished_at - started_at).total_seconds()
+        if status == "completed" and isinstance(result, dict):
+            snapshot_data = self._create_accuracy_loss_snapshots(
+                run_id=job.run_id,
+                architecture=job.architecture,
+                started_at=started_at,
+                finished_at=finished_at,
+            )
+            result.update(snapshot_data)
         with self._lock:
             job.status = status
             job.result = result
@@ -333,6 +371,53 @@ class SimulationRunQueue:
                 job.architecture,
                 duration_seconds,
             )
+
+    def _create_accuracy_loss_snapshots(
+        self,
+        *,
+        run_id: str,
+        architecture: str,
+        started_at: datetime,
+        finished_at: datetime,
+    ) -> dict[str, Any]:
+        range_from_ms = int(started_at.timestamp() * 1000)
+        range_to_ms = int(finished_at.timestamp() * 1000)
+
+        try:
+            if architecture == "both":
+                urls_by_architecture: dict[str, str | None] = {}
+                for arch in ("hierfl", "spyker"):
+                    urls_by_architecture[arch] = create_accuracy_loss_snapshot_url(
+                        run_id=run_id,
+                        architecture=arch,
+                        range_from_ms=range_from_ms,
+                        range_to_ms=range_to_ms,
+                    )
+                return {
+                    "accuracy_loss_snapshot_url": None,
+                    "accuracy_loss_snapshot_urls_by_architecture": urls_by_architecture,
+                }
+
+            url = create_accuracy_loss_snapshot_url(
+                run_id=run_id,
+                architecture=architecture,
+                range_from_ms=range_from_ms,
+                range_to_ms=range_to_ms,
+            )
+            return {
+                "accuracy_loss_snapshot_url": url,
+                "accuracy_loss_snapshot_urls_by_architecture": None,
+            }
+        except Exception:
+            logger.exception(
+                "simulation_snapshot_creation_failed run_id=%s architecture=%s",
+                run_id,
+                architecture,
+            )
+            return {
+                "accuracy_loss_snapshot_url": None,
+                "accuracy_loss_snapshot_urls_by_architecture": None,
+            }
 
     def _run_architecture_series(
         self,

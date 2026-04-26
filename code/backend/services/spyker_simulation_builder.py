@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import inspect
 import sys
 from functools import lru_cache
 from pathlib import Path
@@ -223,6 +224,7 @@ def build_spyker_simulation(
     # eval_time_delay: float | None = None,  TODO: Uncomment and inject in simulation_config
     idle_token_delay: float | None = None,
     gpu_budget: float | None = None,
+    dataset_id: str | None = None,
     seed: int | None = None,
     run_id: str | None = None,
     graph_id: int | None = None,
@@ -255,6 +257,7 @@ def build_spyker_simulation(
             raise ValueError("spyker_invalid_idle_token_delay")
         simulation_config["idle_token_delay"] = idle
     sim = SpykerSimulation(gpu_budget=gpu_budget)
+    supports_dataset_id = "dataset_id" in inspect.signature(sim.add_client).parameters
     sim.set_configurations(
         spyker_params=algorithm_config,
         training_params=spyker_training_config,
@@ -323,17 +326,20 @@ def build_spyker_simulation(
             suffix = f"-{idx + 1}" if count > 1 else ""
             client_id = f"{client.id}{suffix}"
             client_name = _node_name(client_id, client_config)
-            sim.add_client(
-                client_id=client_id,
-                server_id=str(server_id),
-                name=client_name,
-                perf=perf,
-                dataset_partition_id=client_index,
-                total_partitions=total_clients,
-                download_speed=client_download,
-                upload_speed=client_upload,
-                seed=None if seed is None else seed + client_index,
-            )
+            add_client_kwargs = {
+                "client_id": client_id,
+                "server_id": str(server_id),
+                "name": client_name,
+                "perf": perf,
+                "dataset_partition_id": client_index,
+                "total_partitions": total_clients,
+                "download_speed": client_download,
+                "upload_speed": client_upload,
+                "seed": None if seed is None else seed + client_index,
+            }
+            if supports_dataset_id:
+                add_client_kwargs["dataset_id"] = dataset_id
+            sim.add_client(**add_client_kwargs)
             instance_ids.append(client_id)
             client_index += 1
         client_instance_ids[client.id] = instance_ids

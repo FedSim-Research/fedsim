@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import inspect
 import sys
 from functools import lru_cache
 from pathlib import Path
@@ -199,6 +200,7 @@ def build_hierfl_simulation(
     training_config: dict[str, Any] | None = None,
     run_time_limit: float | None = None,
     gpu_budget: float | None = None,
+    dataset_id: str | None = None,
     seed: int | None = None,
     run_id: str | None = None,
     graph_id: int | None = None,
@@ -229,6 +231,7 @@ def build_hierfl_simulation(
     if eval_interval is not None and float(eval_interval) < 0:
         raise ValueError("hierfl_invalid_eval_interval")
     sim = HierarchicalSimulation(run_time_limit=limit, gpu_budget=gpu_budget)
+    supports_dataset_id = "dataset_id" in inspect.signature(sim.add_client).parameters
     sim.set_metadata(
         run_id=run_id,
         graph_id=graph.id if graph_id is None else graph_id,
@@ -322,17 +325,20 @@ def build_hierfl_simulation(
             network_dict = sim.server_registry[server_id].network_metrics or {}
             network_dict[client_id] = edge_net
             sim.server_registry[server_id].network_metrics = network_dict
-            sim.add_client(
-                client_id=client_id,
-                edge_id=server_id,
-                name=client_name,
-                perf=_performance_for(client.type, config),
-                upload_speed=client_upload,
-                download_speed=client_download,
-                dataset_partition_id=client_index,
-                total_partitions=total_clients,
-                seed=None if seed is None else seed + client_index,
-            )
+            add_client_kwargs = {
+                "client_id": client_id,
+                "edge_id": server_id,
+                "name": client_name,
+                "perf": _performance_for(client.type, config),
+                "upload_speed": client_upload,
+                "download_speed": client_download,
+                "dataset_partition_id": client_index,
+                "total_partitions": total_clients,
+                "seed": None if seed is None else seed + client_index,
+            }
+            if supports_dataset_id:
+                add_client_kwargs["dataset_id"] = dataset_id
+            sim.add_client(**add_client_kwargs)
             client_index += 1
 
     return sim

@@ -37,6 +37,10 @@ class GraphRename(BaseModel):
     name: str
 
 
+class GraphMetadataPatch(BaseModel):
+    patch: Dict[str, Any]
+
+
 class NodeCreate(BaseModel):
     type: Literal["ClientNode", "ServerNode", "SuperServerNode"]
     config: Dict[str, Any]

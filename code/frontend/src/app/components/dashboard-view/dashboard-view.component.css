@@ -278,58 +278,11 @@
   border: 0;
 }
 
-.run-dashboards-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.run-dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.run-dashboard-item {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
-  padding: 10px;
-}
-
-.run-dashboard-header {
-  margin-bottom: 8px;
-}
-
-.run-dashboard-id {
-  color: rgba(255, 255, 255, 0.92);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-  font-size: 0.76rem;
-  overflow-wrap: anywhere;
-}
-
-.run-dashboard-meta {
-  color: rgba(255, 255, 255, 0.66);
-  font-size: 0.73rem;
-  margin-top: 4px;
-}
-
-.run-dashboard-embeds {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-}
-
-.run-dashboard-embeds--dual {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 @media (max-width: 1080px) {
   .cockpit-grid,
   .summary-grid,
   .compare-card .compare-grid,
-  .telemetry-grid,
-  .run-dashboard-grid {
+  .telemetry-grid {
     grid-template-columns: 1fr;
   }
 
@@ -338,10 +291,6 @@
   }
 
   .model-quality-metrics {
-    grid-template-columns: 1fr;
-  }
-
-  .run-dashboard-embeds--dual {
     grid-template-columns: 1fr;
   }
 }

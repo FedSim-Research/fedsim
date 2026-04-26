@@ -49,6 +49,9 @@ def _validate_hierfl_payload(
         gpu_budget = simulation_settings.get("gpu_budget")
         if gpu_budget is not None:
             _parse_float_ge_zero(gpu_budget, "hierfl_invalid_gpu_budget")
+        dataset = simulation_settings.get("dataset")
+        if dataset is not None:
+            _validate_dataset_id(dataset, "hierfl_invalid_dataset")
         seed = simulation_settings.get("seed")
         if seed is not None:
             _parse_int_ge_zero(seed, "hierfl_invalid_seed")
@@ -85,6 +88,9 @@ def _validate_spyker_payload(
         gpu_budget = simulation_settings.get("gpu_budget")
         if gpu_budget is not None:
             _parse_float_ge_zero(gpu_budget, "spyker_invalid_gpu_budget")
+        dataset = simulation_settings.get("dataset")
+        if dataset is not None:
+            _validate_dataset_id(dataset, "spyker_invalid_dataset")
         seed = simulation_settings.get("seed")
         if seed is not None:
             _parse_int_ge_zero(seed, "spyker_invalid_seed")
@@ -170,3 +176,14 @@ def _validate_seed_controls(simulation_settings: dict, prefix: str) -> None:
         parsed_repetitions = _parse_int_min_one(repetitions, f"{prefix}_invalid_repetitions")
         if seed_set is not None and parsed_repetitions != len(seed_set):
             raise ValueError(f"{prefix}_seed_repetitions_mismatch")
+
+
+def _validate_dataset_id(value: object, error_code: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(error_code)
+    dataset = value.strip()
+    if not dataset:
+        raise ValueError(error_code)
+    if len(dataset) > 128:
+        raise ValueError(error_code)
+    return dataset
