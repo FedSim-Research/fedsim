@@ -144,41 +144,6 @@
       </article>
     }
 
-    @if (completedRunDashboards().length) {
-      <article class="summary-card run-dashboards-card">
-        <h3>Completed Run Dashboards</h3>
-        <p class="telemetry-note">
-          Each completed run gets its own accuracy and loss dashboard panel.
-        </p>
-        <div class="run-dashboard-grid">
-          @for (runDashboard of completedRunDashboards(); track runDashboard.runId) {
-            <section class="run-dashboard-item">
-              <div class="run-dashboard-header">
-                <div class="run-dashboard-id">{{ runDashboard.runId }}</div>
-                <div class="run-dashboard-meta">
-                  {{ runDashboard.architecture }} • Finished {{ formatEpoch(runDashboard.finishedAtEpoch) }}
-                </div>
-              </div>
-              <div class="run-dashboard-embeds" [class.run-dashboard-embeds--dual]="runDashboard.embeds.length > 1">
-                @for (embed of runDashboard.embeds; track embed.key) {
-                  <section class="mini-telemetry-card">
-                    <div class="mini-telemetry-title">{{ embed.title }}</div>
-                    <iframe
-                      [src]="embed.src"
-                      width="100%"
-                      height="170"
-                      frameborder="0"
-                      loading="lazy"
-                    ></iframe>
-                  </section>
-                }
-              </div>
-            </section>
-          }
-        </div>
-      </article>
-    }
-
     <article class="summary-card">
       <h3>Grafana Research Telemetry</h3>
       <p class="telemetry-note">

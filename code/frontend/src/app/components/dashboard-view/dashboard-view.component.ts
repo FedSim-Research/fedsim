@@ -20,19 +20,6 @@ type ArchitectureEmbed = {
   src: SafeResourceUrl;
 };
 
-type RunDashboardEmbed = {
-  key: string;
-  title: string;
-  src: SafeResourceUrl;
-};
-
-type CompletedRunDashboard = {
-  runId: string;
-  architecture: string;
-  finishedAtEpoch: number | null;
-  embeds: RunDashboardEmbed[];
-};
-
 @Component({
   selector: 'app-dashboard-view',
   standalone: true,
@@ -45,9 +32,10 @@ export class DashboardViewComponent {
   private frameworkJobsService = inject(FrameworkJobsService);
   private runsService = inject(DashboardRunsService);
 
-  private grafanaBaseUrl = ((window as any).FEDSIM_GRAFANA_BASE_URL as string | undefined) ?? 'http://localhost:3000';
+  private grafanaBaseUrl = this.resolveGrafanaBaseUrl();
   private grafanaUrlCache = new Map<string, SafeResourceUrl>();
   private readonly defaultRangeMs = 15 * 60 * 1000;
+  private readonly iframeRefreshIntervalMs = 30 * 1000;
 
   @Input() public sidebarOpen = true;
 
@@ -120,57 +108,6 @@ export class DashboardViewComponent {
         architecture: this.toGrafanaArchitectureParam(architecture),
       }),
     }));
-  });
-
-  public completedRunDashboards = computed<CompletedRunDashboard[]>(() => {
-    const completed = this.runs().filter((run: SimulationRunResponse) => run.status === 'completed');
-    const sorted = [...completed].sort((left, right) => this.toEpoch(right.finished_at) - this.toEpoch(left.finished_at));
-
-    return sorted.slice(0, 8).map((run) => {
-      const runId = run.run_id ?? '';
-      const architecture = String(run.architecture ?? 'unknown');
-      const range = this.runTimeRange(run);
-
-      if (architecture === 'both') {
-        return {
-          runId,
-          architecture,
-          finishedAtEpoch: Number.isFinite(this.toEpoch(run.finished_at)) ? this.toEpoch(run.finished_at) : null,
-          embeds: (['hierfl', 'spyker'] as const).map((singleArchitecture) => ({
-            key: `${runId}-${singleArchitecture}`,
-            title: `${this.architectureLabel(singleArchitecture)} Accuracy & Loss`,
-            src: this.getGrafanaPanelUrl({
-              uid: 'fedsimFrontendDashboard',
-              panelId: 1007,
-              rangeFrom: range.from,
-              rangeTo: range.to,
-              runId,
-              architecture: this.toGrafanaArchitectureParam(singleArchitecture),
-            }),
-          })),
-        };
-      }
-
-      return {
-        runId,
-        architecture,
-        finishedAtEpoch: Number.isFinite(this.toEpoch(run.finished_at)) ? this.toEpoch(run.finished_at) : null,
-        embeds: [
-          {
-            key: `${runId}-${architecture || 'single'}`,
-            title: 'Accuracy & Loss',
-            src: this.getGrafanaPanelUrl({
-              uid: 'fedsimFrontendDashboard',
-              panelId: 1007,
-              rangeFrom: range.from,
-              rangeTo: range.to,
-              runId,
-              architecture: this.toGrafanaArchitectureParam(architecture),
-            }),
-          },
-        ],
-      };
-    });
   });
 
   public getStatusClass(status: SimulationRunResponse['status']): string {
@@ -270,7 +207,8 @@ export class DashboardViewComponent {
   }
 
   private runTimeRange(run: SimulationRunResponse | null): { from: number; to: number } {
-    const now = Date.now();
+    // Keep iframe URL changes on a fixed cadence so embeds refresh every 30 seconds.
+    const now = Math.floor(Date.now() / this.iframeRefreshIntervalMs) * this.iframeRefreshIntervalMs;
     const queuedAt = run?.queued_at ? new Date(run.queued_at).getTime() : NaN;
     const startedAt = run?.started_at ? new Date(run.started_at).getTime() : NaN;
     const finishedAt = run?.finished_at ? new Date(run.finished_at).getTime() : NaN;
@@ -330,5 +268,20 @@ export class DashboardViewComponent {
       return Number.NaN;
     }
     return new Date(value).getTime();
+  }
+
+  private resolveGrafanaBaseUrl(): string {
+    const win = window as any;
+    const configured = win.FEDSIM_GRAFANA_BASE_URL as string | undefined;
+    if (typeof configured === 'string' && configured.trim()) {
+      return configured.trim().replace(/\/$/, '');
+    }
+
+    const apiBase = win.FEDSIM_API_BASE_URL as string | undefined;
+    if (apiBase === '/api') {
+      return `${window.location.origin}/grafana`;
+    }
+
+    return 'http://localhost:3000';
   }
 }
