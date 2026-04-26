@@ -14,8 +14,6 @@ ACCURACY_LOSS_DASHBOARD_UID = "fedsimFrontendDashboard"
 
 
 def _base_urls() -> list[str]:
-    # FEDSIM_GRAFANA_BASE_URL can point to an external URL, while
-    # FEDSIM_GRAFANA_INTERNAL_BASE_URL can force an in-network URL for containers.
     configured = [
         os.getenv("FEDSIM_GRAFANA_INTERNAL_BASE_URL", "").strip(),
         os.getenv("FEDSIM_GRAFANA_BASE_URL", "").strip(),
