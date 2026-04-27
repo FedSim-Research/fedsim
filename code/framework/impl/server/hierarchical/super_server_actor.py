@@ -55,7 +55,7 @@ class SuperServer(BaseAsyncServer):
 
         return self._get_and_clear_events()
 
-    def on_client_update(self, _):
+    def on_client_update(self, data: Dict[str, Any], direct_refs: Any = None):
         raise NotImplementedError(
             "A Super Server should never receive a direct update from a Virtual Client."
         )

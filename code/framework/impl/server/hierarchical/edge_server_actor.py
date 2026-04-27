@@ -99,36 +99,33 @@ class EdgeServer(BaseAsyncServer):
                 else ray.get_runtime_context().current_actor
             )
 
+            weights_ref = ray.put(self.global_model_weights)
+
             for (
                 client_id,
                 virtual_client_actor,
             ) in self.assigned_client_instances.items():
-                fit_ins = FitIns(global_params, local_config)
-
                 self._schedule_event(
                     delay=0.0,
                     target_actor=virtual_client_actor,
                     event_type="START_FIT",
                     data={
-                        "fit_ins": fit_ins,
+                        "config": local_config,
                         "server_id": self.server_id,
                         "server_ref": target_ref,
                     },
+                    refs=weights_ref,
                 )
         else:
             raise ValueError(
                 f"[Edge Server {self.server_id}] Unknown event type: {event_type}"
             )
 
-    def on_client_update(self, data: Dict[str, Any]):
-        """
-        Handle a VirtualClient finishing training.
-        """
-        fit_res = data["fit_res"]
+    def on_client_update(self, data: Dict[str, Any], direct_refs: Any = None):
         client_id = data["client_id"]
-        num_examples = fit_res.num_examples
+        num_examples = data["num_examples"]
 
-        weights = parameters_to_ndarrays(fit_res.parameters)
+        weights = direct_refs
 
         self.client_updates_buffer[client_id] = (weights, num_examples)
 

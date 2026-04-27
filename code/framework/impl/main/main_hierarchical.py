@@ -74,17 +74,17 @@ class HierarchicalSimulation:
         self.graph_id = -1
 
     def set_metadata(
-        self,
-        run_id: str | None,
-        graph_id: int | None,
-        eval_interval: float | None = None,
-    ) -> None:
+        self, run_id: str, graph_id: str, eval_interval: float | None = None
+    ):
+        """Configure telemetry settings."""
         if run_id:
             self.run_id = run_id
         if graph_id is not None:
             self.graph_id = int(graph_id)
         if eval_interval is not None:
             self.eval_interval = max(0.0, float(eval_interval))
+        else:
+            self.eval_interval = 500
 
     def _resolve_server_actor_options(self) -> dict[str, float]:
         if self.gpu_budget is None:

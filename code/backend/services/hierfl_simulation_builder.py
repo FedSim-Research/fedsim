@@ -144,7 +144,6 @@ def validate_hierfl_graph(graph: Graph) -> None:
             if key not in config or config[key] is None:
                 raise ValueError(f"hierfl_missing_{node.type}_{key}")
 
-
     for client in client_nodes:
         client_config = _node_config(client)
         if "count" not in client_config or client_config["count"] is None:
@@ -184,7 +183,10 @@ def _require_training_config(training_config: dict[str, Any] | None) -> dict[str
         if batch_size < 1:
             raise ValueError("hierfl_invalid_batch_size")
         result["batch_size"] = batch_size
-    if "model_complexity" in training_config and training_config["model_complexity"] is not None:
+    if (
+        "model_complexity" in training_config
+        and training_config["model_complexity"] is not None
+    ):
         try:
             model_complexity = float(training_config["model_complexity"])
         except (TypeError, ValueError):
@@ -206,6 +208,8 @@ def build_hierfl_simulation(
     graph_id: int | None = None,
     eval_interval: float | None = None,
 ):
+    from specs.network_metrics import Network
+
     HierarchicalSimulation, _, _, _ = _import_hierfl()
     validate_hierfl_graph(graph)
 
@@ -233,8 +237,8 @@ def build_hierfl_simulation(
     sim = HierarchicalSimulation(run_time_limit=limit, gpu_budget=gpu_budget)
     supports_dataset_id = "dataset_id" in inspect.signature(sim.add_client).parameters
     sim.set_metadata(
-        run_id=run_id,
-        graph_id=graph.id if graph_id is None else graph_id,
+        run_id=run_id or "unknown_run",
+        graph_id=str(graph.id if graph_id is None else graph_id),
         eval_interval=eval_interval,
     )
     sim.set_super_server(

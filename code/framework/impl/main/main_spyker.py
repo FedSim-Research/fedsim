@@ -23,8 +23,10 @@ from client.simulation_client import SimulationFlowerClient
 
 SIM_NAME = "Spyker_CIFAR10"
 
+
 class DataLoaderAdapter:
     """Wraps DataLoader for Flower compatibility (Same as Hierarchical)."""
+
     def __init__(self, loader: DataLoader):
         self.loader = loader
         self.dataset = loader.dataset
@@ -35,6 +37,7 @@ class DataLoaderAdapter:
 
     def __len__(self):
         return len(self.loader)
+
 
 class SpykerSimulation:
     def __init__(self, gpu_budget: float | None = None):
@@ -83,23 +86,25 @@ class SpykerSimulation:
 
         self.run_id = f"run_{uuid.uuid4().hex[:6]}"
         self.graph_id = "default_graph"
-        self.eval_interval = 0.0 # disabled
+        self.eval_interval = 0.0  # disabled
         self.evaluator_actor = None
 
         self.run_id = f"run_{uuid.uuid4().hex[:6]}"
         self.graph_id = "default_graph"
-        self.eval_interval = 0.0 # disabled
+        self.eval_interval = 0.0  # disabled
         self.evaluator_actor = None
 
-    def set_configurations(self, 
-                           spyker_params: Dict[str, Any],
-                           training_params: Dict[str, Any],
-                           simulation_params: Dict[str, Any]):
+    def set_configurations(
+        self,
+        spyker_params: Dict[str, Any],
+        training_params: Dict[str, Any],
+        simulation_params: Dict[str, Any],
+    ):
         """
         API Entry point to inject configurations before build/run.
         Values not provided will fallback to defaults in spyker_config.py
         """
-        
+
         # 1. Update Spyker Algorithm Params
         if spyker_params:
             for k, v in spyker_params.items():
@@ -125,39 +130,43 @@ class SpykerSimulation:
         print(f"  > Epochs: {self.config.training.local_epochs}")
         print(f"  > Token Heartbeat: {self.config.simulation.idle_token_delay}s")
 
-    def set_metadata(self, run_id: str, graph_id: str, eval_interval: float | None = None):
+    def set_metadata(
+        self, run_id: str, graph_id: str, eval_interval: float | None = None
+    ):
         """Configure telemetry settings."""
-        if run_id: self.run_id = run_id
-        if graph_id: self.graph_id = graph_id
+        if run_id:
+            self.run_id = run_id
+        if graph_id:
+            self.graph_id = graph_id
         if eval_interval is None:
             self.eval_interval = self.config.simulation.eval_time_delay
         else:
             self.eval_interval = max(0.0, float(eval_interval))
 
     def add_server(
-            self, 
-            server_id: str, 
-            name: str, 
-            perf: Performance, 
-            net: Dict[str, Network], 
-            download_speed: float, 
-            upload_speed: float
-        ):
+        self,
+        server_id: str,
+        name: str,
+        perf: Performance,
+        net: Dict[str, Network],
+        download_speed: float,
+        upload_speed: float,
+    ):
         """NOTE: net parameter may only take in server_ids in order to establish server to server connections."""
         if server_id not in self.server_ids:
             self.server_ids.append(server_id)
-        
+
         self.server_registry[server_id] = ServerSpec(
-            id = server_id,
-            name = name,
-            performance_metrics = perf,
-            network_metrics = net,
+            id=server_id,
+            name=name,
+            performance_metrics=perf,
+            network_metrics=net,
             download_speed=download_speed,
-            upload_speed=upload_speed
+            upload_speed=upload_speed,
         )
         if server_id not in self.client_map:
             self.client_map[server_id] = []
-    
+
     def add_client(
         self,
         client_id: str,
@@ -166,7 +175,7 @@ class SpykerSimulation:
         perf: Performance,
         dataset_partition_id: int,
         total_partitions: int,
-        download_speed: float, 
+        download_speed: float,
         upload_speed: float,
         seed: int | None = None,
     ):
@@ -182,14 +191,14 @@ class SpykerSimulation:
             name=name,
             performance_metrics=perf,
             download_speed=download_speed,
-            upload_speed=upload_speed
+            upload_speed=upload_speed,
         )
 
         client_config = {
-        "dataset_partition_id": dataset_partition_id,
-        "total_partitions": total_partitions,
-        "seed": seed
-    }
+            "dataset_partition_id": dataset_partition_id,
+            "total_partitions": total_partitions,
+            "seed": seed,
+        }
         self.client_map[server_id].append((client_id, client_config))
 
     def _spawn_actors(self):
@@ -201,18 +210,19 @@ class SpykerSimulation:
             raise ValueError(
                 "First spyker server must have at least one client to initialize global model."
             )
-        
+
         from main.task import Net
+
         dummy_model = Net()
-        initial_weights_np = [val.cpu().numpy() for _, val in dummy_model.state_dict().items()]
+        initial_weights_np = [
+            val.cpu().numpy() for _, val in dummy_model.state_dict().items()
+        ]
 
         print(f"Spawning {len(self.server_ids)} Spyker Servers...")
 
         for s_id in self.server_ids:
             actor = SpykerServer.options(**self._server_actor_options).remote(
-                server_id=s_id,
-                config=self.config,
-                context=self.context
+                server_id=s_id, config=self.config, context=self.context
             )
             self.spyker_actors_map[s_id] = actor
 
@@ -223,18 +233,17 @@ class SpykerSimulation:
 
             # Update Context
             ray.get(actor.set_global_context_remote.remote(self.context))
-            
+
             # Inject Orchestrator & Weights
             ray.get(actor.set_orchestrator.remote(self.orchestrator))
             ray.get(actor.set_initial_weights.remote(initial_weights_np))
 
             # Register Clients
             assigned_client_configs = {
-                c_id: client_config 
-                for c_id, client_config in self.client_map[s_id]
+                c_id: client_config for c_id, client_config in self.client_map[s_id]
             }
             ray.get(actor.register_clients.remote(assigned_client_configs))
-    
+
     def _configure_network(self):
         print("Wiring Spyker Mesh and Token Ring...")
 
@@ -251,20 +260,24 @@ class SpykerSimulation:
                 if k in server_ids_set
             }
 
-            next_peer_id = self.server_ids[(i + 1) % count] # TODO: implement cohesive selection strategy for ring
+            next_peer_id = self.server_ids[
+                (i + 1) % count
+            ]  # TODO: implement cohesive selection strategy for ring
 
             assigned_client_ids = [c_id for c_id, _ in self.client_map[s_id]]
 
-            ray.get(actor.set_topology.remote(
-                peer_connections = outbound_edges,
-                next_token_peer=next_peer_id,
-                assigned_clients = assigned_client_ids
-            ))
+            ray.get(
+                actor.set_topology.remote(
+                    peer_connections=outbound_edges,
+                    next_token_peer=next_peer_id,
+                    assigned_clients=assigned_client_ids,
+                )
+            )
 
             if i == 0:
                 print(f"Server {s_id} designated as Initial Token Holder.")
                 ray.get(actor.set_token_holder.remote(True))
-    
+
     def build(self):
         initialize_environment()
 
@@ -274,7 +287,7 @@ class SpykerSimulation:
         self.context = SimulationContext(
             orchestrator_actor=self.orchestrator,
             client_registry=self.client_registry,
-            server_registry=self.server_registry
+            server_registry=self.server_registry,
         )
 
         set_global_context(self.context)
@@ -282,28 +295,28 @@ class SpykerSimulation:
         self._spawn_actors()
 
         self._configure_network()
-    
+
     def run(self):
         if not self.orchestrator:
             raise RuntimeError("Simulation not built. Call build() first.")
-        
+
         print("Initializing Spyker simulation...")
-        all_initial_events =[]
+        all_initial_events = []
 
         # Telemetry
         if self.eval_interval > 0:
             from telemetry.evaluator_actor import PeriodicEvaluator
-            
+
             # Use Server 0 as the representative model to evaluate
             target_srv = self.spyker_actors_map[self.server_ids[0]]
-            
+
             self.evaluator_actor = PeriodicEvaluator.remote(
                 run_id=self.run_id,
                 graph_id=self.graph_id,
                 architecture="spyker",
                 target_server_ref=target_srv,
                 orchestrator_ref=self.orchestrator,
-                evaluation_interval=self.eval_interval
+                evaluation_interval=self.eval_interval,
             )
 
             eval_events = ray.get(self.evaluator_actor.start.remote())
@@ -314,14 +327,20 @@ class SpykerSimulation:
             events = ray.get(actor.start_simulation.remote())
             if events:
                 all_initial_events.extend(events)
-        
+
         for event in all_initial_events:
             if len(event) == 5:
                 delay, target, method, payload, refs = event
-                ray.get(self.orchestrator.add_event.remote(delay, target, method, payload, refs))
+                ray.get(
+                    self.orchestrator.add_event.remote(
+                        delay, target, method, payload, refs
+                    )
+                )
             elif len(event) == 4:
                 delay, target, method, payload = event
-                ray.get(self.orchestrator.add_event.remote(delay, target, method, payload))
+                ray.get(
+                    self.orchestrator.add_event.remote(delay, target, method, payload)
+                )
             else:
                 raise ValueError(f"Unexpected event tuple length: {len(event)}")
 
@@ -348,13 +367,15 @@ class SpykerSimulation:
 
         torch.save(state_dict, filename)
         print(f"Model successfully saved to {filename}")
-    
+
     # ===========================
+
 
 def initialize_environment():
     ensure_ray_initialized()
     print("Ray environment initialized.")
-    
+
+
 def evaluate_model(filename: str):
     print(f"Starting evaluation for model: {filename}")
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -379,6 +400,7 @@ def evaluate_model(filename: str):
 
     # ==============================================================
 
+
 def run_default_simulation():
     print("Initialising Simulation.")
     sim = SpykerSimulation()
@@ -392,24 +414,25 @@ def run_default_simulation():
             "h_intra": 50,
             "sigmoid_phi": 1.0,
             "server_learning_rate": 0.1,
-            "tcp_rto_delay": 0.2
+            "tcp_rto_delay": 0.2,
         },
         training_params={
             "local_epochs": 1,
             "learning_rate": 0.005,
-            "model_complexity": 1.0
+            "model_complexity": 1.0,
         },
-        simulation_params={
-            "run_time_limit": 5000.0,
-            "idle_token_delay": 0.5
-        }
+        simulation_params={"run_time_limit": 5000.0, "idle_token_delay": 0.5},
     )
 
     perf = Performance(compute_factor=10.0, performance_stddev=1.0)
 
-    net_client = Network(latency_avg=20, latency_stddev=5, packet_loss_avg=0.001, packet_loss_stddev=0)
+    net_client = Network(
+        latency_avg=20, latency_stddev=5, packet_loss_avg=0.001, packet_loss_stddev=0
+    )
 
-    net_backbone = Network(latency_avg=50, latency_stddev=2, packet_loss_avg=0.01, packet_loss_stddev=0)
+    net_backbone = Network(
+        latency_avg=50, latency_stddev=2, packet_loss_avg=0.01, packet_loss_stddev=0
+    )
 
     download_speed_client = 100
     download_speed_server = 1000
@@ -418,17 +441,23 @@ def run_default_simulation():
 
     s1, s2, s3 = "server_A", "server_B", "server_C"
     s1_edges: Dict[str, Network] = {}
-    s1_edges['server_B'] = net_backbone
-    s1_edges['server_C'] = net_backbone
+    s1_edges["server_B"] = net_backbone
+    s1_edges["server_C"] = net_backbone
     s2_edges: Dict[str, Network] = {}
-    s2_edges['server_A'] = net_backbone
-    s2_edges['server_C'] = net_backbone
+    s2_edges["server_A"] = net_backbone
+    s2_edges["server_C"] = net_backbone
     s3_edges: Dict[str, Network] = {}
-    s3_edges['server_A'] = net_backbone
-    s3_edges['server_B'] = net_backbone
-    sim.add_server(s1, "Spyker Node A", perf, s1_edges, download_speed_server, upload_speed_server)
-    sim.add_server(s2, "Spyker Node B", perf, s2_edges, download_speed_server, upload_speed_server)
-    sim.add_server(s3, "Spyker Node C", perf, s3_edges, download_speed_server, upload_speed_server)
+    s3_edges["server_A"] = net_backbone
+    s3_edges["server_B"] = net_backbone
+    sim.add_server(
+        s1, "Spyker Node A", perf, s1_edges, download_speed_server, upload_speed_server
+    )
+    sim.add_server(
+        s2, "Spyker Node B", perf, s2_edges, download_speed_server, upload_speed_server
+    )
+    sim.add_server(
+        s3, "Spyker Node C", perf, s3_edges, download_speed_server, upload_speed_server
+    )
 
     total_clients = 20
     for i in range(total_clients):
@@ -442,7 +471,7 @@ def run_default_simulation():
             s2_edges[cid] = net_client
         else:
             assigned_server = s3
-            s3_edges[cid] = net_client 
+            s3_edges[cid] = net_client
 
         sim.add_client(
             client_id=cid,
@@ -452,9 +481,9 @@ def run_default_simulation():
             dataset_partition_id=i,
             total_partitions=total_clients,
             download_speed=download_speed_client,
-            upload_speed=upload_speed_client
+            upload_speed=upload_speed_client,
         )
-        
+
     sim.build()
     sim.run()
 
@@ -462,8 +491,10 @@ def run_default_simulation():
     sim.save_model(out_file)
     evaluate_model(out_file)
 
+
 def main():
     run_default_simulation()
+
 
 if __name__ == "__main__":
     main()

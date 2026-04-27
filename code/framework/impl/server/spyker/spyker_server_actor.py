@@ -145,16 +145,15 @@ class SpykerServer(BaseAsyncServer):
 
         return self._get_and_clear_events()
 
-    def on_client_update(self, data: Any):
+    def on_client_update(self, data: Any, direct_refs: Any = None):
         """
         Handle the completion of a client training task.
         data = {'fit_res': FitRes, 'client_id': str}
         """
-        fit_res: FitRes = data["fit_res"]
         client_id = data["client_id"]
 
         # Extract Weights from Client Result
-        client_weights = parameters_to_ndarrays(fit_res.parameters)
+        client_weights = direct_refs
 
         # Calculate Decay (Algorithm 1 SPYKER)
         count = self.client_update_counts.get(client_id, 0) + 1
@@ -355,9 +354,6 @@ class SpykerServer(BaseAsyncServer):
     # =====================================================================
 
     def _schedule_client_task(self, client_id):
-        """
-        Interacts with the VirtualClient to perform training and simulation.
-        """
         train_config = self.full_config.training
         config = {
             "server_id": self.server_id,
@@ -366,24 +362,24 @@ class SpykerServer(BaseAsyncServer):
             "model_complexity": train_config.model_complexity,
             "model_age": self.model_age,
         }
-        fit_ins = FitIns(
-            parameters=ndarrays_to_parameters(self.global_model_weights), config=config
-        )
+
         client_actor = self.assigned_client_instances[client_id]
         target_ref = (
             self.self_ref if self.self_ref else ray.get_runtime_context().current_actor
         )
 
-        # Delegate heavily blocking logic to client actor via DES event
+        weights_ref = ray.put(self.global_model_weights)
+
         self._schedule_event(
             delay=0.0,
             target_actor=client_actor,
             event_type="START_FIT",
             data={
-                "fit_ins": fit_ins,
+                "config": config,
                 "server_id": self.server_id,
                 "server_ref": target_ref,
             },
+            refs=weights_ref,
         )
 
     def _send_server_message(

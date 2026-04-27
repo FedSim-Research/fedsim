@@ -34,7 +34,7 @@ class BaseAsyncServer(ABC):
         if event_type == "START_SIMULATION":
             self.start_simulation()
         elif event_type == "CLIENT_UPDATE":
-            self.on_client_update(data)
+            self.on_client_update(data, direct_refs)
         elif event_type == "SERVER_MESSAGE":
             self.on_server_message(data, direct_refs)
         else:
@@ -75,7 +75,7 @@ class BaseAsyncServer(ABC):
         pass
 
     @abstractmethod
-    def on_client_update(self, data: Any):
+    def on_client_update(self, data: Any, direct_refs: Any = None):
         pass
 
     @abstractmethod
