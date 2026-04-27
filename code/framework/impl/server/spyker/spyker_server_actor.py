@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import numpy as np
 import ray
 import random
@@ -57,8 +59,11 @@ class SpykerServer(BaseAsyncServer):
         self.has_token: bool = False
         self.server_ages: Dict[str, int] = {}
 
+        self.client_learning_rates: Dict[str, float] = {}
+
         # Tracking client activity for Decay function
         self.client_update_counts: Dict[str, int] = {}
+        self.total_client_updates_processed = 0
 
         # Self-Reference for scheduling events back to this actor
         self.self_ref = None
@@ -67,7 +72,10 @@ class SpykerServer(BaseAsyncServer):
         self.sync_counts: Dict[str, int] = {}
 
         # Set of sync_ids that we have already broadcasted our model for
-        self.did_broadcast_ids: set = set()
+        self.did_broadcast_ids: OrderedDict = OrderedDict()
+        self.MAX_BROADCAST_CACHE = 1000 # Used inside LRU cache to throw out stale IDs
+
+        self._cached_global_weights_ref = None
 
         # The current broadcast ID
         self.current_bid: str = ""
@@ -98,6 +106,7 @@ class SpykerServer(BaseAsyncServer):
 
         for peer in peer_connections:
             self.server_ages[peer] = 0
+        self.server_ages[self.server_id] = 0
 
     def register_clients(self, client_configs: Dict[str, Any]):
         """Spawns Client Actors dynamically to process tasks concurrently."""
@@ -155,26 +164,39 @@ class SpykerServer(BaseAsyncServer):
         # Extract Weights from Client Result
         client_weights = direct_refs
 
-        # Calculate Decay (Algorithm 1 SPYKER)
-        count = self.client_update_counts.get(client_id, 0) + 1
-        self.client_update_counts[client_id] = count
+        # Model age the client trained on
+        metrics = data.get("metrics", {})
+        ref_model_age = metrics.get("ref_model_age", self.model_age)
 
-        avg_updates = (
-            np.mean(list(self.client_update_counts.values()))
-            if self.client_update_counts
-            else 1
-        )
-        decay_factor = self._calculate_decay(count, avg_updates)
+        # Staleness Dampener
+        age_drift = self.model_age - ref_model_age
+        staleness_weight = 1.0 / (1.0 + max(0, age_drift))
 
-        # Aggregate Client Weights into Global Model
-        # Formula: W_global = W_global + decay * (W_client - W_global) SPYKER
+        # Aggregate Client weights into global model
+        eta_server = self.spyker_config.server_learning_rate
+        effective_alpha = eta_server * staleness_weight
+
         self.global_model_weights = self._aggregate_weights(
             base_weights=self.global_model_weights,
             update_weights=client_weights,
-            alpha=decay_factor,
+            alpha= effective_alpha
         )
 
+        # Invalidate global weights cache because of recent change
+        self._cached_global_weights_ref = None
+
         self.model_age += 1
+
+        self.total_client_updates_processed += 1
+        count = self.client_update_counts.get(client_id, 0) + 1
+        self.client_update_counts[client_id] = count
+
+        num_active_clients = len(self.client_update_counts)
+        avg_updates = self.total_client_updates_processed / num_active_clients
+        
+        base_client_lr = self.full_config.training.learning_rate
+        new_client_lr = self._calculate_decay(count, avg_updates, base_client_lr)
+        self.client_learning_rates[client_id] = new_client_lr
 
         # Check Sync (Algorithm 2 SPYKER)
         if self.has_token:
@@ -203,21 +225,19 @@ class SpykerServer(BaseAsyncServer):
         """
         Performs: base + alpha * (update - base)
         """
-        new_weights = []
-        for w_base, w_upd in zip(base_weights, update_weights):
-            diff = w_upd - w_base
-            new_w = w_base + (alpha * diff)
-            new_weights.append(new_w)
-        return new_weights
+        return[
+            w_base + alpha * (w_upd - w_base) 
+            for w_base, w_upd in zip(base_weights, update_weights)
+        ]
 
-    def _calculate_decay(self, client_updates, avg_updates):
+    def _calculate_decay(self, client_updates, avg_updates, base_lr):
         """Spyker Algorithm 1: Learning Rate Decay."""
         if client_updates < avg_updates:
-            return 1.0
+            return base_lr
 
-        # exp-decay for very active clients
-        val = math.exp(-self.spyker_config.decay_beta * (client_updates - avg_updates))
-        return max(self.spyker_config.min_learning_rate, val)
+        # linear decay for active clients
+        decayed_lr = base_lr - (self.spyker_config.decay_beta * (client_updates - avg_updates))
+        return max(self.spyker_config.min_learning_rate, decayed_lr)
 
     def _get_model_size_mb(self) -> float:
         """Calculates the size of the current global model in Megabytes."""
@@ -254,7 +274,7 @@ class SpykerServer(BaseAsyncServer):
         bid = f"{self.server_id}_{self.model_age}"
         self.current_bid = bid
 
-        self.did_broadcast_ids.add(bid)
+        self.did_broadcast_ids[bid] = True
 
         self.sync_counts[bid] = 1
 
@@ -266,21 +286,35 @@ class SpykerServer(BaseAsyncServer):
         bid = payload["bid"]
         sender_age = payload["age"]
 
-        if bid not in self.did_broadcast_ids:
-            self.did_broadcast_ids.add(bid)
-            self._perform_broadcast(bid)
+        if bid == self.current_bid:
+            if self.has_token:
+                self.sync_counts[bid] += 1
+                if self.sync_counts[bid] >= self.total_servers:
+                    print(f"[{self.server_id}] Sync {bid} Complete. Releasing Token.")
+                    self.current_bid = ""
+                    self._pass_token(immediate_sync_after_release=True)
+            return # Do not aggregate own broadcasted model
+        
+        if bid in self.did_broadcast_ids:
+            return # Do not aggregate seen broadcast as duplicates
+        
+        # New broadcast. Process and forward
+        self.did_broadcast_ids[bid] = True
 
-        # Eliminate ray.get() ! direct_refs was natively resolved by Ray before method execution
+        if len(self.did_broadcast_ids) > self.MAX_BROADCAST_CACHE:
+            self.did_broadcast_ids.popitem(last=False)
+
+        self._perform_broadcast(bid)
+
+        # --- Peer Weight Aggregations ---
         peer_weights = direct_refs
-
-        # Update knowledge
         self.server_ages[sender_id] = sender_age
 
         # Calculate Sigmoid Weight
         delta_age = sender_age - self.model_age
-        sigmoid_w = 1.0 / (
-            1.0 + math.exp(-self.spyker_config.sigmoid_phi * (delta_age))
-        )
+        denominator = max(1, self.model_age)
+        a_val = (self.spyker_config.sigmoid_phi * delta_age) / denominator
+        sigmoid_w = 1.0 / (1.0 + math.exp(-a_val))
 
         # Aggregation as in SPYKER: W = W + eta_server * sigmoid * (W_peer - W)
         effective_alpha = self.spyker_config.server_learning_rate * sigmoid_w
@@ -291,23 +325,20 @@ class SpykerServer(BaseAsyncServer):
             alpha=effective_alpha,
         )
 
+        # Invalidate global weights cache because of recent change
+        self._cached_global_weights_ref = None
+
         # Update local age
-        self.server_ages[sender_id] = sender_age
         old_age = self.model_age
-        self.model_age = max(self.model_age, sender_age)
+        weighted_age = (1.0 - effective_alpha) * self.model_age + (effective_alpha * sender_age)
+        self.model_age = int(round(weighted_age))
+
+        self.model_age = max(old_age, self.model_age)
 
         if self.model_age > old_age:
             print(
                 f"[{self.server_id}] Aggregated model from {sender_id}. Age jumped {old_age} -> {self.model_age}"
             )
-
-        if self.has_token and bid == self.current_bid:
-            self.sync_counts[bid] += 1
-
-            if self.sync_counts[bid] >= self.total_servers:
-                print(f"[{self.server_id}] Sync {bid} Complete. Releasing Token.")
-                self.current_bid = ""
-                self._pass_token(immediate_sync_after_release=True)
 
     def _handle_token_arrival(self, sender_id, payload):
         self.has_token = True
@@ -342,23 +373,28 @@ class SpykerServer(BaseAsyncServer):
 
     def _perform_broadcast(self, bid):
         # Put large object into Plasma store once
-        weights_ref = ray.put(self.global_model_weights)
+        if self._cached_global_weights_ref is None:
+            self._cached_global_weights_ref = ray.put(self.global_model_weights)
+
         for peer_id in self.peer_connections.keys():
             self._send_server_message(
                 target_id=peer_id,
                 msg_type="MODEL_BROADCAST",
                 payload={"age": self.model_age, "bid": bid},
-                refs=weights_ref,  # Pass ref so Orchestrator can utilize Ray's implicit fetching
+                refs=self._cached_global_weights_ref,  # Pass ref so Orchestrator can utilize Ray's implicit fetching
             )
 
     # =====================================================================
 
     def _schedule_client_task(self, client_id):
         train_config = self.full_config.training
+
+        client_lr = self.client_learning_rates.get(client_id, train_config.learning_rate)
+
         config = {
             "server_id": self.server_id,
             "epochs": train_config.local_epochs,
-            "lr": train_config.learning_rate,
+            "lr": client_lr,
             "model_complexity": train_config.model_complexity,
             "model_age": self.model_age,
         }
@@ -368,7 +404,8 @@ class SpykerServer(BaseAsyncServer):
             self.self_ref if self.self_ref else ray.get_runtime_context().current_actor
         )
 
-        weights_ref = ray.put(self.global_model_weights)
+        if self._cached_global_weights_ref is None:
+            self._cached_global_weights_ref = ray.put(self.global_model_weights)
 
         self._schedule_event(
             delay=0.0,
@@ -379,7 +416,7 @@ class SpykerServer(BaseAsyncServer):
                 "server_id": self.server_id,
                 "server_ref": target_ref,
             },
-            refs=weights_ref,
+            refs=self._cached_global_weights_ref,
         )
 
     def _send_server_message(
