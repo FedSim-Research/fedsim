@@ -26,6 +26,7 @@ build/
 .cache/
 *.bak
 *.tmp
+hf-cache/
 
 # IDE / Editor
 .vscode/

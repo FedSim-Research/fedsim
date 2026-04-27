@@ -47,7 +47,9 @@ class DataLoaderAdapter:
 class HierarchicalSimulation:
     """See Hierarchical_Simulation_README.md for details on the simulation setup and how to use it."""
 
-    def __init__(self, run_time_limit: float = RUNTIME_LIMIT, gpu_budget: float | None = None):
+    def __init__(
+        self, run_time_limit: float = RUNTIME_LIMIT, gpu_budget: float | None = None
+    ):
         self.run_time_limit = run_time_limit
         self.gpu_budget = gpu_budget
         self.super_id = None
@@ -71,7 +73,12 @@ class HierarchicalSimulation:
         self.run_id = "unknown_run"
         self.graph_id = -1
 
-    def set_metadata(self, run_id: str | None, graph_id: int | None, eval_interval: float | None = None) -> None:
+    def set_metadata(
+        self,
+        run_id: str | None,
+        graph_id: int | None,
+        eval_interval: float | None = None,
+    ) -> None:
         if run_id:
             self.run_id = run_id
         if graph_id is not None:
@@ -105,11 +112,6 @@ class HierarchicalSimulation:
             f"actors={actor_count}, num_gpus_per_actor={gpu_per_actor}"
         )
         return {"num_gpus": gpu_per_actor}
-
-        self.evaluator_actor = None
-        self.eval_interval = 500 #TODO SET FROM OUTSIDE (stubs)
-        self.run_id = 0 #TODO SET FROM OUTSIDE (stubs)
-        self.graph_id = 0 #TODO SET FROM OUTSIDE (stubs)
 
     def set_super_server(
         self,
@@ -186,7 +188,7 @@ class HierarchicalSimulation:
         client_config = {
             "dataset_partition_id": dataset_partition_id,
             "total_partitions": total_partitions,
-            "seed": seed
+            "seed": seed,
         }
         self.client_map[edge_id].append((client_id, client_config))
 
@@ -199,8 +201,11 @@ class HierarchicalSimulation:
             )
 
         from main.task import Net
+
         dummy_model = Net()
-        initial_weights = [val.cpu().numpy() for _, val in dummy_model.state_dict().items()]
+        initial_weights = [
+            val.cpu().numpy() for _, val in dummy_model.state_dict().items()
+        ]
 
         print(f"Spawning Super Server ({self.super_id})...")
         self.super_actor = SuperServer.options(**self._server_actor_options).remote(
@@ -231,7 +236,7 @@ class HierarchicalSimulation:
         for eid in self.edge_ids:
             actor = self.edge_actors_map[eid]
             ray.get(actor.set_global_context_remote.remote(self.context))
-            
+
             assigned_client_configs = {
                 c_id: config for c_id, config in self.client_map[eid]
             }
@@ -273,12 +278,12 @@ class HierarchicalSimulation:
             raise RuntimeError("Simulation not built. Call build() first.")
 
         print("Initializing simulation...")
-        all_initial_events =[]
+        all_initial_events = []
 
         # --- EVALUATOR INITIALIZATION ---
-        if getattr(self, 'eval_interval', 0.0) > 0:
+        if getattr(self, "eval_interval", 0.0) > 0:
             from telemetry.evaluator_actor import PeriodicEvaluator
-            
+
             print(f"Spawning Periodic Evaluator (Interval: {self.eval_interval}s)...")
             self.evaluator_actor = PeriodicEvaluator.options(num_gpus=0.0).remote(
                 run_id=str(self.run_id),
@@ -286,9 +291,9 @@ class HierarchicalSimulation:
                 architecture="hierarchical",
                 target_server_ref=self.super_actor,
                 orchestrator_ref=self.orchestrator,
-                evaluation_interval=self.eval_interval
+                evaluation_interval=self.eval_interval,
             )
-            
+
             # Fetch the first event (T=0 evaluation + scheduling the next)
             eval_events = ray.get(self.evaluator_actor.start.remote())
             if eval_events:
@@ -299,14 +304,27 @@ class HierarchicalSimulation:
         if server_events:
             all_initial_events.extend(server_events)
 
-        for delay, target, method, payload in all_initial_events:
-            ray.get(self.orchestrator.add_event.remote(delay, target, method, payload))
+        for event in all_initial_events:
+            if len(event) == 5:
+                delay, target, method, payload, refs = event
+                ray.get(
+                    self.orchestrator.add_event.remote(
+                        delay, target, method, payload, refs
+                    )
+                )
+            elif len(event) == 4:
+                delay, target, method, payload = event
+                ray.get(
+                    self.orchestrator.add_event.remote(delay, target, method, payload)
+                )
+            else:
+                raise ValueError(f"Unexpected event tuple length: {len(event)}")
 
         print(f"Simulation started with {len(all_initial_events)} initial events.")
         print("Running simulation loop...")
-        
+
         ray.get(self.orchestrator.run_until.remote(self.run_time_limit))
-        
+
         print("Simulation execution finished.")
 
     def save_model(self, filename: str):
@@ -336,7 +354,7 @@ def evaluate_model(filename: str):
     Loads a saved model checkpoint and evaluates it against the CIFAR-10 test set.
     """
     print(f"Starting evaluation for model: {filename}")
-    device = torch.device("cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     model = Net()
     model.to(device)
@@ -371,9 +389,9 @@ def run_default_simulation():
     default_upload = 20
     default_download = 100
     default_net_dict = {}
-    default_net_dict[SUPER_ID] = (default_net)
+    default_net_dict[SUPER_ID] = default_net
     for i in range(TOTAL_CLIENTS):
-        default_net_dict[f"client_{i}"] = (default_net)
+        default_net_dict[f"client_{i}"] = default_net
 
     sim.set_super_server(
         server_id=SUPER_ID,

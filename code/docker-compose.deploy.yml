@@ -14,6 +14,7 @@ services:
     volumes:
       - ./data:/app/data
       - ray_logs:/tmp/ray
+      - ./hf-cache:/hf-cache
     restart: unless-stopped
     networks:
       - fedsim-network
@@ -33,7 +34,7 @@ services:
       - FEDSIM_GRAFANA_INTERNAL_BASE_URL=http://grafana:3000
     volumes:
       - ./data:/app/data
-      - hf_cache:/hf-cache
+      - ./hf-cache:/hf-cache
     depends_on:
       - ray
     restart: unless-stopped
@@ -133,5 +134,4 @@ networks:
     driver: bridge
 
 volumes:
-  hf_cache:
   ray_logs:

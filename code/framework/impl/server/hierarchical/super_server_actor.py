@@ -8,6 +8,7 @@ from simulation.context import SimulationContext, set_global_context
 
 SERVER_MESSAGE = "SERVER_MESSAGE"
 
+
 @ray.remote
 class SuperServer(BaseAsyncServer):
     def __init__(
@@ -42,7 +43,7 @@ class SuperServer(BaseAsyncServer):
     def get_metrics(self) -> Dict[str, Any]:
         return {
             "model_age": self.model_age,
-            "pending_updates": len(self.updates_buffer)
+            "pending_updates": len(self.updates_buffer),
         }
 
     def start_simulation(self):
@@ -59,43 +60,49 @@ class SuperServer(BaseAsyncServer):
             "A Super Server should never receive a direct update from a Virtual Client."
         )
 
-    def on_server_message(self, data: Dict[str, Any]):
+    def on_server_message(self, data: Dict[str, Any], direct_refs: Any = None):
         """
         Receive partial global models from Edge Servers.
         Payload: { "edge_server_id": str, "weights": List[np.ndarray], "num_samples": int }
         """
-        edge_server_id = data["edge_server_id"]
-        weights = data["weights"]
-        num_samples = data["num_samples"]
+        msg_type = data.get("type")
 
-        self.updates_buffer[edge_server_id] = (weights, num_samples)
+        if msg_type == "AGGREGATION_SYNC":
+            edge_server_id = data["edge_server_id"]
+            weights = direct_refs
+            num_samples = data["num_samples"]
 
-        if len(self.updates_buffer) >= self.required_updates:
-            # --- FedAvg Logic ---
-            total_samples = 0
-            weighted_sum = [np.zeros_like(w) for w in self.initial_parameters]
-            for w, n in self.updates_buffer.values():
-                total_samples += n
-                for i in range(len(w)):
-                    weighted_sum[i] += w[i] * n
-            # --------------------
+            self.updates_buffer[edge_server_id] = (weights, num_samples)
 
-            if total_samples > 0:
-                self.global_model_weights = [ws / total_samples for ws in weighted_sum]
-            else:
-                print(
-                    f"[SuperServer] Warning: Total samples was 0 in round {self.model_age}"
-                )
+            if len(self.updates_buffer) >= self.required_updates:
+                # --- FedAvg Logic ---
+                total_samples = 0
+                weighted_sum = [np.zeros_like(w) for w in self.initial_parameters]
+                for w, n in self.updates_buffer.values():
+                    total_samples += n
+                    for i in range(len(w)):
+                        weighted_sum[i] += w[i] * n
+                # --------------------
 
-            self.updates_buffer.clear()
-            self.model_age += 1
+                if total_samples > 0:
+                    self.global_model_weights = [
+                        ws / total_samples for ws in weighted_sum
+                    ]
+                else:
+                    print(
+                        f"[SuperServer] Warning: Total samples was 0 in round {self.model_age}"
+                    )
 
-            self._broadcast_global_model()
+                self.updates_buffer.clear()
+                self.model_age += 1
+
+                self._broadcast_global_model()
 
     def _broadcast_global_model(self):
         """Helper to send the current global model to all Edge Servers."""
 
         super_spec = self.context.get_server_spec(self.server_id)
+        weights_ref = ray.put(self.global_model_weights)
 
         for edge_server_id, edge_server_ref in self.edge_server_refs.items():
             edge_spec = self.context.get_server_spec(edge_server_id)
@@ -113,11 +120,11 @@ class SuperServer(BaseAsyncServer):
             self._schedule_event(
                 delay=latency,
                 target_actor=edge_server_ref,
-                event_type=SERVER_MESSAGE,
+                event_type="SERVER_MESSAGE",
                 data={
                     "type": "MODEL_SYNC",
-                    "weights": self.global_model_weights,
                     "model_age": self.model_age,
                     "training_config": self.training_config,
                 },
+                refs=weights_ref,
             )

@@ -1,7 +1,12 @@
 FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
+RUN rm -f /etc/apt/sources.list.d/cuda.list && \
+    apt-key del 7fa2af80 && \
+    apt-get update && apt-get install -y --no-install-recommends wget && \
+    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \
+    dpkg -i cuda-keyring_1.1-1_all.deb && \
+    apt-get update \
     && apt-get install -y --no-install-recommends software-properties-common curl \
     && add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update \

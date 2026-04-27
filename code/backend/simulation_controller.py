@@ -3,7 +3,7 @@ import logging
 import importlib
 import threading
 
-
+import ray
 import random
 import numpy as np
 import torch
@@ -33,6 +33,15 @@ class SimulationController:
         self.run_id = run_id
 
     def start(self):
+        # Pre-download the dataset before simulation engines run in multiple Ray actors
+        from framework.impl.main.task import preload_dataset
+        dataset_id = self.simulation_settings.get("dataset")
+        try:
+            preload_dataset(dataset_id)
+        except Exception as e:
+            logger.error("Failed to preload dataset: %s", e)
+            raise ValueError(f"Dataset {dataset_id} could not be pre-downloaded: {e}")
+
         graph_id = self.graph.id if self.graph is not None else None
         logger.info(
             "simulation_controller_start architecture=%s graph_id=%s seed=%s",

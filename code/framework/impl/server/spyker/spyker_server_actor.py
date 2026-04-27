@@ -1,6 +1,7 @@
 import numpy as np
 import ray
 import random
+import torch
 import math
 from typing import Dict, Any, Tuple, List, Optional
 
@@ -19,7 +20,8 @@ from simulation.spyker_config import FullConfiguration
 from specs.network_metrics import Network
 from simulation.network_model import estimate_transmission_time
 from client.simulation_client import SimulationFlowerClient
-from client.virtual_client import VirtualClient
+from client.virtual_client import VirtualClientActor
+
 
 @ray.remote
 class SpykerServer(BaseAsyncServer):
@@ -46,7 +48,7 @@ class SpykerServer(BaseAsyncServer):
         # --- Topology State ---
         self.peer_connections: Dict[str, Network] = {}
         self.next_token_peer: Optional[str] = None
-        self.assigned_client_instances: Dict[str, VirtualClient] = {}
+        self.assigned_client_instances: Dict[str, VirtualClientActor] = {}
 
         # --- Spyker Protocol State ---
         self.model_age: int = 0
@@ -98,18 +100,20 @@ class SpykerServer(BaseAsyncServer):
             self.server_ages[peer] = 0
 
     def register_clients(self, client_configs: Dict[str, Any]):
-        """
-        Receives configuration dictionaries for clients and instantiates the 
-        PyTorch DataLoaders safely inside the Ray worker memory space.
-        """
-        for c_id, config in client_configs.items():
-            inner_client = SimulationFlowerClient(
-                partition_id=config["dataset_partition_id"],
-                num_partitions=config["total_partitions"],
-                seed=config.get("seed")
-            )
+        """Spawns Client Actors dynamically to process tasks concurrently."""
+        gpu_fraction = 1e-4 if torch.cuda.is_available() else 0
 
-            self.assigned_client_instances[c_id] = VirtualClient(c_id, inner_client)
+        for c_id, config in client_configs.items():
+            actor = VirtualClientActor.options(
+                num_cpus=1e-4, num_gpus=gpu_fraction
+            ).remote(client_id=c_id, client_config=config, context=self.context)
+            self.assigned_client_instances[c_id] = actor
+
+    def set_orchestrator(self, orchestrator_ref):
+        super().set_orchestrator(orchestrator_ref)
+        # Link clients to orchestrator
+        for client_actor in self.assigned_client_instances.values():
+            client_actor.set_orchestrator.remote(orchestrator_ref)
 
     def set_token_holder(self, is_holder: bool):
         self.has_token = is_holder
@@ -119,7 +123,7 @@ class SpykerServer(BaseAsyncServer):
         return {
             "model_age": self.model_age,
             "total_client_updates": sum(self.client_update_counts.values()),
-            "has_token": int(self.has_token)
+            "has_token": int(self.has_token),
         }
 
     # ==============================================================
@@ -180,13 +184,12 @@ class SpykerServer(BaseAsyncServer):
 
         self._schedule_client_task(client_id)
 
-    def on_server_message(self, data: Any):
-        """Handle Peer-to-Peer Messages."""
+    def on_server_message(self, data: Any, direct_refs: Any = None):
         msg_type = data["type"]
         sender_id = data["sender_id"]
 
         if msg_type == "MODEL_BROADCAST":
-            self._handle_model_broadcast(sender_id, data)
+            self._handle_model_broadcast(sender_id, data, direct_refs)
         elif msg_type == "TOKEN":
             self._handle_token_arrival(sender_id, data)
 
@@ -260,18 +263,16 @@ class SpykerServer(BaseAsyncServer):
 
         self._perform_broadcast(bid)
 
-    def _handle_model_broadcast(self, sender_id, payload):
+    def _handle_model_broadcast(self, sender_id, payload, direct_refs):
         bid = payload["bid"]
         sender_age = payload["age"]
-        weights_ref = payload["weights_ref"]
 
         if bid not in self.did_broadcast_ids:
-            print(f"[{self.server_id}] Joining Sync {bid} (Reflex Broadcast)")
             self.did_broadcast_ids.add(bid)
             self._perform_broadcast(bid)
 
-        # Fetch the actual numpy arrays from Ray Object Store
-        peer_weights = ray.get(weights_ref)
+        # Eliminate ray.get() ! direct_refs was natively resolved by Ray before method execution
+        peer_weights = direct_refs
 
         # Update knowledge
         self.server_ages[sender_id] = sender_age
@@ -341,13 +342,14 @@ class SpykerServer(BaseAsyncServer):
         )
 
     def _perform_broadcast(self, bid):
+        # Put large object into Plasma store once
         weights_ref = ray.put(self.global_model_weights)
-
         for peer_id in self.peer_connections.keys():
             self._send_server_message(
                 target_id=peer_id,
                 msg_type="MODEL_BROADCAST",
-                payload={"weights_ref": weights_ref, "age": self.model_age, "bid": bid},
+                payload={"age": self.model_age, "bid": bid},
+                refs=weights_ref,  # Pass ref so Orchestrator can utilize Ray's implicit fetching
             )
 
     # =====================================================================
@@ -357,7 +359,6 @@ class SpykerServer(BaseAsyncServer):
         Interacts with the VirtualClient to perform training and simulation.
         """
         train_config = self.full_config.training
-
         config = {
             "server_id": self.server_id,
             "epochs": train_config.local_epochs,
@@ -365,33 +366,33 @@ class SpykerServer(BaseAsyncServer):
             "model_complexity": train_config.model_complexity,
             "model_age": self.model_age,
         }
-
         fit_ins = FitIns(
             parameters=ndarrays_to_parameters(self.global_model_weights), config=config
         )
-
-        client_instance = self.assigned_client_instances[client_id]
-        fit_res = client_instance.fit(fit_ins)
-
-        sim_duration = fit_res.metrics["simulation_duration"]
-
+        client_actor = self.assigned_client_instances[client_id]
         target_ref = (
             self.self_ref if self.self_ref else ray.get_runtime_context().current_actor
         )
 
+        # Delegate heavily blocking logic to client actor via DES event
         self._schedule_event(
-            delay=sim_duration,
-            target_actor=target_ref,
-            event_type="CLIENT_UPDATE",
+            delay=0.0,
+            target_actor=client_actor,
+            event_type="START_FIT",
             data={
-                "client_id": client_id,
+                "fit_ins": fit_ins,
                 "server_id": self.server_id,
-                "fit_res": fit_res,
+                "server_ref": target_ref,
             },
         )
 
     def _send_server_message(
-        self, target_id: str, msg_type: str, payload: Any, added_delay: float = 0.0
+        self,
+        target_id: str,
+        msg_type: str,
+        payload: Any,
+        added_delay: float = 0.0,
+        refs: Any = None,
     ):
         """
         Calculates network delay for Server-to-Server comms and schedules the event.
@@ -425,4 +426,5 @@ class SpykerServer(BaseAsyncServer):
             target_actor=target_actor,
             event_type="SERVER_MESSAGE",
             data=payload,
+            refs=refs,
         )

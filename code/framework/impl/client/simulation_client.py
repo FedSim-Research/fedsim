@@ -31,23 +31,28 @@ class SimulationFlowerClient(flwr.client.Client):
     ):
         self.partition_id = partition_id
         self.num_partitions = num_partitions
-        self.device = torch.device("cpu")
+        self.seed = seed
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
             torch.manual_seed(seed)
 
+        self.dataset_id = dataset_id
+
         # 1. Initialize Model
         self.net = Net().to(self.device)
 
-        # 2. Load Data (Using the FederatedDataset logic from task.py)
-        # This will download/cache dataset partitions on the first run.
-        self.trainloader, self.testloader = load_data(
-            partition_id,
-            num_partitions,
-            seed=seed,
-            dataset_id=dataset_id,
-        )
+    def _ensure_data_loaded(self):
+        if not hasattr(self, "trainloader"):
+            # 2. Load Data (Using the FederatedDataset logic from task.py)
+            # This will download/cache dataset partitions on the first run.
+            self.trainloader, self.testloader = load_data(
+                self.partition_id,
+                self.num_partitions,
+                seed=self.seed,
+                dataset_id=self.dataset_id,
+            )
 
     def get_parameters(self, config: Dict[str, Scalar]) -> Parameters:
         # Convert PyTorch parameters to Flower Parameters
@@ -64,6 +69,8 @@ class SimulationFlowerClient(flwr.client.Client):
         self.net.load_state_dict(state_dict, strict=True)
 
     def fit(self, ins: FitIns) -> FitRes:
+        self._ensure_data_loaded()
+        
         # 1. Update Local Model with Global Weights
         self.set_parameters(ins.parameters)
 
@@ -95,6 +102,8 @@ class SimulationFlowerClient(flwr.client.Client):
         )
 
     def evaluate(self, ins: EvaluateIns) -> EvaluateRes:
+        self._ensure_data_loaded()
+        
         # 1. Update Local Model
         self.set_parameters(ins.parameters)
 

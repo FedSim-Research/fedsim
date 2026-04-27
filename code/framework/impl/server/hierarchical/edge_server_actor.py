@@ -1,4 +1,5 @@
 import ray
+import torch
 import numpy as np
 import simulation.context
 from typing import List, Dict, Tuple, Any
@@ -15,14 +16,15 @@ from flwr.client import Client
 
 from server.server_actor import BaseAsyncServer
 from client.simulation_client import SimulationFlowerClient
-from client.virtual_client import VirtualClient
 from simulation.network_model import estimate_transmission_time
 from simulation.context import SimulationContext, set_global_context
 from specs.server_spec import ServerSpec
+from client.virtual_client import VirtualClientActor
 
 CLIENT_UPDATE = "CLIENT_UPDATE"
 MODEL_SYNC = "MODEL_SYNC"
 SERVER_MESSAGE = "SERVER_MESSAGE"
+
 
 @ray.remote
 class EdgeServer(BaseAsyncServer):
@@ -43,7 +45,7 @@ class EdgeServer(BaseAsyncServer):
         self.super_server_ref = super_server_ref
         self.min_clients_per_round = min_clients_per_round
 
-        self.assigned_client_instances: Dict[str, VirtualClient] = {}
+        self.assigned_client_instances: Dict[str, VirtualClientActor] = {}
 
         # Buffer stores: {client_id: (weights, num_examples)}
         self.client_updates_buffer: Dict[str, Tuple[List[np.ndarray], int]] = {}
@@ -61,74 +63,62 @@ class EdgeServer(BaseAsyncServer):
 
     def register_clients(self, client_configs: Dict[str, Dict[str, Any]]):
         """Instantiates PyTorch DataLoaders safely inside the Ray worker."""
+        gpu_fraction = 1e-4 if torch.cuda.is_available() else 0
         for c_id, config in client_configs.items():
-            inner_client = SimulationFlowerClient(
-                partition_id=config["dataset_partition_id"],
-                num_partitions=config["total_partitions"],
-                seed=config.get("seed")
-            )
-            self.assigned_client_instances[c_id] = VirtualClient(c_id, inner_client)
+            actor = VirtualClientActor.options(
+                num_cpus=1e-4, num_gpus=gpu_fraction
+            ).remote(client_id=c_id, client_config=config, context=self.context)
+            self.assigned_client_instances[c_id] = actor
+
+    def set_orchestrator(self, orchestrator_ref):
+        super().set_orchestrator(orchestrator_ref)
+        for client_actor in self.assigned_client_instances.values():
+            client_actor.set_orchestrator.remote(orchestrator_ref)
 
     def start_simulation(self):
         raise NotImplementedError(
             "The Simulation can only be started through a Super Server, not an Edge Server."
         )
 
-    def on_server_message(self, data: Dict[str, Any]):
-        """
-        Handle Global Model coming from Super Server.
-        """
+    def on_server_message(self, data: Dict[str, Any], direct_refs: Any = None):
         event_type = data.get("type")
 
-        print(
-            f"[{self.server_id}] Received {event_type}. Assigned Clients: {len(self.assigned_client_instances)}"
-        )
-
-        if event_type == MODEL_SYNC:
-            self.global_model_weights = data["weights"]
+        if event_type == "MODEL_SYNC":
+            # Native extraction of ref to avoid memory bottleneck
+            self.global_model_weights = direct_refs
             self.model_age = data["model_age"]
             self.training_config = data["training_config"]
 
             global_params = ndarrays_to_parameters(self.global_model_weights)
-
             local_config = self.training_config.copy()
             local_config["server_id"] = self.server_id
             local_config["model_age"] = self.model_age
+            target_ref = (
+                self.self_ref
+                if self.self_ref
+                else ray.get_runtime_context().current_actor
+            )
 
-            # DEBUG PRINT
-            if not self.assigned_client_instances:
-                print(
-                    f"[{self.server_id}] ERROR: No clients assigned! Loop will not run."
+            for (
+                client_id,
+                virtual_client_actor,
+            ) in self.assigned_client_instances.items():
+                fit_ins = FitIns(global_params, local_config)
+
+                self._schedule_event(
+                    delay=0.0,
+                    target_actor=virtual_client_actor,
+                    event_type="START_FIT",
+                    data={
+                        "fit_ins": fit_ins,
+                        "server_id": self.server_id,
+                        "server_ref": target_ref,
+                    },
                 )
-
-            for client_id, virtual_client in self.assigned_client_instances.items():
-                try:
-                    fit_ins = FitIns(global_params, local_config)
-                    fit_res: FitRes = virtual_client.fit(fit_ins)
-
-                    target_ref = self.self_ref if self.self_ref else ray.get_runtime_context().current_actor
-
-                    self._schedule_event(
-                        delay=fit_res.metrics["simulation_duration"],
-                        target_actor=target_ref,
-                        event_type=CLIENT_UPDATE,
-                        data={
-                            "client_id": client_id,
-                            "server_id": self.server_id,
-                            "fit_res": fit_res
-                        },
-                    )
-
-                    duration = fit_res.metrics["simulation_duration"]
-                    print(f"[{self.server_id}] Client {client_id} finished. Duration: {duration:.2f} seconds")
-
-                except Exception as e:
-                    import traceback
-                    print(f"[{self.server_id}] CRASH PROCESSING CLIENT {client_id}: {e}")
-                    print(traceback.format_exc())
-                    
         else:
-            raise ValueError(f"[Edge Server {self.server_id}] Unknown event type: {event_type}")
+            raise ValueError(
+                f"[Edge Server {self.server_id}] Unknown event type: {event_type}"
+            )
 
     def on_client_update(self, data: Dict[str, Any]):
         """
@@ -165,6 +155,9 @@ class EdgeServer(BaseAsyncServer):
 
         aggregated_weights = [ws / total_samples for ws in weighted_sum]
 
+        # Optimize cross-node transfer
+        weights_ref = ray.put(aggregated_weights)
+
         edge_server_spec = self.context.get_server_spec(self.server_id)
         super_server_spec = self.context.get_server_spec(self.super_server_id)
 
@@ -182,12 +175,12 @@ class EdgeServer(BaseAsyncServer):
         self._schedule_event(
             delay=delay,
             target_actor=self.super_server_ref,
-            event_type=SERVER_MESSAGE,
+            event_type="SERVER_MESSAGE",
             data={
+                "type": "AGGREGATION_SYNC",
                 "edge_server_id": self.server_id,
-                "weights": aggregated_weights,
                 "num_samples": total_samples,
             },
+            refs=weights_ref,
         )
-
         self.client_updates_buffer.clear()

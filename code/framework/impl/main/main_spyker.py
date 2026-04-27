@@ -315,8 +315,15 @@ class SpykerSimulation:
             if events:
                 all_initial_events.extend(events)
         
-        for delay, target, method, payload in all_initial_events:
-            ray.get(self.orchestrator.add_event.remote(delay, target, method, payload))
+        for event in all_initial_events:
+            if len(event) == 5:
+                delay, target, method, payload, refs = event
+                ray.get(self.orchestrator.add_event.remote(delay, target, method, payload, refs))
+            elif len(event) == 4:
+                delay, target, method, payload = event
+                ray.get(self.orchestrator.add_event.remote(delay, target, method, payload))
+            else:
+                raise ValueError(f"Unexpected event tuple length: {len(event)}")
 
         print(f"Simulation queued with {len(all_initial_events)} initial events.")
         print("Running orchestration loop...")
@@ -350,7 +357,7 @@ def initialize_environment():
     
 def evaluate_model(filename: str):
     print(f"Starting evaluation for model: {filename}")
-    device = torch.device("cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = Net()
     model.to(device)
     state_dict = torch.load(filename)

@@ -1,45 +1,68 @@
-import flwr
+import ray
 from flwr.common import (
     FitIns,
     FitRes,
-    GetParametersIns,
-    GetParametersRes,
     EvaluateIns,
     EvaluateRes,
     parameters_to_ndarrays,
 )
-
-from simulation.context import get_global_context
+from client.simulation_client import SimulationFlowerClient
+from simulation.context import get_global_context, SimulationContext, set_global_context
 from simulation.compute_model import estimate_training_time
 from simulation.network_model import estimate_transmission_time
 
 
-class VirtualClient(flwr.client.Client):
-    def __init__(self, client_id: str, inner_client: flwr.client.Client):
+@ray.remote
+class VirtualClientActor:
+    def __init__(self, client_id: str, client_config: dict, context: SimulationContext):
         self.client_id = client_id
-        self.inner_client = inner_client
+        set_global_context(context)
 
-    def get_parameters(self, ins: GetParametersIns) -> GetParametersRes:
-        return self.inner_client.get_parameters(ins)
+        # Instantiate inner client locally to this actor's process
+        # (Prevents serializing un-pickleable PyTorch DataLoaders)
+        self.inner_client = SimulationFlowerClient(
+            partition_id=client_config["dataset_partition_id"],
+            num_partitions=client_config["total_partitions"],
+            seed=client_config.get("seed"),
+        )
+        self.current_virtual_time = 0.0
+        self.orchestrator_ref = None
 
-    def fit(self, ins: FitIns) -> FitRes:
-        """
-        Intercepts the training instruction to calculate Virtual Time.
-        """
+    def set_orchestrator(self, orchestrator_ref):
+        self.orchestrator_ref = orchestrator_ref
+
+    def handle_event(self, payload: dict, direct_refs=None):
+        """Native DES event handler for the Client."""
+        event_type = payload.get("event_type")
+        trigger_time = payload.get("trigger_time")
+        data = payload.get("data")
+
+        self.current_virtual_time = trigger_time
+
+        if event_type == "START_FIT":
+            return self.fit(data)
+        elif event_type == "START_EVALUATE":
+            return self.evaluate(data)
+        else:
+            print(f"[VirtualClient {self.client_id}] Unknown event: {event_type}")
+            return []
+
+    def fit(self, data: dict):
+        ins = data["fit_ins"]
+        server_id = data["server_id"]
+        server_ref = data["server_ref"]
+
         ctx = get_global_context()
         client_spec = ctx.get_client_spec(self.client_id)
+        server_spec = ctx.get_server_spec(server_id)
 
         config = ins.config
-        server_id = str(config.get("server_id"))
         epochs = int(config.get("epochs", 1))
         model_complexity = float(config.get("model_complexity", 1.0))
         ref_model_age = config.get("model_age", 0)
 
-        server_spec = ctx.get_server_spec(server_id)
-
         param_arrays = parameters_to_ndarrays(ins.parameters)
-        model_size_bytes = sum([a.nbytes for a in param_arrays])
-        model_size_mb = model_size_bytes / (1024 * 1024)
+        model_size_mb = sum([a.nbytes for a in param_arrays]) / (1024 * 1024)
 
         t_download = estimate_transmission_time(
             sender_spec=server_spec,
@@ -49,7 +72,10 @@ class VirtualClient(flwr.client.Client):
             payload_size_mb=model_size_mb,
         )
 
+        # --- Non-Blocking for the Server, happens in parallel Ray workers! ---
         fit_res: FitRes = self.inner_client.fit(ins)
+        # ---------------------------------------------------------------------
+
         t_train = estimate_training_time(
             client_spec=client_spec,
             dataset_size=fit_res.num_examples,
@@ -58,8 +84,7 @@ class VirtualClient(flwr.client.Client):
         )
 
         res_arrays = parameters_to_ndarrays(fit_res.parameters)
-        res_size_bytes = sum([a.nbytes for a in res_arrays])
-        res_size_mb = res_size_bytes / (1024 * 1024)
+        res_size_mb = sum([a.nbytes for a in res_arrays]) / (1024 * 1024)
 
         t_upload = estimate_transmission_time(
             sender_spec=server_spec,
@@ -78,54 +103,21 @@ class VirtualClient(flwr.client.Client):
         fit_res.metrics["client_id"] = self.client_id
         fit_res.metrics["ref_model_age"] = ref_model_age
 
-        return fit_res
-
-    def evaluate(self, ins: EvaluateIns) -> EvaluateRes:
-        ctx = get_global_context()
-        client_spec = ctx.get_client_spec(self.client_id)
-
-        config = ins.config
-        server_id = str(config.get("server_id"))
-        inference = 0.3  # usually lower than training
-        model_complexity = float(config.get("model_complexity", inference))
-        server_spec = ctx.get_server_spec(server_id)
-
-        param_arrays = parameters_to_ndarrays(ins.parameters)
-        model_size_mb = sum([a.nbytes for a in param_arrays]) / (1024 * 1024)
-
-        t_download = estimate_transmission_time(
-            sender_spec=server_spec,
-            receiver_spec=client_spec,
-            network_metrics=server_spec.network_metrics,
-            metrics_id=self.client_id,
-            payload_size_mb=model_size_mb,
-        )
-
-        eval_res = self.inner_client.evaluate(ins)
-
-        t_eval = estimate_training_time(
-            client_spec,
-            eval_res.num_examples,
-            epochs=1,
-            model_complexity=model_complexity,
-        )
-
-        res_arrays = parameters_to_ndarrays(eval_res.parameters)
-        res_size_bytes = sum([a.nbytes for a in res_arrays])
-        res_size_mb = res_size_bytes / (1024 * 1024)
-
-        t_upload = estimate_transmission_time(
-            sender_spec=server_spec,
-            receiver_spec=client_spec,
-            network_metrics=server_spec.network_metrics,
-            metrics_id=self.client_id,
-            payload_size_mb=res_size_mb,
-        )
-
-        total_virtual_duration = t_download + t_eval + t_upload
-
-        if eval_res.metrics is None:
-            eval_res.metrics = {}
-        eval_res.metrics["simulation_duration"] = total_virtual_duration
-
-        return eval_res
+        # Return event directly back to Orchestrator to route to Server
+        return [
+            (
+                total_virtual_duration,
+                server_ref,
+                "handle_event",
+                {
+                    "event_type": "CLIENT_UPDATE",
+                    "trigger_time": self.current_virtual_time + total_virtual_duration,
+                    "data": {
+                        "client_id": self.client_id,
+                        "server_id": server_id,
+                        "fit_res": fit_res,
+                    },
+                },
+                None,
+            )
+        ]
