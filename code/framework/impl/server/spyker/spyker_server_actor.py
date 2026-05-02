@@ -80,7 +80,7 @@ class SpykerServer(BaseAsyncServer):
 
         # The current broadcast ID
         self.current_bid: str = ""
-
+        self.ongoing_sync: bool = False
         self.total_servers = 0
 
         self.aggregation_strategy = get_async_server_strategy("spyker")
@@ -201,6 +201,8 @@ class SpykerServer(BaseAsyncServer):
         new_client_lr = self._calculate_decay(count, avg_updates, base_client_lr)
         self.client_learning_rates[client_id] = new_client_lr
 
+        print(f"[{self.server_id}] Accepted update from {client_id}. New Age: {self.model_age}. LR for next round: {new_client_lr}")
+
         # Check Sync (Algorithm 2 SPYKER)
         if self.has_token:
             self.server_ages[self.server_id] = self.model_age
@@ -238,7 +240,7 @@ class SpykerServer(BaseAsyncServer):
 
     def _check_synchronization(self):
         """Spyker Algorithm 2: Server Sync Decision."""
-        if not self.has_token:
+        if not self.has_token or self.ongoing_sync:
             return
 
         min_age = min(self.server_ages.values()) if self.server_ages else 0
@@ -259,6 +261,8 @@ class SpykerServer(BaseAsyncServer):
             self._pass_token()
 
     def _broadcast_model_to_all(self, reason="Unknown"):
+        self.ongoing_sync = True
+
         # Unique Broadcast ID
         bid = f"{self.server_id}_{self.model_age}"
         self.current_bid = bid
@@ -281,6 +285,7 @@ class SpykerServer(BaseAsyncServer):
                 if self.sync_counts[bid] >= self.total_servers:
                     print(f"[{self.server_id}] Sync {bid} Complete. Releasing Token.")
                     self.current_bid = ""
+                    self.ongoing_sync = False
                     self._pass_token(immediate_sync_after_release=True)
             return # Do not aggregate own broadcasted model
         
