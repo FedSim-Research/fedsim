@@ -3,6 +3,7 @@ from collections import OrderedDict
 import numpy as np
 import ray
 import random
+from strategies.server_strategies import get_async_server_strategy
 import torch
 import math
 from typing import Dict, Any, Tuple, List, Optional
@@ -81,6 +82,8 @@ class SpykerServer(BaseAsyncServer):
         self.current_bid: str = ""
 
         self.total_servers = 0
+
+        self.aggregation_strategy = get_async_server_strategy("spyker")
 
     def set_global_context_remote(self, context: SimulationContext):
         """Sets the simulation context for this worker."""
@@ -176,10 +179,10 @@ class SpykerServer(BaseAsyncServer):
         eta_server = self.spyker_config.server_learning_rate
         effective_alpha = eta_server * staleness_weight
 
-        self.global_model_weights = self._aggregate_weights(
-            base_weights=self.global_model_weights,
+        self.global_model_weights = self.aggregation_strategy.aggregate(
+            global_weights=self.global_model_weights,
             update_weights=client_weights,
-            alpha= effective_alpha
+            alpha=effective_alpha,
         )
 
         # Invalidate global weights cache because of recent change
@@ -215,20 +218,6 @@ class SpykerServer(BaseAsyncServer):
             self._handle_token_arrival(sender_id, data)
 
     # =============================================================
-
-    def _aggregate_weights(
-        self,
-        base_weights: List[np.ndarray],
-        update_weights: List[np.ndarray],
-        alpha: float,
-    ) -> List[np.ndarray]:
-        """
-        Performs: base + alpha * (update - base)
-        """
-        return[
-            w_base + alpha * (w_upd - w_base) 
-            for w_base, w_upd in zip(base_weights, update_weights)
-        ]
 
     def _calculate_decay(self, client_updates, avg_updates, base_lr):
         """Spyker Algorithm 1: Learning Rate Decay."""
@@ -319,8 +308,8 @@ class SpykerServer(BaseAsyncServer):
         # Aggregation as in SPYKER: W = W + eta_server * sigmoid * (W_peer - W)
         effective_alpha = self.spyker_config.server_learning_rate * sigmoid_w
 
-        self.global_model_weights = self._aggregate_weights(
-            base_weights=self.global_model_weights,
+        self.global_model_weights = self.aggregation_strategy.aggregate(
+            global_weights=self.global_model_weights,
             update_weights=peer_weights,
             alpha=effective_alpha,
         )

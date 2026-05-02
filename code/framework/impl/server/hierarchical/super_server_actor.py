@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Tuple
 from server.server_actor import BaseAsyncServer
 from simulation.network_model import estimate_transmission_time
 from simulation.context import SimulationContext, set_global_context
+from strategies.server_strategies import get_sync_server_strategy
 
 SERVER_MESSAGE = "SERVER_MESSAGE"
 
@@ -32,6 +33,8 @@ class SuperServer(BaseAsyncServer):
         self.model_age = 0
 
         self.global_model_weights = self.initial_parameters
+
+        self.aggregation_strategy = get_sync_server_strategy("fedavg")
 
     def set_edge_servers(self, edge_server_refs: Dict[str, ray.ObjectRef]):
         """
@@ -75,23 +78,17 @@ class SuperServer(BaseAsyncServer):
             self.updates_buffer[edge_server_id] = (weights, num_samples)
 
             if len(self.updates_buffer) >= self.required_updates:
-                # --- FedAvg Logic ---
-                total_samples = 0
-                weighted_sum = [np.zeros_like(w) for w in self.initial_parameters]
-                for w, n in self.updates_buffer.values():
-                    total_samples += n
-                    for i in range(len(w)):
-                        weighted_sum[i] += w[i] * n
-                # --------------------
-
+                
+                updates_list = list(self.updates_buffer.values())
+                total_samples = sum(n for _, n in updates_list)
+                
                 if total_samples > 0:
-                    self.global_model_weights = [
-                        ws / total_samples for ws in weighted_sum
-                    ]
-                else:
-                    print(
-                        f"[SuperServer] Warning: Total samples was 0 in round {self.model_age}"
+                    self.global_model_weights = self.aggregation_strategy.aggregate(
+                        global_weights=self.global_model_weights,
+                        updates=updates_list
                     )
+                else:
+                    print(f"[SuperServer] Warning: Total samples was 0 in round {self.model_age}")
 
                 self.updates_buffer.clear()
                 self.model_age += 1

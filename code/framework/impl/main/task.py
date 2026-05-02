@@ -10,6 +10,7 @@ from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Normalize, ToTensor, Resize
+from strategies.client_strategies import get_client_strategy
 
 DEFAULT_DATASET_ID = "uoft-cs/cifar10"
 
@@ -131,13 +132,14 @@ def load_data(partition_id: int, num_partitions: int, seed: int | None = None, d
 
     return trainloader, testloader
 
-def train(net, trainloader, epochs, lr, device):
+def train(net, trainloader, epochs, lr, device, strategy_name="standard"):
     """Train the model on the training set."""
     net.to(device)
     criterion = torch.nn.CrossEntropyLoss().to(device)
-    
     optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
     
+    strategy = get_client_strategy(strategy_name)
+
     net.train()
     running_loss = 0.0
     for _ in range(epochs):
@@ -148,7 +150,8 @@ def train(net, trainloader, epochs, lr, device):
             labels = batch[label_key].to(device)
             
             optimizer.zero_grad()
-            loss = criterion(net(images), labels)
+            
+            loss = strategy.compute_loss(net, images, labels, criterion)
             loss.backward()
             optimizer.step()
             
