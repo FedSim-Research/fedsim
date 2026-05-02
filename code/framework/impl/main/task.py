@@ -19,44 +19,41 @@ class Net(nn.Module):
     Generalized 3-Conv, 2-FC Model (Spyker Paper spec).
     Includes Dropout and BatchNorm for stability in FL.
     """
-    def __init__(self):
+    def __init__(self, num_classes=10):
         super(Net, self).__init__()
-        # Conv Layer 1
+
         self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(32)
         
-        # Conv Layer 2
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(64)
         
-        # Conv Layer 3
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.bn3 = nn.BatchNorm2d(128)
         
         self.pool = nn.MaxPool2d(2, 2)
         
-        # Adaptive pooling ensures that no matter what image size the user injects,
-        # it is dynamically pooled down to 4x4 before the Linear layer.
+        # Adaptive pool ensures that if a dataset is  slightly off-size, it is forced to 4x4 before the Linear layers.
         self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
         
         self.fc1 = nn.Linear(128 * 4 * 4, 256)
-        self.fc2 = nn.Linear(256, 10)
-        self.dropout = nn.Dropout(0.5)
+        
+        # Fully Connected Layer 2 (Output layer)
+        self.fc2 = nn.Linear(256, num_classes)
 
     def forward(self, x):
+        # Support Grayscale to RGB conversion for MNIST/Fashion-MNIST
         if x.shape[1] == 1:
             x = x.repeat(1, 3, 1, 1)
 
-        x = self.pool(F.relu(self.bn1(self.conv1(x))))
-        x = self.pool(F.relu(self.bn2(self.conv2(x))))
-        x = self.pool(F.relu(self.bn3(self.conv3(x))))
+        # 3-Conv block with ReLU activations and Pooling
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = self.pool(F.relu(self.conv3(x)))
         
         # Force feature map to 4x4 for dataset agnosticism
         x = self.adaptive_pool(x) 
         
         x = x.view(-1, 128 * 4 * 4)
+        
         x = F.relu(self.fc1(x))
-        x = self.dropout(x)
         return self.fc2(x)
 
 # Resizes everything to 32x32 to maintain consistency for the CNN
