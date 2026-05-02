@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import CIFAR10
 
 # Import the PyTorch logic from your app
-from main.task import Net, test, pytorch_transforms
+from main.task import Net, test, generic_transforms
 from telemetry.logger import setup_telemetry_logger
 
 class DataLoaderAdapter:
@@ -50,7 +50,7 @@ class PeriodicEvaluator:
         self.model = Net().to(self.device)
         
         # Load Global Test Set (Cached locally on this worker)
-        test_set = CIFAR10(root="./data", train=False, download=True, transform=pytorch_transforms)
+        test_set = CIFAR10(root="./data", train=False, download=True, transform=generic_transforms)
         self.test_loader = DataLoaderAdapter(DataLoader(test_set, batch_size=64, shuffle=False))
         
         try:
