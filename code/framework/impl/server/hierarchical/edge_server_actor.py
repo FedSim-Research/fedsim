@@ -1,4 +1,5 @@
 import ray
+from strategies.server_strategies import get_sync_server_strategy
 import torch
 import numpy as np
 import simulation.context
@@ -51,6 +52,8 @@ class EdgeServer(BaseAsyncServer):
         self.client_updates_buffer: Dict[str, Tuple[List[np.ndarray], int]] = {}
         self.model_age = 0
         self.training_config: Dict[str, Scalar] = {}
+
+        self.aggregation_strategy = get_sync_server_strategy("fedavg")
 
         try:
             self.self_ref = ray.get_runtime_context().current_actor
@@ -136,21 +139,17 @@ class EdgeServer(BaseAsyncServer):
         """
         Aggregates local buffer and sends result to Super Server.
         """
-        # --- FedAvg Logic ---
-        total_samples = 0
-        weighted_sum = [np.zeros_like(w) for w in self.global_model_weights]
-
-        for w, n in self.client_updates_buffer.values():
-            total_samples += n
-            for i in range(len(w)):
-                weighted_sum[i] += w[i] * n
-        # --------------------
+        updates_list = list(self.client_updates_buffer.values())
+        total_samples = sum(n for _, n in updates_list)
 
         if total_samples == 0:
             print(f"[Edge {self.server_id}] Warning: 0 samples aggregated.")
             return
 
-        aggregated_weights = [ws / total_samples for ws in weighted_sum]
+        aggregated_weights = self.aggregation_strategy.aggregate(
+            global_weights=self.global_model_weights,
+            updates=updates_list
+        )
 
         # Optimize cross-node transfer
         weights_ref = ray.put(aggregated_weights)

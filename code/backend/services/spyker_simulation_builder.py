@@ -184,6 +184,7 @@ def _require_training_config(training_config: dict[str, Any] | None) -> dict[str
         if model_complexity <= 0:
             raise ValueError("spyker_invalid_model_complexity")
         result["model_complexity"] = model_complexity
+    # TODO: Implement client and server strategy selection here from frontend parse
     return result
 
 
