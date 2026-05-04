@@ -234,7 +234,7 @@ def build_hierfl_simulation(
         raise ValueError("hierfl_invalid_run_time_limit")
     if eval_interval is not None and float(eval_interval) < 0:
         raise ValueError("hierfl_invalid_eval_interval")
-    sim = HierarchicalSimulation(run_time_limit=limit, gpu_budget=gpu_budget)
+    sim = HierarchicalSimulation(dataset_id=dataset_id or "uoft-cs/cifar10", run_time_limit=limit, gpu_budget=gpu_budget)
     supports_dataset_id = "dataset_id" in inspect.signature(sim.add_client).parameters
     sim.set_metadata(
         run_id=run_id or "unknown_run",

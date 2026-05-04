@@ -97,7 +97,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "last_over_time({job=\"fedsim-evaluation\", filename=~\".*sim_${run_id}.*\"} | json accuracy=\"accuracy\" | unwrap accuracy [1h])",
+          "expr": "avg_over_time({job=\"fedsim-evaluation\", filename=~\".*sim_${run_id}.*\"} | json accuracy=\"accuracy\" | unwrap accuracy [5m])",
           "legendFormat": "Accuracy",
           "datasource": {
             "type": "loki",
@@ -107,7 +107,7 @@
         },
         {
           "refId": "B",
-          "expr": "last_over_time({job=\"fedsim-evaluation\", filename=~\".*sim_${run_id}.*\"} | json loss=\"loss\" | unwrap loss [1h])",
+          "expr": "avg_over_time({job=\"fedsim-evaluation\", filename=~\".*sim_${run_id}.*\"} | json loss=\"loss\" | unwrap loss [5m])",
           "legendFormat": "Loss",
           "datasource": {
             "type": "loki",

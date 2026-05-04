@@ -113,7 +113,7 @@ class SpykerServer(BaseAsyncServer):
 
     def register_clients(self, client_configs: Dict[str, Any]):
         """Spawns Client Actors dynamically to process tasks concurrently."""
-        gpu_fraction = 1e-4 if torch.cuda.is_available() else 0
+        gpu_fraction = 0
 
         for c_id, config in client_configs.items():
             actor = VirtualClientActor.options(
@@ -200,8 +200,6 @@ class SpykerServer(BaseAsyncServer):
         base_client_lr = self.full_config.training.learning_rate
         new_client_lr = self._calculate_decay(count, avg_updates, base_client_lr)
         self.client_learning_rates[client_id] = new_client_lr
-
-        print(f"[{self.server_id}] Accepted update from {client_id}. New Age: {self.model_age}. LR for next round: {new_client_lr}")
 
         # Check Sync (Algorithm 2 SPYKER)
         if self.has_token:

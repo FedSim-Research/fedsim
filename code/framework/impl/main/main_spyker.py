@@ -40,7 +40,8 @@ class DataLoaderAdapter:
 
 
 class SpykerSimulation:
-    def __init__(self, gpu_budget: float | None = None):
+    def __init__(self, dataset_id: str = "uoft-cs/cifar10", gpu_budget: float | None = None):
+        self.dataset_id = dataset_id
         self.gpu_budget = gpu_budget
         self.server_ids = []
         self.client_ids = []
@@ -317,6 +318,7 @@ class SpykerSimulation:
                 target_server_ref=target_srv,
                 orchestrator_ref=self.orchestrator,
                 evaluation_interval=self.eval_interval,
+                dataset=self.dataset_id
             )
 
             eval_events = ray.get(self.evaluator_actor.start.remote())
@@ -376,7 +378,7 @@ def initialize_environment():
     print("Ray environment initialized.")
 
 
-def evaluate_model(filename: str):
+def evaluate_model(filename: str, dataset_id: str = "CIFAR10"):
     print(f"Starting evaluation for model: {filename}")
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = Net()
@@ -384,8 +386,17 @@ def evaluate_model(filename: str):
     state_dict = torch.load(filename)
     model.load_state_dict(state_dict, strict=True)
 
-    transform = Compose([ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    test_set = CIFAR10(root="./data", train=False, download=True, transform=transform)
+    from main.task import generic_transforms
+    
+    if dataset_id == "uoft-cs/cifar10":
+        test_set = CIFAR10(root="./data", train=False, download=True, transform=generic_transforms)
+    elif dataset_id == "ylecun/mnist":
+        from torchvision.datasets import MNIST
+        test_set = MNIST(root="./data", train=False, download=True, transform=generic_transforms)
+    else:
+        print(f"Error: Dataset {dataset_id} is not yet compatible with testing. Currently supported:\n\t-uoft-cs/cifar10\n\t- ylecun/mnist")
+        raise ValueError(f"Dataset {dataset_id} is not yet compatible with testing. Currently supported:\n\t-uoft-cs/cifar10\n\t- ylecun/mnist")
+        
     test_loader = DataLoader(test_set, batch_size=32, shuffle=False)
 
     adapter = DataLoaderAdapter(test_loader)

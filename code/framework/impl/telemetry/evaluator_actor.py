@@ -4,6 +4,7 @@ from collections import OrderedDict
 from typing import Dict, Any
 from torch.utils.data import DataLoader
 from torchvision.datasets import CIFAR10
+from torchvision.datasets import MNIST
 
 # Import the PyTorch logic from your app
 from main.task import Net, test, generic_transforms
@@ -32,7 +33,8 @@ class PeriodicEvaluator:
         architecture: str,
         target_server_ref: ray.ObjectRef,
         orchestrator_ref: ray.ObjectRef,
-        evaluation_interval: float
+        evaluation_interval: float,
+        dataset: str = "uoft-cs/cifar10"
     ):
         self.run_id = run_id
         self.graph_id = graph_id
@@ -40,6 +42,7 @@ class PeriodicEvaluator:
         self.target_server = target_server_ref
         self.orchestrator = orchestrator_ref
         self.interval = evaluation_interval
+        self.dataset_id = dataset
         
         self.logger = setup_telemetry_logger(self.run_id)
         
@@ -51,12 +54,22 @@ class PeriodicEvaluator:
         self.model = Net().to(self.device)
         
         # Load Global Test Set (Cached locally on this worker)
-        test_set = CIFAR10(root="./data", train=False, download=True, transform=generic_transforms)
+        if self.dataset_id == "uoft-cs/cifar10":
+            test_set = CIFAR10(root="./data", train=False, download=True, transform=generic_transforms)
+        elif self.dataset_id == "ylecun/mnist":
+            test_set = MNIST(root="./data", train=False, download=True, transform=generic_transforms)
+        else:
+            print(f"Error: Dataset {self.dataset_id} is not yet compatible with testing. Currently supported:\n\t-uoft-cs/cifar10\n\t- ylecun/mnist")
+            raise ValueError(f"Dataset {self.dataset_id} is not yet compatible with testing. Currently supported:\n\t-uoft-cs/cifar10\n\t- ylecun/mnist")
+            
         self.test_loader = DataLoaderAdapter(DataLoader(test_set, batch_size=64, shuffle=False))
         
         try:
             self.self_ref = ray.get_runtime_context().current_actor
-        except Exception:
+            print(f"[{self.architecture} Evaluator] Successfully obtained self_ref")
+        except Exception as e:
+            print(f"[{self.architecture} Evaluator] WARNING: Could not obtain self_ref: {e}")
+            print(f"[{self.architecture} Evaluator] This means periodic evaluations will NOT be scheduled!")
             self.self_ref = None
 
     def start(self):
@@ -96,17 +109,27 @@ class PeriodicEvaluator:
         }
         
         self.logger.info("Evaluation Complete", extra={"extra_data": extra_data})
-        persist_periodic_evaluation(extra_data)
-        print(
-            f"[{self.architecture} Eval] run_id={self.run_id} "
-            f"T={current_virtual_time:>6.1f}s | Round: {round_val} | "
-            f"Acc: {accuracy*100:>5.2f} | Loss: {avg_loss:.4f}"
-        )
+        
+        # Persist evaluation to database
+        try:
+            persist_periodic_evaluation(extra_data)
+            print(
+                f"[{self.architecture} Eval] run_id={self.run_id} "
+                f"T={current_virtual_time:>6.1f}s | Round: {round_val} | "
+                f"Acc: {accuracy*100:>5.2f} | Loss: {avg_loss:.4f}"
+            )
+        except Exception as e:
+            print(
+                f"[{self.architecture} Evaluator] ERROR: Failed to persist evaluation: {e}"
+            )
+            self.logger.error(f"persist_periodic_evaluation failed: {e}", extra={"extra_data": extra_data})
 
         # Schedule Next Evaluation
         if self.self_ref:
             next_payload = {"event_type": "EVALUATE", "trigger_time": current_virtual_time + self.interval}
-            return[
+            return [
                 (self.interval, self.self_ref, "evaluate", next_payload)
             ]
-        return[]
+        else:
+            print(f"[{self.architecture} Evaluator] WARNING: self_ref is None, cannot schedule next evaluation")
+        return []

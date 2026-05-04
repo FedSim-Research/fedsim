@@ -48,8 +48,9 @@ class HierarchicalSimulation:
     """See Hierarchical_Simulation_README.md for details on the simulation setup and how to use it."""
 
     def __init__(
-        self, run_time_limit: float = RUNTIME_LIMIT, gpu_budget: float | None = None
+        self, dataset_id: str = "uoft-cs/cifar10", run_time_limit: float = RUNTIME_LIMIT, gpu_budget: float | None = None
     ):
+        self.dataset_id = dataset_id
         self.run_time_limit = run_time_limit
         self.gpu_budget = gpu_budget
         self.super_id = None
@@ -292,6 +293,7 @@ class HierarchicalSimulation:
                 target_server_ref=self.super_actor,
                 orchestrator_ref=self.orchestrator,
                 evaluation_interval=self.eval_interval,
+                dataset=self.dataset_id
             )
 
             # Fetch the first event (T=0 evaluation + scheduling the next)
@@ -349,9 +351,9 @@ def initialize_environment():
     print("Ray environment initialized.")
 
 
-def evaluate_model(filename: str):
+def evaluate_model(filename: str, dataset_id: str = "CIFAR10"):
     """
-    Loads a saved model checkpoint and evaluates it against the CIFAR-10 test set.
+    Loads a saved model checkpoint and evaluates it against the specified test set.
     """
     print(f"Starting evaluation for model: {filename}")
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -362,8 +364,17 @@ def evaluate_model(filename: str):
     state_dict = torch.load(filename)
     model.load_state_dict(state_dict, strict=True)
 
-    transform = Compose([ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    test_set = CIFAR10(root="./data", train=False, download=True, transform=transform)
+    from main.task import generic_transforms
+    
+    if dataset_id == "uoft-cs/cifar10":
+        test_set = CIFAR10(root="./data", train=False, download=True, transform=generic_transforms)
+    elif dataset_id == "ylecun/mnist":
+        from torchvision.datasets import MNIST
+        test_set = MNIST(root="./data", train=False, download=True, transform=generic_transforms)
+    else:
+        print(f"Error: Dataset {dataset_id} is not yet compatible with testing. Currently supported:\n\t-uoft-cs/cifar10\n\t- ylecun/mnist")
+        raise ValueError(f"Dataset {dataset_id} is not yet compatible with testing. Currently supported:\n\t-uoft-cs/cifar10\n\t- ylecun/mnist")
+        
     test_loader = DataLoader(test_set, batch_size=32, shuffle=False)
 
     print(f"Evaluating on {len(test_set)} samples...")

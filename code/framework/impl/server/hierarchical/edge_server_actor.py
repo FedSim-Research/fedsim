@@ -66,7 +66,7 @@ class EdgeServer(BaseAsyncServer):
 
     def register_clients(self, client_configs: Dict[str, Dict[str, Any]]):
         """Instantiates PyTorch DataLoaders safely inside the Ray worker."""
-        gpu_fraction = 1e-4 if torch.cuda.is_available() else 0
+        gpu_fraction = 0
         for c_id, config in client_configs.items():
             actor = VirtualClientActor.options(
                 num_cpus=1e-4, num_gpus=gpu_fraction

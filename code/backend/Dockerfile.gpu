@@ -1,20 +1,25 @@
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends software-properties-common curl build-essential \
-    && add-apt-repository ppa:deadsnakes/ppa \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends python3.12 python3.12-dev \
-    && ln -sf /usr/bin/python3.12 /usr/bin/python \
-    && ln -sf /usr/bin/python3.12 /usr/bin/python3 \
-    && curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12 \
-    && rm -rf /var/lib/apt/lists/*
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g; s|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true \
+    && apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update \
+    && apt-get install -y --no-install-recommends \
+       ca-certificates \
+       curl \
+       build-essential \
+       python3.12 \
+       python3.12-dev \
+       python3.12-venv \
+       python3-pip \
+   && apt-get clean \
+   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+RUN python3.12 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
 
 COPY requirements.txt /app/requirements.txt
 COPY framework/impl /app/framework/impl

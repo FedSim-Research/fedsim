@@ -9,7 +9,7 @@ from filelock import FileLock
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner
 from torch.utils.data import DataLoader
-from torchvision.transforms import Compose, Normalize, ToTensor, Resize
+from torchvision.transforms import Compose, Normalize, ToTensor, Resize, Lambda
 from strategies.client_strategies import get_client_strategy
 
 DEFAULT_DATASET_ID = "uoft-cs/cifar10"
@@ -59,6 +59,7 @@ class Net(nn.Module):
 # Resizes everything to 32x32 to maintain consistency for the CNN
 generic_transforms = Compose([
     Resize((32, 32)),
+    Lambda(lambda img: img.convert("RGB")),
     ToTensor(),
     Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 ])
@@ -93,7 +94,7 @@ def preload_dataset(dataset_id: str | None = None):
 
 def apply_transforms(batch):
     img_key = "img" if "img" in batch else "image"
-    batch["img"] = [generic_transforms(img.convert("RGB")) for img in batch[img_key]]
+    batch["img"] = [generic_transforms(img) for img in batch[img_key]]
     return batch
 
 def load_data(partition_id: int, num_partitions: int, seed: int | None = None, dataset_id: str | None = None):

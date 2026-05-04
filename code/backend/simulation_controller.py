@@ -121,7 +121,7 @@ class SimulationController:
             simulation.save_model(output_filename)
             if self.simulation_settings.get("evaluate_model"):
                 evaluate_model = evaluator()
-                evaluation = evaluate_model(output_filename)
+                evaluation = evaluate_model(output_filename, self.simulation_settings.get("dataset", "uoft-cs/cifar10"))
         result = {"output_filename": output_filename, "seed": seed}
         if evaluation is not None:
             result["evaluation"] = evaluation

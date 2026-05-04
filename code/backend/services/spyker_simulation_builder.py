@@ -257,7 +257,7 @@ def build_spyker_simulation(
         if idle < 0:
             raise ValueError("spyker_invalid_idle_token_delay")
         simulation_config["idle_token_delay"] = idle
-    sim = SpykerSimulation(gpu_budget=gpu_budget)
+    sim = SpykerSimulation(dataset_id=dataset_id or "uoft-cs/cifar10", gpu_budget=gpu_budget)
     supports_dataset_id = "dataset_id" in inspect.signature(sim.add_client).parameters
     sim.set_configurations(
         spyker_params=algorithm_config,

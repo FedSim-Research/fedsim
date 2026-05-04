@@ -53,7 +53,11 @@ def sync_run_to_loki(run_id: str) -> bool:
         ).scalar_one_or_none()
 
         if not run:
-            logger.warning("Run not found: %s", run_id)
+            logger.warning(
+                "sync_run_to_loki_failed: Run not found in database run_id=%s. "
+                "The SimulationRun record must be created before syncing.",
+                run_id
+            )
             return False
 
         # Fetch evaluation points for this run, ordered by timestamp
@@ -64,7 +68,7 @@ def sync_run_to_loki(run_id: str) -> bool:
         ).scalars().all()
 
         if not eval_points:
-            logger.info("No evaluation points to sync for run: %s", run_id)
+            logger.info("sync_run_to_loki: No evaluation points to sync for run: %s", run_id)
             return True
 
         # Build Loki push payload
@@ -107,20 +111,102 @@ def sync_run_to_loki(run_id: str) -> bool:
         response.raise_for_status()
 
         logger.info(
-            "sync_run_to_loki success: run_id=%s points=%d",
+            "sync_run_to_loki_success: run_id=%s evaluation_points=%d",
             run_id,
             len(eval_points),
         )
         return True
 
     except requests.RequestException as e:
-        logger.error("Loki push failed for run %s: %s", run_id, e)
+        error_msg = str(e)
+        if hasattr(e, 'response') and e.response is not None:
+            try:
+                error_details = e.response.text
+                logger.error(
+                    "sync_run_to_loki_failed: Loki push failed for run %s: HTTP %d - %s",
+                    run_id,
+                    e.response.status_code,
+                    error_details,
+                )
+            except Exception:
+                logger.error("sync_run_to_loki_failed: Loki push failed for run %s: %s", run_id, error_msg)
+        else:
+            logger.error("sync_run_to_loki_failed: Loki push failed for run %s: %s", run_id, error_msg)
         return False
     except Exception as e:
-        logger.exception("sync_run_to_loki failed for run %s", run_id)
+        logger.exception("sync_run_to_loki_failed: Unexpected error for run %s", run_id)
         return False
     finally:
         session.close()
+
+
+def _query_loki_with_strategies(run_id: str, start_ns: int, end_ns: int) -> dict | None:
+    """
+    Try multiple Loki query strategies to find evaluation logs for a run.
+    
+    Tries queries in order of preference:
+    1. Primary: job="fedsim-evaluation" |= "run_id=..."
+    2. Fallback 1: job="ray-actors" |= "run_id=..."
+    3. Fallback 2: All logs containing run_id (no job filter)
+    
+    Returns:
+        Response data dict if successful, None otherwise
+    """
+    escaped_run_id = run_id.replace("\\", "\\\\").replace('"', '\\"')
+    
+    queries_to_try = [
+        # Primary query
+        f'{{job="fedsim-evaluation"}} |= "run_id={escaped_run_id}"',
+        # Fallback: try ray-actors job (if logs went to different job)
+        f'{{job="ray-actors"}} |= "run_id={escaped_run_id}" |= "Eval"',
+        # Fallback: try without job label (broader search)
+        f'|= "run_id={escaped_run_id}" |= "Eval"',
+    ]
+    
+    for attempt, query in enumerate(queries_to_try, 1):
+        try:
+            logger.debug("Loki query attempt %d/%d: query=%s", attempt, len(queries_to_try), query)
+            
+            response = requests.get(
+                LOKI_QUERY_URL,
+                params={
+                    "query": query,
+                    "start": start_ns,
+                    "end": end_ns,
+                    "limit": 10000,
+                },
+                timeout=30,
+            )
+            
+            logger.debug("Loki query attempt %d response status: %d", attempt, response.status_code)
+            response.raise_for_status()
+            
+            data = response.json()
+            if data.get("status") == "success":
+                result = data.get("data", {}).get("result", [])
+                if result:
+                    logger.info("Loki query succeeded at attempt %d: query=%s", attempt, query)
+                    return data
+                else:
+                    logger.debug("Loki query attempt %d returned no results", attempt)
+            else:
+                error_msg = data.get("error", "Unknown error")
+                logger.debug("Loki query attempt %d failed: %s", attempt, error_msg)
+        
+        except requests.RequestException as e:
+            logger.debug("Loki query attempt %d raised exception: %s", attempt, str(e))
+            continue
+        except Exception as e:
+            logger.debug("Loki query attempt %d unexpected error: %s", attempt, str(e))
+            continue
+    
+    # All queries failed
+    logger.warning(
+        "reconstruct_from_loki: All Loki query strategies failed for run %s. "
+        "Logs may not exist in Loki or there may be connectivity issues.",
+        run_id
+    )
+    return None
 
 
 def reconstruct_from_loki(run_id: str) -> int:
@@ -140,29 +226,18 @@ def reconstruct_from_loki(run_id: str) -> int:
         now_ns = int(datetime.now(timezone.utc).timestamp() * 1_000_000_000)
         start_ns = now_ns - (86400 * 1_000_000_000)  # 24 hours ago
         
-        # Use line filter for run_id to avoid label cardinality issues
-        query = f'{{job="fedsim-evaluation"}} |= "run_id={run_id}"'
+        logger.debug("reconstruct_from_loki: Attempting to fetch logs for run %s (24h window)", run_id)
         
-        response = requests.get(
-            LOKI_QUERY_URL,
-            params={
-                "query": query,
-                "start": start_ns,
-                "end": now_ns,
-                "limit": 10000,
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
+        # Try multiple query strategies
+        data = _query_loki_with_strategies(run_id, start_ns, now_ns)
         
-        data = response.json()
-        if data.get("status") != "success":
-            logger.warning("Loki query failed for run %s: %s", run_id, data.get("error"))
+        if data is None:
+            logger.warning("reconstruct_from_loki: Could not query Loki for run %s", run_id)
             return 0
         
         streams = data.get("data", {}).get("result", [])
         if not streams:
-            logger.info("No logs found in Loki for run: %s", run_id)
+            logger.info("reconstruct_from_loki: No logs found in Loki for run: %s", run_id)
             return 0
         
         # Parse log lines and extract evaluation data
@@ -225,19 +300,18 @@ def reconstruct_from_loki(run_id: str) -> int:
             
             if inserted > 0:
                 session.commit()
-                logger.info("reconstruct_from_loki success: run_id=%s reconstructed=%d", run_id, inserted)
+                logger.info("reconstruct_from_loki_success: run_id=%s reconstructed=%d", run_id, inserted)
+            else:
+                logger.info("reconstruct_from_loki: No parseable log entries found for run %s", run_id)
             
             return inserted
         except Exception as e:
             session.rollback()
-            logger.error("reconstruct_from_loki failed for run %s: %s", run_id, str(e))
+            logger.error("reconstruct_from_loki_failed: Error processing Loki results for run %s: %s", run_id, str(e))
             return 0
         finally:
             session.close()
     
-    except requests.RequestException as e:
-        logger.error("Loki query failed for run %s: %s", run_id, str(e))
-        return 0
     except Exception as e:
-        logger.exception("reconstruct_from_loki failed for run %s", run_id)
+        logger.exception("reconstruct_from_loki_failed: Unexpected error for run %s", run_id)
         return 0
