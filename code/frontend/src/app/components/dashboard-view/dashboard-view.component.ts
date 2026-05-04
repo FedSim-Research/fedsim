@@ -11,12 +11,12 @@ type ComparableMetrics = {
 };
 
 type ArchitectureMetrics = {
-  architecture: 'hierfl' | 'spyker';
+  architecture: 'hierarchical' | 'spyker';
   metrics: ComparableMetrics;
 };
 
 type ArchitectureEmbed = {
-  architecture: 'hierfl' | 'spyker';
+  architecture: 'hierarchical' | 'spyker';
   src: SafeResourceUrl;
 };
 
@@ -60,7 +60,7 @@ export class DashboardViewComponent {
   public telemetryEmbeds = computed(() => {
     const run = this.selectedRun();
     const range = this.runTimeRange(run);
-    const runId = run?.run_id ?? '';
+    const runId = this.toGrafanaRunIdParam(run?.run_id ?? '');
     const architecture = this.toGrafanaArchitectureParam(run?.architecture ? String(run.architecture) : '');
     return this.telemetryPanels.map((panel) => ({
       ...panel,
@@ -78,11 +78,11 @@ export class DashboardViewComponent {
   public modelQualityTrendEmbed = computed(() => {
     const run = this.selectedRun();
     const range = this.runTimeRange(run);
-    const runId = run?.run_id ?? '';
+    const runId = this.toGrafanaRunIdParam(run?.run_id ?? '');
     const architecture = this.toGrafanaArchitectureParam(run?.architecture ? String(run.architecture) : '');
     return this.getGrafanaPanelUrl({
       uid: 'fedsimFrontendDashboard',
-      panelId: 1007,
+      panelId: 1008,
       rangeFrom: range.from,
       rangeTo: range.to,
       runId,
@@ -96,18 +96,42 @@ export class DashboardViewComponent {
       return [];
     }
     const range = this.runTimeRange(run);
-    const runId = run.run_id ?? '';
-    return (['hierfl', 'spyker'] as const).map((architecture) => ({
+    const runId = this.toGrafanaRunIdParam(run.run_id ?? '');
+    return (['hierarchical', 'spyker'] as const).map((architecture) => ({
       architecture,
       src: this.getGrafanaPanelUrl({
         uid: 'fedsimFrontendDashboard',
-        panelId: 1007,
+        panelId: 1008,
         rangeFrom: range.from,
         rangeTo: range.to,
         runId,
         architecture: this.toGrafanaArchitectureParam(architecture),
       }),
     }));
+  });
+
+  public modelQualitySnapshot = computed<{ url: string } | null>(() => {
+    const run = this.selectedRun();
+    if (!run) {
+      return null;
+    }
+    if (run.accuracy_loss_snapshot_url) {
+      return { url: run.accuracy_loss_snapshot_url };
+    }
+    return null;
+  });
+
+  public modelQualitySnapshotsByArchitecture = computed<Array<{ architecture: 'hierarchical' | 'spyker'; url: string }>>(() => {
+    const run = this.selectedRun();
+    if (!run || !run.accuracy_loss_snapshot_urls_by_architecture) {
+      return [];
+    }
+    return (['hierarchical', 'spyker'] as const)
+      .map((arch) => ({
+        architecture: arch,
+        url: run.accuracy_loss_snapshot_urls_by_architecture?.[arch] ?? '',
+      }))
+      .filter((item) => item.url);
   });
 
   public getStatusClass(status: SimulationRunResponse['status']): string {
@@ -130,6 +154,11 @@ export class DashboardViewComponent {
       return '-';
     }
     return `${seconds.toFixed(2)}s`;
+  }
+
+  public formatProgress(run: SimulationRunResponse): string {
+    const progress = this.getProgressPercent(run);
+    return progress === null ? '-' : `${progress.toFixed(1)}%`;
   }
 
   public getRunMetrics(run: SimulationRunResponse): ComparableMetrics {
@@ -169,7 +198,7 @@ export class DashboardViewComponent {
       return [];
     }
 
-    return (['hierfl', 'spyker'] as const).map((architecture) => ({
+    return (['hierarchical', 'spyker'] as const).map((architecture) => ({
       architecture,
       metrics: {
         accuracy: byArchitecture[architecture]?.evaluation?.accuracy ?? null,
@@ -178,8 +207,24 @@ export class DashboardViewComponent {
     }));
   }
 
-  public architectureLabel(architecture: 'hierfl' | 'spyker'): string {
-    return architecture === 'hierfl' ? 'HierFL' : 'Spyker';
+  public architectureLabel(architecture: 'hierarchical' | 'spyker' | 'both'): string {
+    if (architecture === 'hierarchical') {
+      return 'hierarchical';
+    }
+    if (architecture === 'spyker') {
+      return 'Spyker';
+    }
+    return 'Both';
+  }
+
+  public normalizeArchitecture(value: string | null | undefined): 'hierarchical' | 'spyker' | 'both' {
+    if (value === 'hierfl') {
+      return 'hierarchical';
+    }
+    if (value === 'hierarchical' || value === 'spyker' || value === 'both') {
+      return value;
+    }
+    return 'spyker';
   }
 
   public formatPercent(value: number | null): string {
@@ -196,14 +241,39 @@ export class DashboardViewComponent {
     return value.toFixed(4);
   }
 
-  public getCombinedGraphIds(run: SimulationRunResponse): { hierfl: number | null; spyker: number | null } {
+  public getCombinedGraphIds(run: SimulationRunResponse): { hierarchical: number | null; spyker: number | null } {
     const metadata = run.run_metadata as Record<string, unknown> | null | undefined;
     const combinedPayload = (metadata?.['combined_payload'] as Record<string, unknown> | undefined) ?? {};
-    const hierfl = combinedPayload['hierfl'] as Record<string, unknown> | undefined;
+    const hierarchical = combinedPayload['hierarchical'] as Record<string, unknown> | undefined;
     const spyker = combinedPayload['spyker'] as Record<string, unknown> | undefined;
-    const hierflGraphId = typeof hierfl?.['graph_id'] === 'number' ? (hierfl['graph_id'] as number) : null;
+    const hierarchicalGraphId = typeof hierarchical?.['graph_id'] === 'number' ? (hierarchical['graph_id'] as number) : null;
     const spykerGraphId = typeof spyker?.['graph_id'] === 'number' ? (spyker['graph_id'] as number) : null;
-    return { hierfl: hierflGraphId, spyker: spykerGraphId };
+    return { hierarchical: hierarchicalGraphId, spyker: spykerGraphId };
+  }
+
+  public exportRunToCsv(run: SimulationRunResponse): void {
+    const apiBase = (window as any).FEDSIM_API_BASE_URL as string | undefined;
+    const baseUrl = apiBase || '/api';
+    const csvUrl = `${baseUrl}/runs/${encodeURIComponent(run.run_id)}/export/csv`;
+    
+    const link = document.createElement('a');
+    link.href = csvUrl;
+    link.download = `run_${run.run_id}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  private getProgressPercent(run: SimulationRunResponse): number | null {
+    const currentSimTime = run.current_sim_time;
+    const runTimeLimit = run.run_time_limit;
+    if (currentSimTime === null || currentSimTime === undefined) {
+      return null;
+    }
+    if (runTimeLimit === null || runTimeLimit === undefined || runTimeLimit <= 0) {
+      return null;
+    }
+    return Math.max(0, Math.min(100, (currentSimTime / runTimeLimit) * 100));
   }
 
   private runTimeRange(run: SimulationRunResponse | null): { from: number; to: number } {
@@ -255,12 +325,24 @@ export class DashboardViewComponent {
 
   private toGrafanaArchitectureParam(value: string): string {
     if (value === 'hierfl') {
-      return 'hierfl';
+      return 'hierarchical';
+    }
+    if (value === 'hierarchical') {
+      return 'hierarchical';
     }
     if (value === 'both') {
-      return 'spyker|hierfl';
+      return 'spyker|hierarchical';
     }
     return value;
+  }
+
+  private toGrafanaRunIdParam(value: string): string {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return '';
+    }
+    const baseRunId = trimmed.split(':', 1)[0];
+    return baseRunId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   private toEpoch(value: string | null | undefined): number {

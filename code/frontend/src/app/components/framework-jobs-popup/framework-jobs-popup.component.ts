@@ -35,9 +35,26 @@ export class FrameworkJobsPopupComponent implements OnInit, OnDestroy {
     this.isOpen.update((value) => !value);
   }
 
+  public formatRunProgress(run: SimulationRunResponse): string {
+    const progress = this.getProgressPercent(run);
+    return progress === null ? '-' : `${progress.toFixed(1)}%`;
+  }
+
   public formatRunTitle(run: SimulationRunResponse): string {
     const architecture = String(run.architecture ?? 'unknown').toUpperCase();
     const graphId = run.graph_id ?? '-';
     return `${architecture} run · graph ${graphId}`;
+  }
+
+  private getProgressPercent(run: SimulationRunResponse): number | null {
+    const currentSimTime = run.current_sim_time;
+    const runTimeLimit = run.run_time_limit;
+    if (currentSimTime === null || currentSimTime === undefined) {
+      return null;
+    }
+    if (runTimeLimit === null || runTimeLimit === undefined || runTimeLimit <= 0) {
+      return null;
+    }
+    return Math.max(0, Math.min(100, (currentSimTime / runTimeLimit) * 100));
   }
 }

@@ -1,15 +1,162 @@
 from __future__ import annotations
 
 from datetime import datetime
+import csv
+import logging
 import json
+import os
+import re
+import time
+from pathlib import Path
 from typing import Any
 
+import requests
 from sqlalchemy import select
 
 from backend.db.database import SessionLocal
 from backend.db.models import SimulationRun
 
 TERMINAL_STATUSES = {"completed", "failed"}
+DEFAULT_RUNS_CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "simulation_runs.csv"
+RUNS_CSV_PATH_ENV_VAR = "FEDSIM_RUNS_CSV_PATH"
+logger = logging.getLogger(__name__)
+
+_PERIODIC_EVALUATOR_T_RE = re.compile(r"\bT=\s*(?P<time>[0-9]+(?:\.[0-9]+)?)s\b")
+
+
+CSV_FIELDNAMES = [
+    "run_id",
+    "graph_id",
+    "architecture",
+    "status",
+    "queued_at",
+    "started_at",
+    "finished_at",
+    "duration_seconds",
+    "error",
+    "metadata_json",
+    "result_json",
+    "final_summary_json",
+    "training_config_json",
+    "simulation_settings_json",
+    "spyker_config_json",
+    "combined_payload_json",
+    "evaluation_json",
+    "evaluation_accuracy",
+    "evaluation_avg_loss",
+    "evaluation_summary_json",
+]
+
+
+def _run_time_limit_from_settings(
+    simulation_settings: dict[str, Any] | None,
+    combined_payload: dict[str, Any] | None,
+    architecture: str,
+) -> float | None:
+    if architecture == "both":
+        settings = ((combined_payload or {}).get("hierfl") or {}).get("simulation_settings") or {}
+    else:
+        settings = simulation_settings or {}
+
+    value = settings.get("run_time_limit")
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def _loki_base_urls() -> list[str]:
+    configured = [
+        os.getenv("FEDSIM_LOKI_INTERNAL_BASE_URL", "").strip(),
+        os.getenv("FEDSIM_LOKI_BASE_URL", "").strip(),
+    ]
+    urls = [url.rstrip("/") for url in configured if url]
+    if not urls:
+        urls.extend(["http://localhost:3100", "http://loki:3100"])
+    elif "http://localhost:3100" not in urls:
+        urls.append("http://localhost:3100")
+    if "http://loki:3100" not in urls:
+        urls.append("http://loki:3100")
+    return urls
+
+
+def _current_sim_time_from_loki(run_id: str, architecture: str) -> float | None:
+    query = f'{{component="ray", job="ray-actors"}} |= "run_id={run_id}" |= "T="'
+    if architecture in {"hierarchical", "spyker"}:
+        query += f' |~ "\\[{architecture} Eval\\]"'
+
+    end_ns = int(time.time() * 1_000_000_000)
+    start_ns = end_ns - int(24 * 60 * 60 * 1_000_000_000)
+
+    for base_url in _loki_base_urls():
+        try:
+            response = requests.get(
+                f"{base_url}/loki/api/v1/query_range",
+                params={
+                    "query": query,
+                    "start": start_ns,
+                    "end": end_ns,
+                    "limit": 50,
+                    "direction": "backward",
+                },
+                timeout=8,
+            )
+        except requests.RequestException:
+            continue
+
+        if response.status_code >= 400:
+            continue
+
+        payload = response.json()
+        results = payload.get("data", {}).get("result", [])
+        latest_line: str | None = None
+        latest_ts = -1
+        for item in results:
+            values = item.get("values", [])
+            for value_pair in values:
+                if not isinstance(value_pair, list) or len(value_pair) < 2:
+                    continue
+                try:
+                    ts = int(value_pair[0])
+                except (TypeError, ValueError):
+                    continue
+                line = value_pair[1]
+                if not isinstance(line, str):
+                    continue
+                if ts >= latest_ts:
+                    latest_ts = ts
+                    latest_line = line
+
+        if not latest_line:
+            continue
+
+        match = _PERIODIC_EVALUATOR_T_RE.search(latest_line)
+        if match is None:
+            continue
+
+        try:
+            return float(match.group("time"))
+        except ValueError:
+            continue
+
+    return None
+
+
+def get_run_progress_info(
+    run_id: str,
+    *,
+    architecture: str,
+    status: str | None = None,
+    simulation_settings: dict[str, Any] | None = None,
+    combined_payload: dict[str, Any] | None = None,
+) -> dict[str, float | None]:
+    current_sim_time = _current_sim_time_from_loki(run_id, architecture)
+    if current_sim_time is None and status in {"queued", "running"}:
+        current_sim_time = 0.0
+
+    return {
+        "current_sim_time": current_sim_time,
+        "run_time_limit": _run_time_limit_from_settings(simulation_settings, combined_payload, architecture),
+    }
 
 
 def _loads_json(value: str | None) -> dict[str, Any] | None:
@@ -25,7 +172,91 @@ def _loads_json(value: str | None) -> dict[str, Any] | None:
 def _dumps_json(value: dict[str, Any] | None) -> str | None:
     if value is None:
         return None
-    return json.dumps(value)
+    return json.dumps(value, sort_keys=True, default=str)
+
+
+def _csv_export_path() -> Path:
+    configured = os.getenv(RUNS_CSV_PATH_ENV_VAR, "").strip()
+    if configured:
+        return Path(configured).expanduser()
+    return DEFAULT_RUNS_CSV_PATH
+
+
+def _csv_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, sort_keys=True, default=str)
+    return str(value)
+
+
+def _csv_row_for_run(record: SimulationRun) -> dict[str, str]:
+    metadata = _loads_json(record.metadata_json) or {}
+    result = _loads_json(record.result_json) or {}
+    final_summary = _loads_json(record.final_summary_json) or {}
+
+    evaluation = result.get("evaluation")
+    evaluation_summary = result.get("evaluation_summary")
+    if evaluation is None and isinstance(final_summary, dict):
+        evaluation = final_summary.get("evaluation")
+        evaluation_summary = evaluation_summary or final_summary.get("evaluation_summary")
+
+    evaluation_accuracy = ""
+    evaluation_avg_loss = ""
+    if isinstance(evaluation, dict):
+        accuracy = evaluation.get("accuracy")
+        avg_loss = evaluation.get("avg_loss")
+        evaluation_accuracy = "" if accuracy is None else str(accuracy)
+        evaluation_avg_loss = "" if avg_loss is None else str(avg_loss)
+
+    return {
+        "run_id": record.run_id,
+        "graph_id": _csv_value(record.graph_id),
+        "architecture": record.architecture,
+        "status": record.status,
+        "queued_at": _csv_value(record.queued_at),
+        "started_at": _csv_value(record.started_at),
+        "finished_at": _csv_value(record.finished_at),
+        "duration_seconds": _csv_value(record.duration_seconds),
+        "error": _csv_value(record.error),
+        "metadata_json": _csv_value(metadata),
+        "result_json": _csv_value(result),
+        "final_summary_json": _csv_value(final_summary),
+        "training_config_json": _csv_value(metadata.get("training_config")),
+        "simulation_settings_json": _csv_value(metadata.get("simulation_settings")),
+        "spyker_config_json": _csv_value(metadata.get("spyker_config")),
+        "combined_payload_json": _csv_value(metadata.get("combined_payload")),
+        "evaluation_json": _csv_value(evaluation),
+        "evaluation_accuracy": evaluation_accuracy,
+        "evaluation_avg_loss": evaluation_avg_loss,
+        "evaluation_summary_json": _csv_value(evaluation_summary),
+    }
+
+
+def refresh_runs_csv() -> Path:
+    export_path = _csv_export_path()
+    export_path.parent.mkdir(parents=True, exist_ok=True)
+
+    session = SessionLocal()
+    try:
+        stmt = (
+            select(SimulationRun)
+            .where(SimulationRun.status.in_(TERMINAL_STATUSES))
+            .order_by(SimulationRun.queued_at.desc())
+        )
+        records = list(session.execute(stmt).scalars().all())
+    finally:
+        session.close()
+
+    temp_path = export_path.parent / f"{export_path.name}.tmp"
+    with temp_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=CSV_FIELDNAMES)
+        writer.writeheader()
+        for record in records:
+            writer.writerow(_csv_row_for_run(record))
+
+    temp_path.replace(export_path)
+    return export_path
 
 
 def _iso_to_datetime(value: str | None) -> datetime | None:
@@ -105,6 +336,10 @@ def persist_final_run(job: Any) -> None:
         record.result_json = _dumps_json(job.result)
         record.final_summary_json = _dumps_json(_build_final_summary(job))
         session.commit()
+        try:
+            refresh_runs_csv()
+        except Exception:
+            logger.exception("simulation_run_csv_export_failed run_id=%s", job.run_id)
     finally:
         session.close()
 
@@ -139,6 +374,14 @@ def _to_api_dict(record: SimulationRun) -> dict[str, Any]:
             "spyker": _dataset_from(spyker_settings),
         }
 
+    progress_info = get_run_progress_info(
+        record.run_id,
+        architecture=record.architecture,
+        status=record.status,
+        simulation_settings=metadata.get("simulation_settings") if isinstance(metadata.get("simulation_settings"), dict) else None,
+        combined_payload=metadata.get("combined_payload") if isinstance(metadata.get("combined_payload"), dict) else None,
+    )
+
     return {
         "run_id": record.run_id,
         "status": record.status,
@@ -152,6 +395,8 @@ def _to_api_dict(record: SimulationRun) -> dict[str, Any]:
         "started_at": _datetime_to_iso(record.started_at),
         "finished_at": _datetime_to_iso(record.finished_at),
         "duration_seconds": record.duration_seconds,
+        "current_sim_time": progress_info["current_sim_time"],
+        "run_time_limit": progress_info["run_time_limit"],
         "output_filename": result.get("output_filename"),
         "dataset": dataset,
         "datasets_by_architecture": datasets_by_architecture,
@@ -190,5 +435,39 @@ def list_runs_api() -> list[dict[str, Any]]:
         )
         records = list(session.execute(stmt).scalars().all())
         return [_to_api_dict(record) for record in records]
+    finally:
+        session.close()
+
+
+def delete_run_api(run_id: str) -> bool:
+    session = SessionLocal()
+    try:
+        record = session.get(SimulationRun, run_id)
+        if record is None:
+            return False
+        session.delete(record)
+        session.commit()
+        return True
+    finally:
+        session.close()
+
+
+def export_run_to_csv(run_id: str) -> str | None:
+    """Export a single run to CSV format string."""
+    session = SessionLocal()
+    try:
+        record = session.get(SimulationRun, run_id)
+        if record is None:
+            return None
+        
+        output = []
+        import io
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=CSV_FIELDNAMES)
+        writer.writeheader()
+        writer.writerow(_csv_row_for_run(record))
+        output = buffer.getvalue()
+        buffer.close()
+        return output
     finally:
         session.close()

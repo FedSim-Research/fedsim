@@ -3,6 +3,8 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    build:
+      dockerfile: backend/Dockerfile.gpu
     deploy:
       resources:
         reservations:
@@ -15,6 +17,8 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    build:
+      dockerfile: backend/Dockerfile.gpu
     deploy:
       resources:
         reservations:

@@ -24,7 +24,10 @@
           <i *ngIf="run.status === 'running'" class="pi pi-spinner pi-spin"></i>
           <i *ngIf="run.status === 'queued'" class="pi pi-clock"></i>
         </span>
-        <span class="jobs-title">{{ formatRunTitle(run) }}</span>
+        <span class="jobs-content">
+          <span class="jobs-title">{{ formatRunTitle(run) }}</span>
+          <span class="jobs-progress">{{ formatRunProgress(run) }}</span>
+        </span>
       </li>
     </ul>
   </div>

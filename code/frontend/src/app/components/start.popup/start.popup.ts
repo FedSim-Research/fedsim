@@ -432,20 +432,18 @@ export class StartPopup implements OnInit {
   }
 
   private applyPersistedParams(architecture: 'hierfl' | 'spyker', params: PersistedStartParams): void {
+    const currentSettings = architecture === 'hierfl' ? this.hierflSettings : this.spykerSettings;
+    const normalizedSettings = this.normalizeSavedSettings(params.settings, currentSettings.seedSetText);
+    const mergedSettings = this.mergePersistedSettings(currentSettings, normalizedSettings);
+
     if (architecture === 'hierfl') {
-      this.hierflSettings = {
-        ...this.hierflSettings,
-        ...this.normalizeSavedSettings(params.settings, this.hierflSettings.seedSetText),
-      };
+      this.hierflSettings = mergedSettings as typeof this.hierflSettings;
       this.hierflSettings.repetitions = this.countSeeds(this.hierflSettings.seedSetText);
       this.evaluateAfterRunByArchitecture.hierfl = params.evaluateAfterRun === true;
       return;
     }
 
-    this.spykerSettings = {
-      ...this.spykerSettings,
-      ...this.normalizeSavedSettings(params.settings, this.spykerSettings.seedSetText),
-    };
+    this.spykerSettings = mergedSettings as typeof this.spykerSettings;
     this.spykerSettings.repetitions = this.countSeeds(this.spykerSettings.seedSetText);
     this.evaluateAfterRunByArchitecture.spyker = params.evaluateAfterRun === true;
   }
@@ -497,6 +495,45 @@ export class StartPopup implements OnInit {
     delete normalized['seed'];
     delete normalized['seedSet'];
     return normalized;
+  }
+
+  private mergePersistedSettings<T extends Record<string, unknown>>(
+    currentSettings: T,
+    persistedSettings: Record<string, unknown>,
+  ): T {
+    // Start with a copy of all current properties
+    const mergedSettings: Record<string, unknown> = { ...currentSettings };
+
+    // Apply persisted settings, with special handling for certain string properties
+    for (const [key, incomingValue] of Object.entries(persistedSettings)) {
+      const currentValue = mergedSettings[key];
+      if (
+        typeof currentValue === 'string' &&
+        typeof incomingValue === 'string' &&
+        (key === 'dataset' || key === 'outputFilename')
+      ) {
+        mergedSettings[key] = this.concatPersistedString(currentValue, incomingValue);
+        continue;
+      }
+
+      mergedSettings[key] = incomingValue;
+    }
+
+    // Spread currentSettings first to ensure all properties are preserved, then apply merged values
+    return { ...currentSettings, ...mergedSettings } as T;
+  }
+
+  private concatPersistedString(currentValue: string, incomingValue: string): string {
+    if (!incomingValue.length) {
+      return currentValue;
+    }
+    if (!currentValue.length) {
+      return incomingValue;
+    }
+    if (currentValue.endsWith(incomingValue)) {
+      return currentValue;
+    }
+    return `${currentValue}${incomingValue}`;
   }
 
   private extractSeedSetText(

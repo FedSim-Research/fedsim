@@ -1,18 +1,22 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ConfirmationService, MessageService } from 'primeng/api';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DashboardRunsService } from '../../services/dashboard-runs.service';
 import { SimulationRunResponse } from '../../services/graph-api.service';
 
 @Component({
   selector: 'app-sidebar-dashboard-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ConfirmDialogModule],
   templateUrl: './sidebar-dashboard-panel.component.html',
   styleUrl: './sidebar-dashboard-panel.component.css',
 })
 export class SidebarDashboardPanelComponent implements OnInit, OnDestroy {
   private runsService = inject(DashboardRunsService);
+  private confirmationService = inject(ConfirmationService);
+  private messageService = inject(MessageService);
 
   public loading = this.runsService.loading;
   public error = this.runsService.error;
@@ -60,6 +64,44 @@ export class SidebarDashboardPanelComponent implements OnInit, OnDestroy {
     await this.runsService.retryRunTracking();
   }
 
+  public canDeleteRun(run: SimulationRunResponse): boolean {
+    return run.status === 'completed' || run.status === 'failed';
+  }
+
+  public async deleteRun(run: SimulationRunResponse, event: Event): Promise<void> {
+    event.stopPropagation();
+    if (!this.canDeleteRun(run)) {
+      return;
+    }
+    this.confirmationService.confirm({
+      header: 'Delete run',
+      message: `Are you sure you want to delete ${run.run_id}?`,
+      icon: 'pi pi-trash',
+      acceptLabel: 'Yes',
+      rejectLabel: 'No',
+      acceptButtonStyleClass: 'cta-option cta-option--confirm p-button-danger',
+      rejectButtonStyleClass: 'cta-option cta-option--cancel p-button-text',
+      accept: async () => {
+        try {
+          await this.runsService.deleteRun(run.run_id);
+          this.messageService.add({
+            severity: 'success',
+            summary: 'Run deleted',
+            detail: `Run ${run.run_id} was removed from the database.`,
+            life: 3500,
+          });
+        } catch (error) {
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Delete failed',
+            detail: error instanceof Error ? error.message : 'Failed to delete run.',
+            life: 4500,
+          });
+        }
+      },
+    });
+  }
+
   public getStatusClass(status: SimulationRunResponse['status']): string {
     return `status-pill status-pill--${status}`;
   }
@@ -73,5 +115,18 @@ export class SidebarDashboardPanelComponent implements OnInit, OnDestroy {
       return '-';
     }
     return value.toLocaleString();
+  }
+
+  public formatProgress(run: SimulationRunResponse): string {
+    const currentSimTime = run.current_sim_time;
+    const runTimeLimit = run.run_time_limit;
+    if (currentSimTime === null || currentSimTime === undefined) {
+      return '-';
+    }
+    if (runTimeLimit === null || runTimeLimit === undefined || runTimeLimit <= 0) {
+      return '-';
+    }
+    const percentage = Math.max(0, Math.min(100, (currentSimTime / runTimeLimit) * 100));
+    return `${percentage.toFixed(1)}%`;
   }
 }

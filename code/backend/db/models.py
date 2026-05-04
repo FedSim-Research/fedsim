@@ -1,4 +1,4 @@
-from sqlalchemy import String, Text, DateTime, Float, func, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Text, DateTime, Float, func, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.db.database import Base
@@ -139,5 +139,39 @@ class SimulationRun(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class EvaluationPoint(Base):
+    """
+    Persisted periodic evaluation point for Grafana queries.
+    """
+
+    __tablename__ = "evaluation_points"
+    __table_args__ = (
+        UniqueConstraint(
+            "run_id",
+            "architecture",
+            "virtual_time",
+            "round",
+            name="uq_evaluation_points_run_arch_time_round",
+        ),
+        Index("ix_evaluation_points_run_arch_time", "run_id", "architecture", "virtual_time"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    graph_id: Mapped[int | None] = mapped_column(nullable=True)
+    architecture: Mapped[str] = mapped_column(String(20), nullable=False)
+    timestamp_real: Mapped[str] = mapped_column(DateTime(timezone=True), nullable=False)
+    virtual_time: Mapped[float] = mapped_column(Float, nullable=False)
+    round: Mapped[int] = mapped_column(nullable=False)
+    accuracy: Mapped[float] = mapped_column(Float, nullable=False)
+    loss: Mapped[float] = mapped_column(Float, nullable=False)
+    server_stats_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[str] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
         nullable=False,
     )

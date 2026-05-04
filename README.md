@@ -26,30 +26,6 @@ cd code
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
 ```
 
-## Server Deployment (Nginx Included)
-
-Use the deployment compose file if you want to run everything on a server without installing Nginx manually on the host.
-
-CPU deploy:
-
-```bash
-cd code
-docker compose -f docker-compose.deploy.yml up -d
-```
-
-GPU deploy (requires NVIDIA driver + NVIDIA Container Toolkit on the server):
-
-```bash
-cd code
-docker compose -f docker-compose.deploy.yml -f docker-compose.gpu.yml up -d
-```
-
-- Frontend URL: `http://<SERVER-IP>:8088`  
-  (Port mapping is defined in `code/docker-compose.deploy.yml` at the nginx `ports` entry: `${DEPLOY_HTTP_PORT:-8088}:80`.)
-- Grafana URL: `http://<SERVER-IP>:8088/grafana/`
-- Ray URL: `http://<SERVER-IP>:8088/ray/`
-- Prometheus URL: `http://<SERVER-IP>:8088/prometheus/`
-
 - Open the port in the server firewall (example with `ufw`):
 
 ```bash
@@ -62,8 +38,6 @@ Stop containers (use the same compose files as for `up`):
 cd code
 docker compose -f docker-compose.yml down --remove-orphans
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml down --remove-orphans
-docker compose -f docker-compose.deploy.yml down --remove-orphans
-docker compose -f docker-compose.deploy.yml -f docker-compose.gpu.yml down --remove-orphans
 ```
 
 View logs:
@@ -84,8 +58,8 @@ docker compose logs -f
 
 URLs:
 
-- Frontend: `http://localhost:4200`
-- Backend: `http://localhost:8000`
-- Ray Dashboard: `http://localhost:8265`
-- Prometheus: `http://localhost:9010`
-- Grafana: `http://localhost:3000`
+- Frontend URL: `http://<SERVER-IP>:8088`  
+  (Port mapping is defined in `code/docker-compose.yml` at the nginx `ports` entry: `${DEPLOY_HTTP_PORT:-8088}:80`.)
+- Grafana URL: `http://<SERVER-IP>:8088/grafana/`
+- Ray URL: `http://<SERVER-IP>:8088/ray/`
+- Prometheus URL: `http://<SERVER-IP>:8088/prometheus/`

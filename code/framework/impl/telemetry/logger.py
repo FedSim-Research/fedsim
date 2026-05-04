@@ -20,8 +20,9 @@ class JSONFormatter(logging.Formatter):
 
 def setup_telemetry_logger(run_id: str):
     """Sets up a file logger that outputs strict JSON lines."""
-    os.makedirs("logs", exist_ok=True)
-    log_filename = f"logs/sim_{run_id}.jsonl"
+    log_dir = os.environ.get("FEDSIM_TELEMETRY_LOG_DIR", "/tmp/ray/session_latest/logs")
+    os.makedirs(log_dir, exist_ok=True)
+    log_filename = os.path.join(log_dir, f"sim_{run_id}.jsonl")
     
     logger = logging.getLogger(f"telemetry_{run_id}")
     logger.setLevel(logging.INFO)

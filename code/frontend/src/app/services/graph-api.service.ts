@@ -217,6 +217,8 @@ export interface SimulationRunResponse {
   started_at?: string | null;
   finished_at?: string | null;
   duration_seconds?: number | null;
+  current_sim_time?: number | null;
+  run_time_limit?: number | null;
   output_filename?: string | null;
   dataset?: string | null;
   datasets_by_architecture?: Record<string, string | null> | null;
@@ -344,6 +346,10 @@ export class GraphApiService {
 
   public async listRuns(): Promise<SimulationRunResponse[]> {
     return firstValueFrom(this.http.get<SimulationRunResponse[]>(this.url('/runs')));
+  }
+
+  public async deleteRun(runId: string): Promise<void> {
+    await firstValueFrom(this.http.delete(this.url(`/runs/${runId}`)));
   }
 
   public async replaceGraphState(graphId: number, payload: VflowGraph): Promise<GraphDetail> {

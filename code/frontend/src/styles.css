@@ -27,8 +27,20 @@ html, body {
   width: 100%;
   background-color: var(--bg); 
   color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
   margin: 0;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body,
+.p-component,
+.p-dialog {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+body .pi,
+body .pi:before {
+  font-family: 'primeicons' !important;
 }
 
 .vflow-node > foreignObject {

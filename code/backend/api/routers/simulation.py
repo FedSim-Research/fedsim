@@ -1,9 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status, Response
 import logging
 from pydantic import BaseModel
 
 from backend.services import graph_service
+from backend.services import simulation_run_store
 from backend.services.simulation_run_queue import run_queue
+from backend.services.loki_sync_service import sync_run_to_loki
+from backend.services.loki_sync_service import sync_run_to_loki, reconstruct_from_loki
 from backend.services.simulation_seed_sets import normalize_simulation_settings, shared_seed_set_or_raise
 from backend.services.simulation_validation import validate_start_payload
 
@@ -66,6 +69,8 @@ class SimulationRunResponse(BaseModel):
     started_at: str | None = None
     finished_at: str | None = None
     duration_seconds: float | None = None
+    current_sim_time: float | None = None
+    run_time_limit: float | None = None
     output_filename: str | None = None
     dataset: str | None = None
     datasets_by_architecture: dict[str, str | None] | None = None
@@ -203,6 +208,24 @@ def get_run_status(run_id: str):
     if run is None:
         logger.warning("get_run_status_not_found run_id=%s", run_id)
         raise HTTPException(status_code=404, detail="Run not found")
+    
+    # For completed runs, trigger Loki sync to reconstruct graphs from database
+    if run.get("status") == "completed":
+        try:
+            sync_run_to_loki(run_id)
+            logger.info("triggered_loki_sync_on_get run_id=%s", run_id)
+        except Exception as exc:
+            logger.warning("loki_sync_on_get_failed run_id=%s error=%s", run_id, str(exc))
+            # Don't fail the GET request if sync fails - still return the run data
+        # If sync had no data, try reconstructing from Loki first
+        try:
+            count = reconstruct_from_loki(run_id)
+            if count > 0:
+                sync_run_to_loki(run_id)
+                logger.info("reconstructed_and_synced_from_loki run_id=%s count=%d", run_id, count)
+        except Exception as exc2:
+            logger.debug("loki_reconstruction_skipped run_id=%s error=%s", run_id, str(exc2))
+    
     logger.debug("get_run_status run_id=%s status=%s", run_id, run.get("status"))
     return run
 
@@ -210,3 +233,29 @@ def get_run_status(run_id: str):
 @router.get("/runs", response_model=list[SimulationRunResponse])
 def list_runs():
     return run_queue.list_runs_api()
+
+
+@router.delete("/runs/{run_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_run(run_id: str):
+    try:
+        deleted = run_queue.delete_run_api(run_id)
+    except ValueError as exc:
+        if str(exc) == "run_not_deletable":
+            raise HTTPException(status_code=409, detail="Only completed or failed runs can be deleted") from exc
+        raise
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+
+@router.get("/runs/{run_id}/export/csv")
+def export_run_to_csv(run_id: str):
+    csv_content = simulation_run_store.export_run_to_csv(run_id)
+    if csv_content is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=run_{run_id}.csv"}
+    )
