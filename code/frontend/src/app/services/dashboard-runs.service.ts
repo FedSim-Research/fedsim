@@ -122,6 +122,11 @@ export class DashboardRunsService {
     }
   }
 
+  public async deleteRun(runId: string): Promise<void> {
+    await this.graphApi.deleteRun(runId);
+    await this.refreshRuns();
+  }
+
   public async retryRunTracking(): Promise<void> {
     this.pollingSupported.set(true);
     await this.refreshRuns();

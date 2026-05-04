@@ -84,7 +84,19 @@
   color: #facc15;
 }
 
+.jobs-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .jobs-title {
   font-size: 0.82rem;
   color: rgba(255, 255, 255, 0.92);
+}
+
+.jobs-progress {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.66);
 }

@@ -14,12 +14,14 @@ import ray
 
 from backend.services import graph_service
 from backend.services.grafana_snapshot_service import create_accuracy_loss_snapshot_url
+from backend.services.loki_sync_service import sync_run_to_loki
 from backend.services.simulation_seed_sets import build_seeded_output_filename, shared_seed_set_or_raise
 from backend.services import simulation_run_store
 from backend.simulation_controller import SimulationController
 
 RunStatus = Literal["queued", "running", "completed", "failed"]
 logger = logging.getLogger(__name__)
+TERMINAL_RUN_STATUSES = {"completed", "failed"}
 
 
 def _utcnow_iso() -> str:
@@ -108,6 +110,7 @@ class RunJob:
     def to_api_dict(self) -> dict[str, Any]:
         result = self.result or {}
         primary_settings = self._primary_simulation_settings()
+        run_time_limit = self._run_time_limit()
         return {
             "run_id": self.run_id,
             "status": self.status,
@@ -121,6 +124,14 @@ class RunJob:
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "duration_seconds": self.duration_seconds,
+            "current_sim_time": simulation_run_store.get_run_progress_info(
+                self.run_id,
+                architecture=self.architecture,
+                status=self.status,
+                simulation_settings=self.simulation_settings,
+                combined_payload=self.combined_payload,
+            )["current_sim_time"],
+            "run_time_limit": run_time_limit,
             "output_filename": result.get("output_filename"),
             "dataset": self._dataset_for_architecture(),
             "datasets_by_architecture": self._datasets_by_architecture(),
@@ -164,6 +175,13 @@ class RunJob:
             "spyker": _dataset_from(spyker_settings),
         }
 
+    def _run_time_limit(self) -> float | None:
+        settings = self._primary_simulation_settings()
+        value = settings.get("run_time_limit")
+        if isinstance(value, (int, float)):
+            return float(value)
+        return None
+
 
 class SimulationRunQueue:
     def __init__(self, max_concurrent_runs: int = 1) -> None:
@@ -180,6 +198,32 @@ class SimulationRunQueue:
             simulation_run_store.persist_final_run(job)
         except Exception:
             logger.exception("simulation_run_persist_failed run_id=%s", job.run_id)
+
+    def _sync_accuracy_loss_to_loki(self, job: RunJob, result: dict[str, Any]) -> None:
+        run_ids: list[str] = []
+        if job.architecture == "both":
+            results_by_architecture = result.get("results_by_architecture")
+            if isinstance(results_by_architecture, dict):
+                for architecture_result in results_by_architecture.values():
+                    if not isinstance(architecture_result, dict):
+                        continue
+                    runs = architecture_result.get("runs")
+                    if not isinstance(runs, list):
+                        continue
+                    for run in runs:
+                        if not isinstance(run, dict):
+                            continue
+                        run_id = run.get("run_id")
+                        if isinstance(run_id, str) and run_id.strip():
+                            run_ids.append(run_id)
+        else:
+            run_id = result.get("run_id") or job.run_id
+            if isinstance(run_id, str) and run_id.strip():
+                run_ids.append(run_id)
+
+        for run_id in dict.fromkeys(run_ids):
+            if not sync_run_to_loki(run_id):
+                logger.warning("simulation_run_loki_sync_failed run_id=%s", run_id)
 
     def start(self) -> None:
         with self._lock:
@@ -286,6 +330,20 @@ class SimulationRunQueue:
                 persisted[job.run_id] = merged
         return sorted(persisted.values(), key=lambda item: item.get("queued_at") or "", reverse=True)
 
+    def delete_run_api(self, run_id: str) -> bool:
+        with self._lock:
+            job = self._jobs.get(run_id)
+            if job is not None and job.status not in TERMINAL_RUN_STATUSES:
+                raise ValueError("run_not_deletable")
+
+        deleted = simulation_run_store.delete_run_api(run_id)
+
+        if job is not None:
+            with self._lock:
+                self._jobs.pop(run_id, None)
+
+        return deleted or job is not None
+
     def _worker_loop(self) -> None:
         while not self._stop_event.is_set():
             try:
@@ -349,6 +407,7 @@ class SimulationRunQueue:
         finished_at = datetime.now(timezone.utc)
         duration_seconds = (finished_at - started_at).total_seconds()
         if status == "completed" and isinstance(result, dict):
+            self._sync_accuracy_loss_to_loki(job, result)
             snapshot_data = self._create_accuracy_loss_snapshots(
                 run_id=job.run_id,
                 architecture=job.architecture,
@@ -496,6 +555,7 @@ class SimulationRunQueue:
         started_at = datetime.now(timezone.utc)
         result = controller.start()
         duration_seconds = (datetime.now(timezone.utc) - started_at).total_seconds()
+        result["run_id"] = run_id
         result["seed"] = seed
         result["repetition_index"] = repetition_index
         result["duration_seconds"] = duration_seconds

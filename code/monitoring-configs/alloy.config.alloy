@@ -1,52 +1,24 @@
-local.file_match "ray_actor_stdout" {
+local.file_match "simulation_telemetry" {
   path_targets = [
     {
-      __path__  = "/ray-logs/session_latest/logs/*.out",
+      __path__  = "/ray-logs/session_latest/logs/sim_*.jsonl",
       app       = "fedsim",
-      component = "ray",
-      job       = "ray-actors",
-      stream    = "stdout",
+      component = "simulation",
+      job       = "fedsim-evaluation",
+      stream    = "telemetry",
     },
     {
-      __path__  = "/ray-logs/session_*/logs/*.out",
+      __path__  = "/ray-logs/session_*/logs/sim_*.jsonl",
       app       = "fedsim",
-      component = "ray",
-      job       = "ray-actors",
-      stream    = "stdout",
-    },
-    {
-      __path__  = "/ray-logs/session_latest/logs/*.err",
-      app       = "fedsim",
-      component = "ray",
-      job       = "ray-actors",
-      stream    = "stderr",
-    },
-    {
-      __path__  = "/ray-logs/session_*/logs/*.err",
-      app       = "fedsim",
-      component = "ray",
-      job       = "ray-actors",
-      stream    = "stderr",
-    },
-    {
-      __path__  = "/ray-logs/session_latest/logs/*.log",
-      app       = "fedsim",
-      component = "ray",
-      job       = "ray-actors",
-      stream    = "log",
-    },
-    {
-      __path__  = "/ray-logs/session_*/logs/*.log",
-      app       = "fedsim",
-      component = "ray",
-      job       = "ray-actors",
-      stream    = "log",
+      component = "simulation",
+      job       = "fedsim-evaluation",
+      stream    = "telemetry",
     },
   ]
 }
 
-loki.source.file "ray_actor_logs" {
-  targets    = local.file_match.ray_actor_stdout.targets
+loki.source.file "simulation_telemetry_logs" {
+  targets    = local.file_match.simulation_telemetry.targets
   forward_to = [loki.write.default.receiver]
 }
 

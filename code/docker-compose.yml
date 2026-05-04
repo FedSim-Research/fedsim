@@ -3,13 +3,9 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: fedsim-ray
+    container_name: fedsim-ray-deploy
     command: >
       bash -lc "ray start --head --port=6379 --ray-client-server-port=10001 --metrics-export-port=8080 --include-dashboard=true --dashboard-host=0.0.0.0 --dashboard-port=8265 --disable-usage-stats --block"
-    ports:
-      - "8080:8080"
-      - "8265:8265"
-      - "10001:10001"
     environment:
       - HF_HOME=/hf-cache
       - HF_DATASETS_CACHE=/hf-cache/datasets
@@ -17,9 +13,9 @@ services:
       - PYTHONPATH=/app/framework/impl:/app
     volumes:
       - ./backend:/app/backend
-      - ./framework/impl:/app/framework/impl
       - ./data:/app/data
       - ray_logs:/tmp/ray
+      - ./hf-cache:/hf-cache
     restart: unless-stopped
     networks:
       - fedsim-network
@@ -28,7 +24,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: fedsim-backend
+    container_name: fedsim-backend-deploy
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
       - RAY_ADDRESS=ray://ray:10001
@@ -36,13 +32,11 @@ services:
       - HF_HOME=/hf-cache
       - HF_DATASETS_CACHE=/hf-cache/datasets
       - TRANSFORMERS_CACHE=/hf-cache/transformers
-    ports:
-      - "8000:8000"
+      - FEDSIM_GRAFANA_INTERNAL_BASE_URL=http://grafana:3000
     volumes:
       - ./backend:/app/backend
-      - ./framework/impl:/app/framework/impl
       - ./data:/app/data
-      - hf_cache:/hf-cache
+      - ./hf-cache:/hf-cache
     depends_on:
       - ray
     restart: unless-stopped
@@ -53,15 +47,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: fedsim-frontend
-    user: "${UID}:${GID}"
-    command: >
-      bash -lc "if [ ! -d /app/node_modules/uuid ]; then npm ci; fi && npm run start -- --host 0.0.0.0 --port 4200 --poll 2000"
-    ports:
-      - "4200:4200"
-    volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
+    container_name: fedsim-frontend-deploy
+    command: npm run start -- --host 0.0.0.0 --port 4200
     depends_on:
       - backend
     restart: unless-stopped
@@ -70,9 +57,7 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: fedsim-prometheus
-    ports:
-      - "9010:9010"
+    container_name: fedsim-prometheus-deploy
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -87,10 +72,8 @@ services:
 
   loki:
     image: grafana/loki:latest
-    container_name: fedsim-loki
+    container_name: fedsim-loki-deploy
     command: -config.file=/etc/loki/local-config.yaml
-    ports:
-      - "3100:3100"
     volumes:
       - ./monitoring-configs/loki.yml:/etc/loki/local-config.yaml:ro
     restart: unless-stopped
@@ -99,7 +82,7 @@ services:
 
   alloy:
     image: grafana/alloy:latest
-    container_name: fedsim-alloy
+    container_name: fedsim-alloy-deploy
     command: run /etc/alloy/config.alloy --server.http.listen-addr=0.0.0.0:12345
     volumes:
       - ./monitoring-configs/alloy.config.alloy:/etc/alloy/config.alloy:ro
@@ -113,13 +96,12 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: fedsim-grafana
-    ports:
-      - "3000:3000"
+    container_name: fedsim-grafana-deploy
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_SECURITY_ALLOW_EMBED_INIT_STATE_TOKEN=true
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      - GF_SERVER_ROOT_URL=http://localhost:8088/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - ./monitoring-configs/grafana.ini:/etc/grafana/grafana.ini:ro
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -131,11 +113,26 @@ services:
     networks:
       - fedsim-network
 
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: fedsim-nginx-deploy
+    ports:
+      - "${DEPLOY_HTTP_PORT:-8088}:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+      - ray
+      - prometheus
+      - grafana
+    restart: unless-stopped
+    networks:
+      - fedsim-network
+
 networks:
   fedsim-network:
     driver: bridge
 
 volumes:
-  frontend_node_modules:
-  hf_cache:
   ray_logs:

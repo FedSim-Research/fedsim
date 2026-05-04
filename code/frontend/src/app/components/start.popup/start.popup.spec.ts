@@ -41,4 +41,18 @@ describe('StartPopup', () => {
     expect(payload?.hierfl.simulationSettings.seedSet).toEqual([42, 42]);
     expect(payload?.hierfl.simulationSettings.repetitions).toBe(2);
   });
+
+  it('concatenates persisted string settings onto the current values', () => {
+    (component as any).applyPersistedParams('hierfl', {
+      settings: {
+        dataset: 'custom-dataset',
+        outputFilename: '.pth',
+        epochs: 3,
+      },
+    });
+
+    expect(component.hierflSettings.dataset).toBe('uoft-cs/cifar10custom-dataset');
+    expect(component.hierflSettings.outputFilename).toBe('final_model_hierarchical.pth.pth');
+    expect(component.hierflSettings.epochs).toBe(3);
+  });
 });

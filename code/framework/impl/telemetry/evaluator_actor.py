@@ -8,6 +8,7 @@ from torchvision.datasets import CIFAR10
 # Import the PyTorch logic from your app
 from main.task import Net, test, generic_transforms
 from telemetry.logger import setup_telemetry_logger
+from backend.services.evaluation_point_store import persist_periodic_evaluation
 
 class DataLoaderAdapter:
     """Wraps standard torchvision DataLoader to match Flower's FederatedDataset dict format."""
@@ -95,6 +96,7 @@ class PeriodicEvaluator:
         }
         
         self.logger.info("Evaluation Complete", extra={"extra_data": extra_data})
+        persist_periodic_evaluation(extra_data)
         print(
             f"[{self.architecture} Eval] run_id={self.run_id} "
             f"T={current_virtual_time:>6.1f}s | Round: {round_val} | "

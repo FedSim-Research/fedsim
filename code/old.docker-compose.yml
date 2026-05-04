@@ -24,7 +24,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: fedsim-backend-deploy
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
       - RAY_ADDRESS=ray://ray:10001
       - PYTHONUNBUFFERED=1
@@ -34,6 +34,7 @@ services:
       - FEDSIM_GRAFANA_INTERNAL_BASE_URL=http://grafana:3000
     volumes:
       - ./data:/app/data
+      - ./backend/db:/app/backend/db
       - ./hf-cache:/hf-cache
     depends_on:
       - ray
