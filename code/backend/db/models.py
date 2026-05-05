@@ -130,6 +130,7 @@ class SimulationRun(Base):
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     final_summary_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    raw_logs: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[str] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

@@ -15,6 +15,7 @@ from sqlalchemy import select
 
 from backend.db.database import SessionLocal
 from backend.db.models import SimulationRun
+from backend.services.evaluation_point_store import ensure_run_points, _candidate_log_paths
 
 TERMINAL_STATUSES = {"completed", "failed"}
 DEFAULT_RUNS_CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "simulation_runs.csv"
@@ -141,6 +142,92 @@ def _current_sim_time_from_loki(run_id: str, architecture: str) -> float | None:
     return None
 
 
+def _current_sim_time_from_raw_sources(run_id: str, architecture: str) -> float | None:
+    """Fallback: look for T= values in persisted raw_logs or candidate log files on disk."""
+    # 1) Check persisted raw_logs in DB
+    session = SessionLocal()
+    try:
+        record = session.get(SimulationRun, run_id)
+        if record and isinstance(record.raw_logs, str) and record.raw_logs:
+            # Try parsing JSONL lines first (virtual_time field), otherwise fallback to T= regex
+            latest: float | None = None
+            for raw_line in (record.raw_logs or "").splitlines():
+                raw_line = raw_line.strip()
+                if not raw_line:
+                    continue
+                try:
+                    payload = json.loads(raw_line)
+                    extra = payload.get("extra_data") or payload
+                    if isinstance(extra, dict):
+                        vt = extra.get("virtual_time")
+                        if vt is not None:
+                            try:
+                                value = float(vt)
+                                latest = value if latest is None or value > latest else latest
+                                continue
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
+                m = _PERIODIC_EVALUATOR_T_RE.search(raw_line)
+                if m:
+                    try:
+                        value = float(m.group("time"))
+                        latest = value if latest is None or value > latest else latest
+                    except Exception:
+                        pass
+
+            if latest is not None:
+                return latest
+    finally:
+        session.close()
+
+    # 2) Check candidate log files on disk (JSONL or worker stdout)
+    for candidate in _candidate_log_paths(run_id):
+        try:
+            if not candidate.exists() or not candidate.is_file():
+                continue
+            text = candidate.read_text(errors="ignore")
+        except Exception:
+            continue
+        # JSONL lines may contain extra_data with virtual_time, or plain stdout with T= marker
+        # First try JSON parse per-line
+        latest: float | None = None
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            # try JSON payload
+            try:
+                payload = json.loads(line)
+                extra = payload.get("extra_data") or payload
+                vt = extra.get("virtual_time") if isinstance(extra, dict) else None
+                if vt is not None:
+                    try:
+                        value = float(vt)
+                        latest = value if latest is None or value > latest else latest
+                        continue
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            # fallback: regex search in the line
+            m = _PERIODIC_EVALUATOR_T_RE.search(line)
+            if m:
+                try:
+                    value = float(m.group("time"))
+                    latest = value if latest is None or value > latest else latest
+                except Exception:
+                    continue
+
+        if latest is not None:
+            return latest
+
+    return None
+
+
 def get_run_progress_info(
     run_id: str,
     *,
@@ -150,6 +237,9 @@ def get_run_progress_info(
     combined_payload: dict[str, Any] | None = None,
 ) -> dict[str, float | None]:
     current_sim_time = _current_sim_time_from_loki(run_id, architecture)
+    # Loki may be unavailable or not indexed; try DB/file fallbacks
+    if current_sim_time is None:
+        current_sim_time = _current_sim_time_from_raw_sources(run_id, architecture)
     if current_sim_time is None and status in {"queued", "running"}:
         current_sim_time = 0.0
 
@@ -335,11 +425,29 @@ def persist_final_run(job: Any) -> None:
         record.metadata_json = _dumps_json(_build_run_metadata(job))
         record.result_json = _dumps_json(job.result)
         record.final_summary_json = _dumps_json(_build_final_summary(job))
+        # attempt to persist raw JSONL logs (non-blocking)
+        try:
+            for candidate in _candidate_log_paths(job.run_id):
+                if candidate.exists():
+                    try:
+                        content = candidate.read_text(encoding="utf-8")
+                    except Exception:
+                        content = None
+                    if content:
+                        record.raw_logs = (record.raw_logs or "") + "\n" + content
+                        break
+        except Exception:
+            logger.exception("raw_log_persist_failed run_id=%s", job.run_id)
         session.commit()
         try:
             refresh_runs_csv()
         except Exception:
             logger.exception("simulation_run_csv_export_failed run_id=%s", job.run_id)
+        # backfill evaluation points from any actor JSONL logs (safe, non-blocking)
+        try:
+            ensure_run_points(job.run_id)
+        except Exception:
+            logger.exception("evaluation_point_backfill_failed run_id=%s", job.run_id)
     finally:
         session.close()
 

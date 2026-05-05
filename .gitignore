@@ -20,3 +20,5 @@ data/
 code/frontend/grafana-data/
 code/frontend/grafana-logs/
 code/frontend/grafana-plugins/
+
+.vscode/

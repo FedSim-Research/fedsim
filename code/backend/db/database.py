@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import logging
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.engine import Engine
@@ -19,6 +20,7 @@ SessionLocal = sessionmaker(
 )
 
 Base = declarative_base()
+logger = logging.getLogger(__name__)
 
 LEGACY_NODES_BACKUP = "nodes_legacy_backup"
 LEGACY_EDGES_BACKUP = "edges_legacy_backup"
@@ -171,9 +173,29 @@ def _migrate_legacy_graph_schema() -> None:
             )
 
 
+def _ensure_simulation_runs_raw_logs_column() -> None:
+    with engine.begin() as connection:
+        table_names = {
+            str(row[0])
+            for row in connection.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+        if "simulation_runs" not in table_names:
+            return
+
+        columns = _table_columns(connection, "simulation_runs")
+        if "raw_logs" in columns:
+            return
+
+        connection.exec_driver_sql("ALTER TABLE simulation_runs ADD COLUMN raw_logs TEXT")
+        logger.info("added_missing_simulation_runs_raw_logs_column")
+
+
 def init_db():
     _migrate_legacy_graph_schema()
     Base.metadata.create_all(engine)
+    _ensure_simulation_runs_raw_logs_column()
 
 if __name__ == "__main__":
     init_db()

@@ -37,6 +37,7 @@ services:
       - ./backend:/app/backend
       - ./data:/app/data
       - ./hf-cache:/hf-cache
+      - ray_logs:/tmp/ray:ro
     depends_on:
       - ray
     restart: unless-stopped

@@ -66,10 +66,7 @@ class PeriodicEvaluator:
         
         try:
             self.self_ref = ray.get_runtime_context().current_actor
-            print(f"[{self.architecture} Evaluator] Successfully obtained self_ref")
-        except Exception as e:
-            print(f"[{self.architecture} Evaluator] WARNING: Could not obtain self_ref: {e}")
-            print(f"[{self.architecture} Evaluator] This means periodic evaluations will NOT be scheduled!")
+        except Exception:
             self.self_ref = None
 
     def start(self):
@@ -109,27 +106,17 @@ class PeriodicEvaluator:
         }
         
         self.logger.info("Evaluation Complete", extra={"extra_data": extra_data})
-        
-        # Persist evaluation to database
-        try:
-            persist_periodic_evaluation(extra_data)
-            print(
-                f"[{self.architecture} Eval] run_id={self.run_id} "
-                f"T={current_virtual_time:>6.1f}s | Round: {round_val} | "
-                f"Acc: {accuracy*100:>5.2f} | Loss: {avg_loss:.4f}"
-            )
-        except Exception as e:
-            print(
-                f"[{self.architecture} Evaluator] ERROR: Failed to persist evaluation: {e}"
-            )
-            self.logger.error(f"persist_periodic_evaluation failed: {e}", extra={"extra_data": extra_data})
+        persist_periodic_evaluation(extra_data)
+        print(
+            f"[{self.architecture} Eval] run_id={self.run_id} "
+            f"T={current_virtual_time:>6.1f}s | Round: {round_val} | "
+            f"Acc: {accuracy*100:>5.2f} | Loss: {avg_loss:.4f}"
+        )
 
         # Schedule Next Evaluation
         if self.self_ref:
             next_payload = {"event_type": "EVALUATE", "trigger_time": current_virtual_time + self.interval}
-            return [
+            return[
                 (self.interval, self.self_ref, "evaluate", next_payload)
             ]
-        else:
-            print(f"[{self.architecture} Evaluator] WARNING: self_ref is None, cannot schedule next evaluation")
-        return []
+        return[]

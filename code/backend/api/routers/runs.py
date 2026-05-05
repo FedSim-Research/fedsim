@@ -1,10 +1,10 @@
 """API endpoints for simulation run management."""
 
 import logging
-from fastapi import APIRouter, HTTPException, status
 
-from backend.services.loki_sync_service import sync_run_to_loki
-from backend.services.loki_sync_service import sync_run_to_loki, reconstruct_from_loki
+from fastapi import APIRouter, HTTPException, Response, status
+
+from backend.services.loki_sync_service import fetch_run_logs, reconstruct_from_loki, sync_run_to_loki
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 logger = logging.getLogger(__name__)
@@ -60,3 +60,21 @@ def reconstruct_run_loki(run_id: str) -> dict[str, str]:
     
     logger.info("reconstruct_run_loki success run_id=%s count=%d", run_id, count)
     return {"status": "ok", "run_id": run_id, "message": f"Reconstructed {count} evaluation points from Loki", "reconstructed": str(count)}
+
+
+@router.get("/{run_id}/logs")
+def get_run_logs(run_id: str) -> Response:
+    """
+    Return the raw periodic evaluator logs for a run.
+
+    Prefers the persisted `raw_logs` column and falls back to Loki if needed.
+    """
+    logs = fetch_run_logs(run_id)
+    if not logs:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No logs found for run {run_id}")
+
+    return Response(
+        content=logs,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'inline; filename="run_{run_id}_logs.txt"'},
+    )

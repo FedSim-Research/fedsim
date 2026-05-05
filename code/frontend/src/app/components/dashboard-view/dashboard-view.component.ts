@@ -264,6 +264,19 @@ export class DashboardViewComponent {
     document.body.removeChild(link);
   }
 
+  public downloadRunLogs(run: SimulationRunResponse): void {
+    const apiBase = (window as any).FEDSIM_API_BASE_URL as string | undefined;
+    const baseUrl = apiBase || '/api';
+    const logsUrl = `${baseUrl}/runs/${encodeURIComponent(run.run_id)}/logs`;
+
+    const link = document.createElement('a');
+    link.href = logsUrl;
+    link.download = `run_${run.run_id}.log`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   private getProgressPercent(run: SimulationRunResponse): number | null {
     const currentSimTime = run.current_sim_time;
     const runTimeLimit = run.run_time_limit;
