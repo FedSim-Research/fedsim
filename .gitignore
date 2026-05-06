@@ -11,5 +11,14 @@ Include/
 Lib/
 
 pyvenv.cfg
-
 final_model.pt
+final_model_hierarchical.pth
+data/
+# ML model artifacts
+*.pth
+# Grafana runtime directories
+code/frontend/grafana-data/
+code/frontend/grafana-logs/
+code/frontend/grafana-plugins/
+
+.vscode/

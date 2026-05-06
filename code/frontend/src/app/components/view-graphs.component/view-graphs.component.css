@@ -1,0 +1,196 @@
+.dialog-body {
+  padding: 6px 16px 12px;
+}
+
+.dialog-current {
+  display: grid;
+  gap: 4px;
+  padding: 10px 16px 0;
+  font-size: 0.85rem;
+  color: var(--text-color-secondary);
+}
+
+.dialog-current__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dialog-current__row strong {
+  color: inherit;
+}
+
+.dialog-tabs {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+  padding: 10px 16px 6px;
+}
+
+.dialog-tab {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  padding: 8px 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dialog-tab--active {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.dialog-body {
+  padding: 6px 16px 12px;
+}
+
+.empty-state {
+  min-height: 200px;
+}
+
+.p-listbox {
+  min-height: 200px;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 16px;
+}
+
+.loading-container p {
+  margin: 0;
+  color: var(--text-color-secondary);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.empty-state p {
+  margin: 0;
+  color: var(--text-color-secondary);
+}
+
+.empty-state__create {
+  margin-top: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.empty-state__create input {
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
+
+.graph-item {
+  width: 100%;
+}
+
+.graph-item__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.graph-item__name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.graph-item__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-item__name-edit {
+  flex: 1;
+  min-width: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+  padding: 4px 6px;
+  font-size: 0.9rem;
+}
+
+.graph-item__edit {
+  border: none;
+  background: transparent;
+  color: var(--text-color-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.graph-item__edit:hover {
+  color: inherit;
+}
+
+.graph-item__delete {
+  border: none;
+  background: transparent;
+  color: var(--text-color-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.graph-item__delete:hover {
+  color: #f87171;
+}
+
+.graph-item__architecture {
+  padding: 2px 8px;
+  background-color: var(--surface-100);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  color: var(--text-color-secondary);
+  flex-shrink: 0;
+}
+
+.graph-item__meta {
+  font-size: 12px;
+  color: var(--text-color-secondary);
+}
+
+.dialog-footer {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.dialog-footer .p-button {
+  width: 100%;
+  min-height: 40px;
+  line-height: 1;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

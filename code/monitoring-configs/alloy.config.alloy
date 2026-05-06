@@ -1,0 +1,29 @@
+local.file_match "simulation_telemetry" {
+  path_targets = [
+    {
+      __path__  = "/ray-logs/session_latest/logs/sim_*.jsonl",
+      app       = "fedsim",
+      component = "simulation",
+      job       = "fedsim-evaluation",
+      stream    = "telemetry",
+    },
+    {
+      __path__  = "/ray-logs/session_*/logs/sim_*.jsonl",
+      app       = "fedsim",
+      component = "simulation",
+      job       = "fedsim-evaluation",
+      stream    = "telemetry",
+    },
+  ]
+}
+
+loki.source.file "simulation_telemetry_logs" {
+  targets    = local.file_match.simulation_telemetry.targets
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

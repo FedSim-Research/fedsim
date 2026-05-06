@@ -26,6 +26,7 @@ build/
 .cache/
 *.bak
 *.tmp
+hf-cache/
 
 # IDE / Editor
 .vscode/
@@ -39,3 +40,12 @@ Thumbs.db
 
 # Project specific
 code/config.json
+
+# Database (SQLite)
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables
+*.env
+*.env.*

@@ -1,0 +1,630 @@
+@if (!isOpen) {
+<button class="sidebar-fab" type="button" (click)="openSidebar()" aria-label="Open sidebar">
+  <span class="fab-icon"></span>
+</button>
+}
+
+<aside class="sidebar" [class.sidebar--closed]="!isOpen">
+  <header class="sidebar__header">
+    <div class="brand">
+      <div class="brand__text">
+        <div class="brand__title">FedSim</div>
+        <div class="brand__subtitle">Configurator</div>
+      </div>
+    </div>
+    <div class="sidebar__actions">
+      <button class="icon-btn" type="button" aria-label="Help" title="Help" (click)="openHelpDialog()">
+        <span class="icon-question">?</span>
+      </button>
+
+      <button class="icon-btn" (click)="openViewGraphsDialog()" aria-label="Open settings" title="Graphsettings">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          style="display: block; margin: auto;"
+        >
+          <circle cx="12" cy="12" r="3"></circle>
+          <path
+            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+          ></path>
+        </svg>
+      </button>
+
+      <button class="icon-btn" (click)="toggleTheme()"
+        [attr.aria-label]="isDarkMode ? 'Switch to Light' : 'Switch to Dark'" title="Dark-/Lightmode">
+        @if (isDarkMode) {
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        } @else {
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+        }
+      </button>
+
+      <button class="icon-btn" type="button" (click)="closeSidebar()" aria-label="Close sidebar">
+        <span class="icon-chevron-left"></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="content">
+    <section class="control-hub">
+      <div class="control-row">
+        <div class="control-row__label">Workspace</div>
+        <div class="mode-tabs mode-tabs--compact">
+          <button type="button" class="mode-tab" [class.active]="activeView === 'editor'" (click)="setView('editor')">
+            Graph Editor
+          </button>
+          <button type="button" class="mode-tab" [class.active]="activeView === 'dashboard'" (click)="setView('dashboard')">
+            Dashboard
+          </button>
+        </div>
+      </div>
+
+      @if (activeView === 'editor') {
+        <div class="control-row">
+          <div class="control-row__label">Architecture</div>
+          <div class="architecture-select">
+            <button
+              type="button"
+              class="architecture-select__trigger"
+              [class.architecture-select__trigger--open]="architectureMenuOpen"
+              (click)="toggleArchitectureMenu($event)">
+              <span>{{ architectureLabel() }}</span>
+              <span class="architecture-select__chevron" [class.architecture-select__chevron--open]="architectureMenuOpen"></span>
+            </button>
+            @if (architectureMenuOpen) {
+              <div class="architecture-select__menu">
+                <button
+                  type="button"
+                  class="architecture-select__option"
+                  [class.architecture-select__option--active]="architectureMode === 'hierfl'"
+                  (click)="selectArchitectureMode('hierfl', $event)">
+                  Hierarchical
+                </button>
+                <button
+                  type="button"
+                  class="architecture-select__option"
+                  [class.architecture-select__option--active]="architectureMode === 'spyker'"
+                  (click)="selectArchitectureMode('spyker', $event)">
+                  Spyker
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </section>
+
+    @if (activeView === 'editor') {
+      <div class="rightpane__header">
+        <div class="rightpane__subtitle">Node Library</div>
+      </div>
+
+      <div class="tooltip-wrapper" [title]="selectedArchitectures.spyker ? 'Not available in Spyker' : ''">
+        <details #supDetails class="disclosure" [class.disclosure--disabled]="selectedArchitectures.spyker">
+          <summary class="disclosure__summary" (click)="onSuperServerSummaryClick($event)">
+            <span>Super Server</span>
+          </summary>
+          <div class="disclosure__body">
+            <label class="field field-with-plus">
+              <span>Name</span>
+              <div class="field-row">
+                <input class="field-input--short" type="text" [(ngModel)]="configDraft.superserver.name" placeholder="Name" />
+                <button class="plus-btn" type="button" (click)="openSuperServerBlueprintPopup()" aria-label="Inspect Super Server presets" title="Inspect presets">+</button>
+                <button class="plus-btn plus-btn--save" type="button" (click)="saveCurrentSuperServerPreset()" aria-label="Save Super Server preset" title="Save preset">
+                  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                    <path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-8h8v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            </label>
+            <div class="selected-preset-info">Selected preset: {{ selectedSuperServerPresetName() }}</div>
+            <div class="grid">
+              <label class="field">
+                <span>Upload (Mbps)</span>
+                <input type="number" min="0" [(ngModel)]="configDraft.superserver.uploadMbps" />
+              </label>
+              <label class="field">
+                <span>Download (Mbps)</span>
+                <input type="number" min="0" [(ngModel)]="configDraft.superserver.downloadMbps" />
+              </label>
+            </div>
+            <div class="field-pair">
+              <label class="field">
+                <span>Compute factor</span>
+                <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.superserver.computeFactor" />
+              </label>
+              <span class="field-divider" aria-hidden="true">±</span>
+              <label class="field">
+                <span>Performance σ</span>
+                <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.superserver.performanceSigma" />
+              </label>
+            </div>
+            <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'SuperServerNode')">
+              Drag Super Server
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <details class="disclosure">
+        <summary class="disclosure__summary">
+          <span>Server Nodes</span>
+        </summary>
+        <div class="disclosure__body">
+          <label class="field field-with-plus">
+            <span>Name</span>
+            <div class="field-row">
+              <input class="field-input--short" type="text" [(ngModel)]="configDraft.server.name" />
+              <button class="plus-btn" type="button" (click)="openServerBlueprintPopup()" aria-label="Inspect Server Node presets" title="Inspect presets">+</button>
+              <button class="plus-btn plus-btn--save" type="button" (click)="saveCurrentServerPreset()" aria-label="Save Server Node preset" title="Save preset">
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                  <path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-8h8v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </div>
+          </label>
+          <div class="selected-preset-info">Selected preset: {{ selectedServerPresetName() }}</div>
+          <div class="grid">
+            <label class="field">
+              <span>Upload (Mbps)</span>
+              <input type="number" min="0" [(ngModel)]="configDraft.server.uploadMbps" />
+            </label>
+            <label class="field">
+              <span>Download (Mbps)</span>
+              <input type="number" min="0" [(ngModel)]="configDraft.server.downloadMbps" />
+            </label>
+          </div>
+          <div class="field-pair">
+            <label class="field">
+              <span>Compute factor</span>
+              <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.server.computeFactor" />
+            </label>
+            <span class="field-divider" aria-hidden="true">±</span>
+            <label class="field">
+              <span>Performance σ</span>
+              <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.server.performanceSigma" />
+            </label>
+          </div>
+          <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'ServerNode')">
+            Drag Server Node
+          </div>
+        </div>
+      </details>
+
+      <details class="disclosure">
+        <summary class="disclosure__summary">
+          <span>Client Nodes</span>
+        </summary>
+        <div class="disclosure__body">
+          <label class="field field-with-plus">
+            <span>Client type</span>
+            <div class="field-row">
+              <select class="field-input--short" [(ngModel)]="configDraft.client.type">
+                <option value="laptop">Laptop</option>
+                <option value="workstation">Workstation</option>
+                <option value="mobile">Mobile</option>
+              </select>
+              <button class="plus-btn" type="button" (click)="openClientBlueprintPopup()" aria-label="Inspect Client Node presets" title="Inspect presets">+</button>
+              <button class="plus-btn plus-btn--save" type="button" (click)="saveCurrentClientPreset()" aria-label="Save Client Node preset" title="Save preset">
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                  <path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-8h8v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </div>
+          </label>
+          <div class="selected-preset-info">Selected preset: {{ selectedClientPresetName() }}</div>
+          <label class="field">
+            <span>Number of clients</span>
+            <input type="number" min="1" [(ngModel)]="configDraft.client.count" />
+          </label>
+          <div class="grid">
+            <label class="field">
+              <span>Upload (Mbps)</span>
+              <input type="number" min="0" [(ngModel)]="configDraft.client.uploadMbps" />
+            </label>
+            <label class="field">
+              <span>Download (Mbps)</span>
+              <input type="number" min="0" [(ngModel)]="configDraft.client.downloadMbps" />
+            </label>
+          </div>
+          <div class="field-pair">
+            <label class="field">
+              <span>Compute factor</span>
+              <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.client.computeFactor" />
+            </label>
+            <span class="field-divider" aria-hidden="true">±</span>
+            <label class="field">
+              <span>Performance σ</span>
+              <input type="number" min="0" step="0.1" [(ngModel)]="configDraft.client.performanceSigma" />
+            </label>
+          </div>
+          <div class="drag" draggable="true" (dragstart)="onDragStart($event, 'ClientNode')">
+            Drag Client Node
+          </div>
+        </div>
+      </details>
+    } @else {
+      <div class="rightpane__header">
+        <div class="rightpane__subtitle">Dashboard</div>
+      </div>
+      <app-sidebar-dashboard-panel></app-sidebar-dashboard-panel>
+    }
+  </div>
+
+  <footer class="sidebar__footer">
+    @if (activeView === 'editor') {
+      <div class="footer__info footer__info--expand">
+        <button class="cta" cta--secondary type="button" (click)="undo()">Undo</button>
+        <button class="cta" cta--secondary type="button" (click)="redo()">Redo</button>
+      </div>
+      <button class="cta" type="button" (click)="openSimulationpopup()">Start simulation</button>
+      <app-reset-button (reset)="onResetRequested()"></app-reset-button>
+    } @else {
+      <button class="cta" type="button" (click)="openSimulationpopup()">Start simulation</button>
+      <button class="cta" type="button" (click)="setView('editor')">Back to Graph Editor</button>
+    }
+  </footer>
+</aside>
+
+@if (showViewGraphsDialog) {
+<app-view-graphs-dialog
+  [isDarkMode]="isDarkMode"
+  [shortcuts]="shortcuts"
+  [activeMode]="selectedArchitectures.spyker ? 'spyker' : 'hierfl'"
+  (modeRequested)="setArchitecture($event === 'spyker')"
+  (graphSelected)="onGraphSelected($event)"
+  (close)="closeViewGraphsDialog()"></app-view-graphs-dialog>
+}
+
+@if (showHelpDialog) {
+<app-help-dialog (close)="closeHelpDialog()"></app-help-dialog>
+}
+<p-toast position="top-right" />
+
+@if (showSimulationpopup) {
+<app-start-popup
+  [hierflGraphId]="hierflGraphId"
+  [spykerGraphId]="spykerGraphId"
+  (close)="closeSimulationpopup()"
+  (run)="runSimulation($event)">
+</app-start-popup>
+}
+
+@if (showSuperServerBlueprintPopup) {
+<div class="popup-backdrop" (click)="closeSuperServerBlueprintPopup()">
+  <div class="popup-card" (click)="$event.stopPropagation()">
+    <div class="popup-header">
+      <h3>Super Server Blueprints</h3>
+      <button class="icon-btn-small" type="button" (click)="closeSuperServerBlueprintPopup()">✕</button>
+    </div>
+    <div class="popup-body">
+      <label class="field">
+        <span>Preset name</span>
+        <input type="text" [(ngModel)]="superServerBlueprintDraft.presetName" />
+      </label>
+      <div class="blueprint-list" aria-label="Saved super server blueprints">
+        @if (superServerBlueprints.length === 0) {
+        <div class="blueprint-empty">No saved super servers yet.</div>
+        } @else {
+        <div class="blueprint-items">
+          @for (item of superServerBlueprints; track $index; let i = $index) {
+          <div
+            class="blueprint-item"
+            [class.blueprint-item--selected]="selectedSuperServerBlueprintIndex === i"
+            (click)="selectSuperServerBlueprint(i)"
+            (dblclick)="applySuperServerBlueprint(item, i)"
+          >
+            <button
+              class="blueprint-item__delete"
+              type="button"
+              aria-label="Delete preset"
+              (click)="requestDeletePreset('superserver', i); $event.stopPropagation()"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  d="M3 6h18M8 6V4h8v2M9 6v12m6-12v12M6 6l1 14h10l1-14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <div class="blueprint-item__name">{{ item.name }}</div>
+            <div class="blueprint-item__meta">
+              <span>Name: {{ item.config.name }} | Up/Down: {{ item.config.uploadMbps }} / {{ item.config.downloadMbps }} Mbps</span>
+            </div>
+          </div>
+          }
+        </div>
+        }
+      </div>
+      <label class="field">
+        <span>Name</span>
+        <input type="text" [(ngModel)]="superServerBlueprintDraft.config.name" />
+      </label>
+      <div class="grid">
+        <label class="field">
+          <span>Upload (Mbps)</span>
+          <input type="number" min="0" [(ngModel)]="superServerBlueprintDraft.config.uploadMbps" />
+        </label>
+        <label class="field">
+          <span>Download (Mbps)</span>
+          <input type="number" min="0" [(ngModel)]="superServerBlueprintDraft.config.downloadMbps" />
+        </label>
+      </div>
+      <div class="field-pair">
+        <label class="field">
+          <span>Compute factor</span>
+          <input type="number" min="0" step="0.1" [(ngModel)]="superServerBlueprintDraft.config.computeFactor" />
+        </label>
+        <span class="field-divider" aria-hidden="true">±</span>
+        <label class="field">
+          <span>Performance σ</span>
+          <input type="number" min="0" step="0.1" [(ngModel)]="superServerBlueprintDraft.config.performanceSigma" />
+        </label>
+      </div>
+    </div>
+    <div class="popup-actions popup-actions--inline">
+      <button class="cta-option cta-option--confirm" type="button" (click)="saveSuperServerBlueprint()">Save</button>
+      <button class="cta-option cta-option--cancel" type="button" (click)="createNewSuperServerPreset()">New</button>
+    </div>
+    <div class="popup-actions popup-actions--single">
+      <button class="cta-option cta-option--initialize" type="button" (click)="loadSuperServerPreset()">Load preset</button>
+    </div>
+  </div>
+</div>
+}
+
+@if (showServerBlueprintPopup) {
+<div class="popup-backdrop" (click)="closeServerBlueprintPopup()">
+  <div class="popup-card" (click)="$event.stopPropagation()">
+    <div class="popup-header">
+      <h3>Server Nodes Blueprints</h3>
+      <button class="icon-btn-small" type="button" (click)="closeServerBlueprintPopup()">✕</button>
+    </div>
+    <div class="popup-body">
+      <label class="field">
+        <span>Preset name</span>
+        <input type="text" [(ngModel)]="serverBlueprintDraft.presetName" />
+      </label>
+      <div class="blueprint-list" aria-label="Saved server node blueprints">
+        @if (serverBlueprints.length === 0) {
+        <div class="blueprint-empty">No saved server nodes yet.</div>
+        } @else {
+        <div class="blueprint-items">
+          @for (item of serverBlueprints; track $index; let i = $index) {
+          <div
+            class="blueprint-item"
+            [class.blueprint-item--selected]="selectedServerBlueprintIndex === i"
+            (click)="selectServerBlueprint(i)"
+            (dblclick)="applyServerBlueprint(item, i)"
+          >
+            <button
+              class="blueprint-item__delete"
+              type="button"
+              aria-label="Delete preset"
+              (click)="requestDeletePreset('server', i); $event.stopPropagation()"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  d="M3 6h18M8 6V4h8v2M9 6v12m6-12v12M6 6l1 14h10l1-14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <div class="blueprint-item__name">{{ item.name }}</div>
+            <div class="blueprint-item__meta">
+              <span>Name: {{ item.config.name }} | Up/Down: {{ item.config.uploadMbps }} / {{ item.config.downloadMbps }} Mbps</span>
+            </div>
+          </div>
+          }
+        </div>
+        }
+      </div>
+      <label class="field">
+        <span>Name</span>
+        <input type="text" [(ngModel)]="serverBlueprintDraft.config.name" />
+      </label>
+      <div class="grid">
+        <label class="field">
+          <span>Upload (Mbps)</span>
+          <input type="number" min="0" [(ngModel)]="serverBlueprintDraft.config.uploadMbps" />
+        </label>
+        <label class="field">
+          <span>Download (Mbps)</span>
+          <input type="number" min="0" [(ngModel)]="serverBlueprintDraft.config.downloadMbps" />
+        </label>
+      </div>
+      <div class="field-pair">
+        <label class="field">
+          <span>Compute factor</span>
+          <input type="number" min="0" step="0.1" [(ngModel)]="serverBlueprintDraft.config.computeFactor" />
+        </label>
+        <span class="field-divider" aria-hidden="true">±</span>
+        <label class="field">
+          <span>Performance σ</span>
+          <input type="number" min="0" step="0.1" [(ngModel)]="serverBlueprintDraft.config.performanceSigma" />
+        </label>
+      </div>
+    </div>
+    <div class="popup-actions popup-actions--inline">
+      <button class="cta-option cta-option--confirm" type="button" (click)="saveServerBlueprint()">Save</button>
+      <button class="cta-option cta-option--cancel" type="button" (click)="createNewServerPreset()">New</button>
+    </div>
+    <div class="popup-actions popup-actions--single">
+      <button class="cta-option cta-option--initialize" type="button" (click)="loadServerPreset()">Load preset</button>
+    </div>
+  </div>
+</div>
+}
+
+@if (showClientBlueprintPopup) {
+<div class="popup-backdrop" (click)="closeClientBlueprintPopup()">
+  <div class="popup-card" (click)="$event.stopPropagation()">
+    <div class="popup-header">
+      <h3>Client Nodes Blueprints</h3>
+      <button class="icon-btn-small" type="button" (click)="closeClientBlueprintPopup()">✕</button>
+    </div>
+    <div class="popup-body">
+      <label class="field">
+        <span>Preset name</span>
+        <input type="text" [(ngModel)]="clientBlueprintDraft.presetName" />
+      </label>
+      <div class="blueprint-list" aria-label="Saved client node blueprints">
+        @if (clientBlueprints.length === 0) {
+        <div class="blueprint-empty">No saved client nodes yet.</div>
+        } @else {
+        <div class="blueprint-items">
+          @for (item of clientBlueprints; track $index; let i = $index) {
+          <div
+            class="blueprint-item"
+            [class.blueprint-item--selected]="selectedClientBlueprintIndex === i"
+            (click)="selectClientBlueprint(i)"
+            (dblclick)="applyClientBlueprint(item, i)"
+          >
+            <button
+              class="blueprint-item__delete"
+              type="button"
+              aria-label="Delete preset"
+              (click)="requestDeletePreset('client', i); $event.stopPropagation()"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  d="M3 6h18M8 6V4h8v2M9 6v12m6-12v12M6 6l1 14h10l1-14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <div class="blueprint-item__name">{{ item.name }}</div>
+            <div class="blueprint-item__meta">
+              <span>Type: {{ item.config.type }} | Count: {{ item.config.count }} | Up/Down: {{ item.config.uploadMbps }} / {{ item.config.downloadMbps }} Mbps</span>
+            </div>
+          </div>
+          }
+        </div>
+        }
+      </div>
+      <label class="field">
+        <span>Client type</span>
+        <select [(ngModel)]="clientBlueprintDraft.config.type">
+          <option value="laptop">Laptop</option>
+          <option value="workstation">Workstation</option>
+          <option value="mobile">Mobile</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Number of clients</span>
+        <input type="number" min="1" [(ngModel)]="clientBlueprintDraft.config.count" />
+      </label>
+      <div class="grid">
+        <label class="field">
+          <span>Upload (Mbps)</span>
+          <input type="number" min="0" [(ngModel)]="clientBlueprintDraft.config.uploadMbps" />
+        </label>
+        <label class="field">
+          <span>Download (Mbps)</span>
+          <input type="number" min="0" [(ngModel)]="clientBlueprintDraft.config.downloadMbps" />
+        </label>
+      </div>
+      <div class="field-pair">
+        <label class="field">
+          <span>Compute factor</span>
+          <input type="number" min="0" step="0.1" [(ngModel)]="clientBlueprintDraft.config.computeFactor" />
+        </label>
+        <span class="field-divider" aria-hidden="true">±</span>
+        <label class="field">
+          <span>Performance σ</span>
+          <input type="number" min="0" step="0.1" [(ngModel)]="clientBlueprintDraft.config.performanceSigma" />
+        </label>
+      </div>
+    </div>
+    <div class="popup-actions popup-actions--inline">
+      <button class="cta-option cta-option--confirm" type="button" (click)="saveClientBlueprint()">Save</button>
+      <button class="cta-option cta-option--cancel" type="button" (click)="createNewClientPreset()">New</button>
+    </div>
+    <div class="popup-actions popup-actions--single">
+      <button class="cta-option cta-option--initialize" type="button" (click)="loadClientPreset()">Load preset</button>
+    </div>
+  </div>
+</div>
+}
+
+@if (showResetPopup) {
+<div class="popup-backdrop" (click)="closeResetPopup()">
+  <div class="popup-card" (click)="$event.stopPropagation()">
+    <div class="popup-header">
+      <h3>Reset graph</h3>
+      <button class="icon-btn-small" (click)="closeResetPopup()">✕</button>
+    </div>
+    <div class="popup-body">
+      <p><strong>Are you sure you want to delete all nodes and edges?</strong></p>
+      <div class="popup-actions popup-actions--inline">
+        <button class="cta-option cta-option--confirm" (click)="confirmResetGraph()">Yes, delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+}
+
+@if (showDeletePresetPopup) {
+<div class="popup-backdrop" (click)="closeDeletePresetPopup()">
+  <div class="popup-card" (click)="$event.stopPropagation()">
+    <div class="popup-header">
+      <h3>Delete preset</h3>
+      <button class="icon-btn-small" (click)="closeDeletePresetPopup()">✕</button>
+    </div>
+    <div class="popup-body">
+      <p><strong>Are you sure you want to delete preset "{{ deletePresetTarget?.name }}"?</strong></p>
+      <div class="popup-actions popup-actions--inline">
+        <button class="cta-option cta-option--confirm" (click)="confirmDeletePreset()">Yes, delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+}
+
+@if (showConfirmSavePresetPopup) {
+<div class="popup-backdrop" (click)="closeConfirmSavePresetPopup()">
+  <div class="popup-card" (click)="$event.stopPropagation()">
+    <div class="popup-header">
+      <h3>Update preset?</h3>
+      <button class="icon-btn-small" (click)="closeConfirmSavePresetPopup()">✕</button>
+    </div>
+    <div class="popup-body">
+      <p><strong>You are about to update preset "{{ savePresetTarget?.name }}".</strong></p>
+      <div class="popup-actions popup-actions--inline">
+        <button class="cta-option cta-option--confirm" (click)="confirmUpdateSelectedPreset()">Update</button>
+        <button class="cta-option cta-option--initialize" (click)="confirmCreateNewPresetFromSidebar()">New preset</button>
+      </div>
+    </div>
+  </div>
+</div>
+}

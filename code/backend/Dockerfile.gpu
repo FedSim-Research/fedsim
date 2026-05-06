@@ -1,0 +1,40 @@
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       software-properties-common \
+       ca-certificates \
+       gnupg \
+       dirmngr \
+       lsb-release \
+       apt-transport-https \
+       curl \
+       build-essential \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+       python3.12 \
+       python3.12-dev \
+       python3.12-venv \
+    && ln -sf /usr/bin/python3.12 /usr/bin/python \
+    && ln -sf /usr/bin/python3.12 /usr/bin/python3 \
+    && curl -sS https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py \
+    && python3.12 /tmp/get-pip.py \
+    && pip install --no-cache-dir setuptools \
+    && rm -f /tmp/get-pip.py \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+COPY requirements.txt /app/requirements.txt
+COPY framework/impl /app/framework/impl
+
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+COPY backend /app/backend
+
+EXPOSE 8000

@@ -1,110 +1,94 @@
-# RP_FedSim
+# Federated Learning Simulation in Geo-Distributed Settings (FedSim)
 
-# Python venv setup and running simulations
-Currently, the flower simulation (explicitly ray) only supports Linux. To run simulations on a Windows machine, use WSL2 and follow this guide using the Linux commands.
+FedSim is a graph-based federated learning simulation platform with a FastAPI backend, an Angular frontend, and two simulation engines (Hierarchical FL and Spyker FL).
 
-In order to use a virtual environment setup with python (strongly recommended), the following procedure is necessary:
+## Repository Overview
 
-Starting from the project root directory, firstly a new venv is generated.
-```
-python3 -m venv .
-```
+- [`code/backend/`](code/backend): FastAPI API, persistence layer, simulation orchestration
+- [`code/frontend/`](code/frontend): Angular UI (graph editor + simulation start flow)
+- [`code/framework/impl/`](code/framework/impl): Simulation implementations (Hierarchical, Spyker)
+- [`code/framework/flower/framework/`](code/framework/flower/framework): local Flower framework fork
 
-Now, the python environment can be activated using the command:
-- Linux: `source <path to project-root>/bin/activate`
-- Powershell: `<path to project-root>/Scripts/Activate.ps1`
+See [`code/README.md`](code/README.md) for a compact code directory overview.
 
+- Open the port in the server firewall (example with `ufw`):
 
-The setup can be checked using the command `which pip` for Linux and `gcm pip` for Powershell. Confirm that the path to pip corresponds to:
-- Linux: `<path to project-root>/bin/pip`
-- Powershell: `<path to project-root>/Scripts/pip`
-
-For the next step, flower has to be installed by pip. By using the `-e` flag it is ensured that changes made to the custom flower implementation in this project are instantly reflected when using the `flwr` command.
-```
-cd ./code/framework/flower/framework/
-pip install -e .
-pip install -e ".[simulation]"
+```bash
+sudo ufw allow 8088/tcp
 ```
 
-Beware, the download size of all necessary dependencies is roughly 8GB.
-To confirm this step has succeeded, the following path checks can be performed:
+You can change the port inside [`docker-compose.yml`](code/docker-compose.yml)
 
-Linux:
-- `which flwr` should point to `<path to project-root>/bin/flwr`
-- `which flower-simulation` should point to `<path to project-root>/bin/flower-simulation`
+URLs:
 
-Powershell:
-- `gcm flwr` should point to `<path to project-root>/Scripts/flwr`
-- `gcm flower-simulation` should point to `<path to project-root>/Scripts/flower-simulation`
+- Frontend URL: `http://<SERVER-IP>:8088`  
+  (Port mapping is defined in `code/docker-compose.yml` at the nginx `ports` entry: `${DEPLOY_HTTP_PORT:-8088}:80`.)
+- Grafana URL: `http://<SERVER-IP>:8088/grafana/`
+- Ray URL: `http://<SERVER-IP>:8088/ray/`
 
-In order to be REALLY sure that the custom implementation of the flower framework is used, the following code can be temporarily injected into the startup file located at:
 
- `<path to project-root>/code/framework/flower/framework/py/flwr/__init__.py`
+## One-Command Docker Startup (No GPU-Support)
 
-In order to work properly, the following code has to be inserted at the very top of the file. (even above all imports!)
- ```
-print("\n" + "="*53)
-print(">>> SUCCESS: You are using your CUSTOM LOCAL FLWR <<<")
-print("="*53 + "\n")
- ```
-
-In order to work properly, the above mentioned code has to be inserted at the very top of the file. (even above all imports!)
-
-Finally, to run a simulation and make see the work of this code injection, use the following commands:
-
-Starting from project root:
-```
-flwr run ./code/framework/impl/
+```bash
+cd code
+docker compose -f docker-compose.yml up -d
 ```
 
-An output file, called `final_model.pt` will be created, which unsurprisingly contains the final model after the simulation has ended and the model has been trained. This file is located wherever the above mentioned `flwr` run is started.
 
----
+## One-Command Docker Startup (With GPU-Support)
 
-# Editing this README
+GPU allocation is configured per simulation run via the frontend/API `gpu_budget` setting. 
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+Note that GPU currently only supports evaluation.
 
-## Suggestions for a good README
+```bash
+cd code
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+```
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+##  Stop Containers
 
-## Name
-Choose a self-explaining name for your project.
+```bash
+cd code
+docker compose -f docker-compose.yml down
+```
+or
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml down
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+## Debugging
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+View logs:
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+- Single service (example: backend):
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```bash
+cd code
+docker compose logs -f fedsim-backend-deploy
+```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+- All services:
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```bash
+cd code
+docker compose logs -f
+```
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+## Rebuild containers from scratch:
+- Without GPU-Support:
+```bash
+cd code
+docker compose -f docker-compose.yml down --remove-orphans
+docker compose -f docker-compose.yml build --no-cache
+docker compose -f docker-compose.yml up -d
+```
+- With GPU-Support:
+```bash
+cd code
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml down --remove-orphans
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml build --no-cache
+docker compose -f docker-compose.yml up -d
+```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Note that that building with the flag ```--no-cache``` could result in *extreme* cache sizes. You can view the size of the docker cache with ```docker system df``` and clean the *whole* cache with ```docker system prune```. Please refer to the official Docker manual.

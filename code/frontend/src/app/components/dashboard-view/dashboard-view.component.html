@@ -1,0 +1,209 @@
+<section class="dashboard-shell" [class.dashboard-shell--sidebar-open]="sidebarOpen" [class.dashboard-shell--sidebar-closed]="!sidebarOpen">
+  <main class="details-panel">
+    <section class="cockpit-grid">
+      <article class="summary-card">
+        <h3>Total Runs</h3>
+        <div class="metric-value metric-value--large">{{ runStats().total }}</div>
+      </article>
+      <article class="summary-card">
+        <h3>Queued</h3>
+        <div class="metric-value metric-value--large">{{ runStats().queued }}</div>
+      </article>
+      <article class="summary-card">
+        <h3>Completed</h3>
+        <div class="metric-value metric-value--large">{{ runStats().completed }}</div>
+      </article>
+      <article class="summary-card">
+        <h3>Failed</h3>
+        <div class="metric-value metric-value--large">{{ runStats().failed }}</div>
+      </article>
+    </section>
+
+    @if (selectedRun(); as run) {
+      <div class="summary-grid">
+        <article class="summary-card">
+          <div class="card-header">
+            <h3>Run Summary</h3>
+            <div class="export-actions">
+              <button type="button" class="export-csv-btn" (click)="exportRunToCsv(run)" title="Export this run as CSV">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" fill="currentColor" />
+              </svg>
+              Export CSV
+              </button>
+              <button type="button" class="download-logs-btn" (click)="downloadRunLogs(run)" title="Download evaluator logs for this run">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path d="M12 3v10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                  <path d="M8 11l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                  <path d="M21 21H3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                </svg>
+                Download Logs
+              </button>
+            </div>
+          </div>
+          <div class="kv"><span>Run ID</span><strong>{{ run.run_id }}</strong></div>
+          <div class="kv"><span>Architecture</span><strong>{{ architectureLabel(normalizeArchitecture(run.architecture)) }}</strong></div>
+          <div class="kv"><span>Status</span><strong>{{ run.status }}</strong></div>
+          @if (isCombinedRun(run)) {
+            @let graphIds = getCombinedGraphIds(run);
+            <div class="kv"><span>hierarchical Graph ID</span><strong>{{ graphIds.hierarchical ?? '-' }}</strong></div>
+            <div class="kv"><span>Spyker Graph ID</span><strong>{{ graphIds.spyker ?? '-' }}</strong></div>
+          } @else {
+            <div class="kv"><span>Graph ID</span><strong>{{ run.graph_id }}</strong></div>
+          }
+          <div class="kv"><span>Seed</span><strong>{{ run.seed ?? '-' }}</strong></div>
+          <div class="kv"><span>Duration</span><strong>{{ formatDuration(run.duration_seconds) }}</strong></div>
+          <div class="kv"><span>Progress</span><strong>{{ formatProgress(run) }}</strong></div>
+        </article>
+
+        <article class="summary-card">
+          <h3>Model Quality</h3>
+          <div class="model-quality-grid">
+            <div class="model-quality-metrics">
+              @if (isCombinedRun(run)) {
+                @for (entry of getCombinedRunMetrics(run); track entry.architecture) {
+                  <div class="metric-block metric-block--combined">
+                    <span class="metric-label">{{ architectureLabel(entry.architecture) }} Accuracy</span>
+                    <strong class="metric-value">{{ formatPercent(entry.metrics.accuracy) }}</strong>
+                    <span class="metric-label">{{ architectureLabel(entry.architecture) }} Loss</span>
+                    <strong class="metric-value">{{ formatLoss(entry.metrics.loss) }}</strong>
+                  </div>
+                }
+              } @else {
+                @let metrics = getRunMetrics(run);
+                <div class="metric-block">
+                  <span class="metric-label">Accuracy</span>
+                  <strong class="metric-value">{{ formatPercent(metrics.accuracy) }}</strong>
+                </div>
+                <div class="metric-block">
+                  <span class="metric-label">Loss</span>
+                  <strong class="metric-value">{{ formatLoss(metrics.loss) }}</strong>
+                </div>
+              }
+            </div>
+            @if (isCombinedRun(run)) {
+              <div class="mini-telemetry-grid">
+                @for (embed of modelQualityTrendEmbedsForBoth(); track embed.architecture) {
+                  <section class="mini-telemetry-card">
+                    <div class="mini-telemetry-title">{{ architectureLabel(embed.architecture) }} Trend</div>
+                    <iframe
+                      [src]="embed.src"
+                      width="100%"
+                      height="150"
+                      frameborder="0"
+                      loading="lazy"
+                    ></iframe>
+                  </section>
+                }
+              </div>
+              <div class="snapshot-links">
+                @if (modelQualitySnapshotsByArchitecture().length > 0) {
+                  <div class="snapshot-section">
+                    <span class="snapshot-label">Model Quality Snapshots</span>
+                    @for (item of modelQualitySnapshotsByArchitecture(); track item.architecture) {
+                      <a [href]="item.url" target="_blank" class="snapshot-link">
+                        {{ architectureLabel(item.architecture) }} Dashboard
+                      </a>
+                    }
+                  </div>
+                }
+              </div>
+            } @else {
+              <section class="mini-telemetry-card">
+                <iframe
+                  [src]="modelQualityTrendEmbed()"
+                  width="100%"
+                  height="150"
+                  frameborder="0"
+                  loading="lazy"
+                ></iframe>
+              </section>
+              @if (modelQualitySnapshot()) {
+                <div class="snapshot-links">
+                  <div class="snapshot-section">
+                    <span class="snapshot-label">Model Quality Snapshot</span>
+                    <a [href]="modelQualitySnapshot()!.url" target="_blank" class="snapshot-link">
+                      View Dashboard
+                    </a>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+        </article>
+      </div>
+    } @else {
+      <div class="empty-details">
+        @if (pollingSupported()) {
+          Select a run to inspect details.
+        } @else {
+          Run details are unavailable without <code>/runs</code>. System telemetry and local job history are still available below.
+        }
+      </div>
+    }
+
+    @if (recentJobs().length) {
+      <article class="summary-card">
+        <h3>Recent Framework Jobs (Local Session)</h3>
+        <ul class="jobs-list">
+          @for (job of recentJobs(); track job.id) {
+            <li class="job-row">
+              <div class="job-main">
+                <strong>{{ job.title }}</strong>
+                <span [class]="getStatusClass(job.status)">{{ job.status }}</span>
+              </div>
+              <div class="job-meta">Started: {{ formatEpoch(job.startedAt) }}</div>
+            </li>
+          }
+        </ul>
+      </article>
+    }
+
+    @if (compareRuns().length === 2) {
+      <article class="summary-card compare-card">
+        <h3>Run Comparison</h3>
+        <div class="compare-grid">
+          @for (run of compareRuns(); track run.run_id) {
+            <div class="compare-col">
+              <div class="compare-id">{{ run.run_id }}</div>
+              <div class="compare-kv"><span>Architecture</span><strong>{{ architectureLabel(normalizeArchitecture(run.architecture)) }}</strong></div>
+              <div class="compare-kv"><span>Status</span><strong>{{ run.status }}</strong></div>
+              @if (isCombinedRun(run)) {
+                @for (entry of getCombinedRunMetrics(run); track entry.architecture) {
+                  <div class="compare-kv"><span>{{ architectureLabel(entry.architecture) }} Accuracy</span><strong>{{ formatPercent(entry.metrics.accuracy) }}</strong></div>
+                  <div class="compare-kv"><span>{{ architectureLabel(entry.architecture) }} Loss</span><strong>{{ formatLoss(entry.metrics.loss) }}</strong></div>
+                }
+              } @else {
+                @let metrics = getRunMetrics(run);
+                <div class="compare-kv"><span>Accuracy</span><strong>{{ formatPercent(metrics.accuracy) }}</strong></div>
+                <div class="compare-kv"><span>Loss</span><strong>{{ formatLoss(metrics.loss) }}</strong></div>
+              }
+              <div class="compare-kv"><span>Duration</span><strong>{{ formatDuration(run.duration_seconds) }}</strong></div>
+              <div class="compare-kv"><span>Progress</span><strong>{{ formatProgress(run) }}</strong></div>
+            </div>
+          }
+        </div>
+      </article>
+    }
+
+    <article class="summary-card">
+      <h3>Grafana Research Telemetry</h3>
+      <p class="telemetry-note">
+        Panels are filtered to the selected run time window when a run is selected.
+      </p>
+      <div class="telemetry-grid">
+        @for (panel of telemetryEmbeds(); track panel.uid + '-' + panel.panelId) {
+          <section class="telemetry-card">
+            <iframe
+              [src]="panel.src"
+              width="100%"
+              [height]="panel.height"
+              frameborder="0"
+              loading="lazy"
+            ></iframe>
+          </section>
+        }
+      </div>
+    </article>
+  </main>
+</section>

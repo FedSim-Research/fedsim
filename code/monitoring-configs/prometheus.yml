@@ -1,0 +1,14 @@
+# Prometheus example config file
+
+# global config
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+# Scrape from Ray.
+scrape_configs:
+  - job_name: 'ray'
+    static_configs:
+      - targets:
+          - 'ray:8080'
+    metrics_path: '/metrics'

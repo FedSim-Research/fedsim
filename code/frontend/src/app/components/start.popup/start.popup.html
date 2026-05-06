@@ -1,0 +1,218 @@
+<div class="popup-backdrop" (click)="onClose()">
+  <div class="popup-card" (click)="$event.stopPropagation()" lang="en-US">
+    <div class="popup-header">
+      <h3>Start simulation</h3>
+      <button class="icon-btn-small" (click)="onClose()">✕</button>
+    </div>
+
+    <div class="popup-body">
+      <p-stepper [value]="activeStep" [linear]="true">
+        <p-step-list>
+          <p-step [value]="1">Architecture</p-step>
+          <p-step [value]="2" [disabled]="!isHierflIncluded()">Hierarchical</p-step>
+          <p-step [value]="3" [disabled]="!isSpykerIncluded()">Spyker</p-step>
+        </p-step-list>
+
+        <p-step-panels>
+          <p-step-panel [value]="1">
+            <ng-template #content>
+              <p class="section-hint">Choose which architecture to run.</p>
+              <div class="popup-actions">
+                <button class="cta-option cta-option--hier" [class.active]="selectedMode === 'hierfl'" (click)="selectMode('hierfl')">
+                  <span class="dot hier-dot"></span>
+                  Hierarchical
+                </button>
+                <button class="cta-option cta-option--spyker" [class.active]="selectedMode === 'spyker'" (click)="selectMode('spyker')">
+                  <span class="dot spyker-dot"></span>
+                  Spyker
+                </button>
+                <button class="cta-option cta-option--both" [class.active]="selectedMode === 'both'" (click)="selectMode('both')">
+                  <span class="dot both-dot"></span>
+                  Spyker & Hierarchical
+                </button>
+              </div>
+              <div class="step-actions step-actions--end">
+                <button class="nav-btn nav-btn--primary" [disabled]="!selectedMode" (click)="nextStep()">Next</button>
+              </div>
+            </ng-template>
+          </p-step-panel>
+
+          <p-step-panel [value]="2">
+            <ng-template #content>
+              @if (isHierflIncluded()) {
+              <div class="config-stack">
+                <section class="config-card">
+                  <div class="sim-settings-title">Hierarchical</div>
+                  <div class="grid">
+                    <label class="field">
+                      <span class="field-label">Epochs <span class="help-dot" title="Number of local training passes per client before aggregation.">?</span></span>
+                      <p-inputNumber [(ngModel)]="hierflSettings.epochs" [min]="1" [step]="1" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Learning rate <span class="help-dot" title="Step size used by the optimizer during local training.">?</span></span>
+                      <p-inputNumber [(ngModel)]="hierflSettings.lr" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Model complexity <span class="help-dot" title="Scaling factor for simulated compute effort per training step.">?</span></span>
+                      <p-inputNumber [(ngModel)]="hierflSettings.modelComplexity" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Batch size <span class="help-dot" title="Mini-batch size used for local client training in HierFL.">?</span></span>
+                      <p-inputNumber [(ngModel)]="hierflSettings.batchSize" [min]="1" [step]="1" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>
+                      <p-inputNumber [(ngModel)]="hierflSettings.runTimeLimit" [min]="1" [step]="1" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Eval interval (s) <span class="help-dot" title="Periodic evaluation interval in virtual seconds. 0 disables periodic evaluation.">?</span></span>
+                      <p-inputNumber [(ngModel)]="hierflSettings.evalInterval" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">GPU budget <span class="help-dot" title="Total GPU share for this run. 0 means CPU only.">?</span></span>
+                      <p-inputNumber [(ngModel)]="hierflSettings.gpuBudget" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Dataset <span class="help-dot" title="Hugging Face dataset id used for partition loading, for example uoft-cs/cifar10.">?</span></span>
+                      <input pInputText type="text" [(ngModel)]="hierflSettings.dataset" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Seed set <span class="help-dot" title="Fixed list of seeds used for reproducible benchmark repetitions, for example 42, 43, 44, 45, 46.">?</span></span>
+                      <input pInputText type="text" [(ngModel)]="hierflSettings.seedSetText" (ngModelChange)="updateSeedSet('hierfl', $event)" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Output filename <span class="help-dot" title="Target file path/name used to store the final model checkpoint.">?</span></span>
+                      <input pInputText type="text" [(ngModel)]="hierflSettings.outputFilename" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                  </div>
+                </section>
+              </div>
+
+              <div class="step-actions">
+                <button class="nav-btn" (click)="previousStep()">Back</button>
+                @if (canStartFromHierflStep()) {
+                <div class="step-actions-right">
+                  <label class="field checkbox field-checkbox-inline">
+                    <input type="checkbox" [(ngModel)]="evaluateAfterRun" (ngModelChange)="onEvaluateAfterRunChanged($event)" />
+                    <span class="field-label">Evaluate after run <span class="help-dot" title="Runs post-training evaluation and returns accuracy/loss.">?</span></span>
+                  </label>
+                  <button class="nav-btn nav-btn--primary" (click)="onRun()">Start</button>
+                </div>
+                } @else {
+                <button class="nav-btn nav-btn--primary" (click)="nextFromHierfl()">Next</button>
+                }
+              </div>
+              } @else {
+              <p class="section-hint">Hierarchical is disabled for the selected run mode.</p>
+              }
+            </ng-template>
+          </p-step-panel>
+
+          <p-step-panel [value]="3">
+            <ng-template #content>
+              @if (isSpykerIncluded()) {
+              <div class="config-stack">
+                <section class="config-card">
+                  <div class="sim-settings-title">Spyker</div>
+                  <div class="grid">
+                    <label class="field">
+                      <span class="field-label">Epochs <span class="help-dot" title="Number of local training passes per client before aggregation.">?</span></span>
+                      <p-inputNumber [(ngModel)]="spykerSettings.epochs" [min]="1" [step]="1" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Learning rate <span class="help-dot" title="Step size used by the optimizer during local training.">?</span></span>
+                      <p-inputNumber [(ngModel)]="spykerSettings.lr" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Model complexity <span class="help-dot" title="Scaling factor for simulated compute effort per training step.">?</span></span>
+                      <p-inputNumber [(ngModel)]="spykerSettings.modelComplexity" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Batch size <span class="help-dot" title="Mini-batch size used for local client training in Spyker.">?</span></span>
+                      <p-inputNumber [(ngModel)]="spykerSettings.batchSize" [min]="1" [step]="1" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Time limit (s) <span class="help-dot" title="Maximum virtual simulation time in seconds.">?</span></span>
+                      <p-inputNumber [(ngModel)]="spykerSettings.runTimeLimit" [min]="1" [step]="1" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Eval interval (s) <span class="help-dot" title="Periodic evaluation interval in virtual seconds. 0 disables periodic evaluation.">?</span></span>
+                      <p-inputNumber [(ngModel)]="spykerSettings.evalInterval" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">GPU budget <span class="help-dot" title="Total GPU share for this run. 0 means CPU only.">?</span></span>
+                      <p-inputNumber [(ngModel)]="spykerSettings.gpuBudget" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Dataset <span class="help-dot" title="Hugging Face dataset id used for partition loading, for example uoft-cs/cifar10.">?</span></span>
+                      <input pInputText type="text" [(ngModel)]="spykerSettings.dataset" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Seed set <span class="help-dot" title="Fixed list of seeds used for reproducible benchmark repetitions, for example 42, 43, 44, 45, 46.">?</span></span>
+                      <input pInputText type="text" [(ngModel)]="spykerSettings.seedSetText" (ngModelChange)="updateSeedSet('spyker', $event)" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Idle token delay (s) <span class="help-dot" title="Delay before token forwarding when no immediate sync is triggered.">?</span></span>
+                      <p-inputNumber [(ngModel)]="spykerSettings.idleTokenDelay" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Output filename <span class="help-dot" title="Target file path/name used to store the final model checkpoint.">?</span></span>
+                      <input pInputText type="text" [(ngModel)]="spykerSettings.outputFilename" (ngModelChange)="onSettingsChanged()" />
+                    </label>
+                  </div>
+                  <div class="sim-settings-section sim-settings-section--separated">
+                    <div class="sim-settings-subtitle">Algorithm</div>
+                    <div class="grid">
+                      <label class="field">
+                        <span class="field-label">Decay beta <span class="help-dot" title="Decay factor for reducing contribution of frequently-updating clients.">?</span></span>
+                        <p-inputNumber [(ngModel)]="spykerSettings.decayBeta" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Min learning rate <span class="help-dot" title="Lower bound for client contribution scaling during decay.">?</span></span>
+                        <p-inputNumber [(ngModel)]="spykerSettings.minLearningRate" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="8" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">h_inter <span class="help-dot" title="Inter-server drift threshold to trigger synchronization.">?</span></span>
+                        <p-inputNumber [(ngModel)]="spykerSettings.hInter" [min]="1" [step]="1" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">h_intra <span class="help-dot" title="Intra-server drift threshold to trigger synchronization.">?</span></span>
+                        <p-inputNumber [(ngModel)]="spykerSettings.hIntra" [min]="1" [step]="1" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Sigmoid phi <span class="help-dot" title="Sharpness parameter for weighting server-side aggregation.">?</span></span>
+                        <p-inputNumber [(ngModel)]="spykerSettings.sigmoidPhi" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Server learning rate <span class="help-dot" title="Server-side aggregation learning rate.">?</span></span>
+                        <p-inputNumber [(ngModel)]="spykerSettings.serverLearningRate" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">TCP RTO delay <span class="help-dot" title="Simulated TCP retransmission timeout delay.">?</span></span>
+                        <p-inputNumber [(ngModel)]="spykerSettings.tcpRtoDelay" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                      </label>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <div class="step-actions">
+                <button class="nav-btn" (click)="previousFromSpyker()">Back</button>
+                <div class="step-actions-right">
+                  <label class="field checkbox field-checkbox-inline">
+                    <input type="checkbox" [(ngModel)]="evaluateAfterRun" (ngModelChange)="onEvaluateAfterRunChanged($event)" />
+                    <span class="field-label">Evaluate after run <span class="help-dot" title="Runs post-training evaluation and returns accuracy/loss.">?</span></span>
+                  </label>
+                  <button class="nav-btn nav-btn--primary" (click)="onRun()">Start</button>
+                </div>
+              </div>
+              } @else {
+              <p class="section-hint">Spyker is disabled for the selected run mode.</p>
+              }
+            </ng-template>
+          </p-step-panel>
+        </p-step-panels>
+      </p-stepper>
+    </div>
+  </div>
+</div>
