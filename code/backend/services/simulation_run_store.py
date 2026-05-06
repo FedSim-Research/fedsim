@@ -11,11 +11,13 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from backend.db.database import SessionLocal
+from backend.db.models import EvaluationPoint
 from backend.db.models import SimulationRun
-from backend.services.evaluation_point_store import ensure_run_points, _candidate_log_paths
+from backend.services.evaluation_point_store import ensure_run_points
+from backend.services.simulation_seed_sets import shared_seed_set_or_raise
 
 TERMINAL_STATUSES = {"completed", "failed"}
 DEFAULT_RUNS_CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "simulation_runs.csv"
@@ -65,6 +67,43 @@ def _run_time_limit_from_settings(
     return None
 
 
+def _combined_run_ids(
+    run_id: str,
+    architecture: str,
+    combined_payload: dict[str, Any] | None,
+) -> list[str]:
+    if architecture != "both":
+        return [run_id]
+
+    payload = combined_payload or {}
+    hierfl_settings = (payload.get("hierfl") or {}).get("simulation_settings") or {}
+    spyker_settings = (payload.get("spyker") or {}).get("simulation_settings") or {}
+    if not isinstance(hierfl_settings, dict) or not isinstance(spyker_settings, dict):
+        return [run_id]
+
+    try:
+        seed_set = shared_seed_set_or_raise(hierfl_settings, spyker_settings)
+    except Exception:
+        return [run_id]
+
+    target_run_ids: list[str] = []
+    for repetition_index, seed in enumerate(seed_set, start=1):
+        target_run_ids.append(f"{run_id}:hierfl:{seed}:{repetition_index}")
+        target_run_ids.append(f"{run_id}:spyker:{seed}:{repetition_index}")
+    return target_run_ids
+
+
+def _candidate_log_paths_for_run(run_id: str) -> list[Path]:
+    root = Path("/tmp/ray")
+    candidates: list[Path] = []
+    if root.exists():
+        candidates.append(root / "session_latest" / "logs" / f"sim_{run_id}.jsonl")
+        candidates.extend(
+            sorted((path / f"sim_{run_id}.jsonl" for path in root.glob("session_*/logs")), reverse=True)
+        )
+    return [candidate for candidate in candidates if candidate.exists() and candidate.is_file()]
+
+
 def _loki_base_urls() -> list[str]:
     configured = [
         os.getenv("FEDSIM_LOKI_INTERNAL_BASE_URL", "").strip(),
@@ -80,152 +119,201 @@ def _loki_base_urls() -> list[str]:
     return urls
 
 
-def _current_sim_time_from_loki(run_id: str, architecture: str) -> float | None:
-    query = f'{{component="ray", job="ray-actors"}} |= "run_id={run_id}" |= "T="'
-    if architecture in {"hierarchical", "spyker"}:
-        query += f' |~ "\\[{architecture} Eval\\]"'
+def _current_sim_time_from_loki(
+    run_id: str,
+    architecture: str,
+    combined_payload: dict[str, Any] | None = None,
+) -> float | None:
+    target_run_ids = _combined_run_ids(run_id, architecture, combined_payload)
+    latest_time: float | None = None
 
-    end_ns = int(time.time() * 1_000_000_000)
-    start_ns = end_ns - int(24 * 60 * 60 * 1_000_000_000)
+    for target_run_id in target_run_ids:
+        query = f'{{component="ray", job="ray-actors"}} |= "run_id={target_run_id}" |= "T="'
 
-    for base_url in _loki_base_urls():
-        try:
-            response = requests.get(
-                f"{base_url}/loki/api/v1/query_range",
-                params={
-                    "query": query,
-                    "start": start_ns,
-                    "end": end_ns,
-                    "limit": 50,
-                    "direction": "backward",
-                },
-                timeout=8,
-            )
-        except requests.RequestException:
-            continue
+        end_ns = int(time.time() * 1_000_000_000)
+        start_ns = end_ns - int(24 * 60 * 60 * 1_000_000_000)
 
-        if response.status_code >= 400:
-            continue
+        for base_url in _loki_base_urls():
+            try:
+                response = requests.get(
+                    f"{base_url}/loki/api/v1/query_range",
+                    params={
+                        "query": query,
+                        "start": start_ns,
+                        "end": end_ns,
+                        "limit": 50,
+                        "direction": "backward",
+                    },
+                    timeout=8,
+                )
+            except requests.RequestException:
+                continue
 
-        payload = response.json()
-        results = payload.get("data", {}).get("result", [])
-        latest_line: str | None = None
-        latest_ts = -1
-        for item in results:
-            values = item.get("values", [])
-            for value_pair in values:
-                if not isinstance(value_pair, list) or len(value_pair) < 2:
-                    continue
-                try:
-                    ts = int(value_pair[0])
-                except (TypeError, ValueError):
-                    continue
-                line = value_pair[1]
-                if not isinstance(line, str):
-                    continue
-                if ts >= latest_ts:
-                    latest_ts = ts
-                    latest_line = line
+            if response.status_code >= 400:
+                continue
 
-        if not latest_line:
-            continue
+            payload = response.json()
+            results = payload.get("data", {}).get("result", [])
+            latest_line: str | None = None
+            latest_ts = -1
+            for item in results:
+                values = item.get("values", [])
+                for value_pair in values:
+                    if not isinstance(value_pair, list) or len(value_pair) < 2:
+                        continue
+                    try:
+                        ts = int(value_pair[0])
+                    except (TypeError, ValueError):
+                        continue
+                    line = value_pair[1]
+                    if not isinstance(line, str):
+                        continue
+                    if ts >= latest_ts:
+                        latest_ts = ts
+                        latest_line = line
 
-        match = _PERIODIC_EVALUATOR_T_RE.search(latest_line)
-        if match is None:
-            continue
+            if not latest_line:
+                continue
 
-        try:
-            return float(match.group("time"))
-        except ValueError:
-            continue
+            match = _PERIODIC_EVALUATOR_T_RE.search(latest_line)
+            if match is None:
+                continue
 
-    return None
+            try:
+                current_time = float(match.group("time"))
+            except ValueError:
+                continue
+
+            latest_time = current_time if latest_time is None else max(latest_time, current_time)
+            break
+
+    return latest_time
 
 
-def _current_sim_time_from_raw_sources(run_id: str, architecture: str) -> float | None:
+def _current_sim_time_from_raw_sources(
+    run_id: str,
+    architecture: str,
+    combined_payload: dict[str, Any] | None = None,
+) -> float | None:
     """Fallback: look for T= values in persisted raw_logs or candidate log files on disk."""
+    target_run_ids = _combined_run_ids(run_id, architecture, combined_payload)
+
     # 1) Check persisted raw_logs in DB
     session = SessionLocal()
     try:
-        record = session.get(SimulationRun, run_id)
-        if record and isinstance(record.raw_logs, str) and record.raw_logs:
-            # Try parsing JSONL lines first (virtual_time field), otherwise fallback to T= regex
-            latest: float | None = None
-            for raw_line in (record.raw_logs or "").splitlines():
-                raw_line = raw_line.strip()
-                if not raw_line:
+        for target_run_id in target_run_ids:
+            record = session.get(SimulationRun, target_run_id)
+            if record and isinstance(record.raw_logs, str) and record.raw_logs:
+                latest: float | None = None
+                for raw_line in (record.raw_logs or "").splitlines():
+                    raw_line = raw_line.strip()
+                    if not raw_line:
+                        continue
+                    try:
+                        payload = json.loads(raw_line)
+                        extra = payload.get("extra_data") or payload
+                        if isinstance(extra, dict):
+                            vt = extra.get("virtual_time")
+                            if vt is not None:
+                                try:
+                                    value = float(vt)
+                                    latest = value if latest is None or value > latest else latest
+                                    continue
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
+
+                    m = _PERIODIC_EVALUATOR_T_RE.search(raw_line)
+                    if m:
+                        try:
+                            value = float(m.group("time"))
+                            latest = value if latest is None or value > latest else latest
+                        except Exception:
+                            pass
+
+                if latest is not None:
+                    return latest
+    finally:
+        session.close()
+
+    # 2) Check candidate log files on disk (JSONL or worker stdout)
+    for target_run_id in target_run_ids:
+        for candidate in _candidate_log_paths_for_run(target_run_id):
+            try:
+                if not candidate.exists() or not candidate.is_file():
                     continue
+                text = candidate.read_text(errors="ignore")
+            except Exception:
+                continue
+            # JSONL lines may contain extra_data with virtual_time, or plain stdout with T= marker
+            # First try JSON parse per-line
+            latest: float | None = None
+            for line in text.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                # try JSON payload
                 try:
-                    payload = json.loads(raw_line)
+                    payload = json.loads(line)
                     extra = payload.get("extra_data") or payload
-                    if isinstance(extra, dict):
-                        vt = extra.get("virtual_time")
-                        if vt is not None:
-                            try:
-                                value = float(vt)
-                                latest = value if latest is None or value > latest else latest
-                                continue
-                            except Exception:
-                                pass
+                    vt = extra.get("virtual_time") if isinstance(extra, dict) else None
+                    if vt is not None:
+                        try:
+                            value = float(vt)
+                            latest = value if latest is None or value > latest else latest
+                            continue
+                        except Exception:
+                            pass
                 except Exception:
                     pass
 
-                m = _PERIODIC_EVALUATOR_T_RE.search(raw_line)
+                # fallback: regex search in the line
+                m = _PERIODIC_EVALUATOR_T_RE.search(line)
                 if m:
                     try:
                         value = float(m.group("time"))
                         latest = value if latest is None or value > latest else latest
                     except Exception:
-                        pass
+                        continue
 
             if latest is not None:
                 return latest
-    finally:
-        session.close()
-
-    # 2) Check candidate log files on disk (JSONL or worker stdout)
-    for candidate in _candidate_log_paths(run_id):
-        try:
-            if not candidate.exists() or not candidate.is_file():
-                continue
-            text = candidate.read_text(errors="ignore")
-        except Exception:
-            continue
-        # JSONL lines may contain extra_data with virtual_time, or plain stdout with T= marker
-        # First try JSON parse per-line
-        latest: float | None = None
-        for line in text.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            # try JSON payload
-            try:
-                payload = json.loads(line)
-                extra = payload.get("extra_data") or payload
-                vt = extra.get("virtual_time") if isinstance(extra, dict) else None
-                if vt is not None:
-                    try:
-                        value = float(vt)
-                        latest = value if latest is None or value > latest else latest
-                        continue
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-
-            # fallback: regex search in the line
-            m = _PERIODIC_EVALUATOR_T_RE.search(line)
-            if m:
-                try:
-                    value = float(m.group("time"))
-                    latest = value if latest is None or value > latest else latest
-                except Exception:
-                    continue
-
-        if latest is not None:
-            return latest
 
     return None
+
+
+def _current_sim_time_from_evaluation_points(
+    run_id: str,
+    architecture: str,
+    combined_payload: dict[str, Any] | None = None,
+) -> float | None:
+    # Start with canonical target ids (handles 'both' combined runs).
+    target_run_ids = _combined_run_ids(run_id, architecture, combined_payload)
+
+    session = SessionLocal()
+    try:
+        # Ensure points exist or backfill for canonical ids
+        for target_run_id in target_run_ids:
+            ensure_run_points(target_run_id)
+
+        # First try exact match on run ids
+        stmt = select(func.max(EvaluationPoint.virtual_time)).where(EvaluationPoint.run_id.in_(target_run_ids))
+        latest_time = session.execute(stmt).scalar_one_or_none()
+        if latest_time is not None:
+            return float(latest_time)
+
+        # No points for canonical ids. Some runs persist evaluation points under suffixed run ids
+        # (e.g. "<base_run_id>:hierfl:<seed>:<rep>"). Try to find matching evaluation points that start
+        # with the base run id followed by a colon.
+        candidate_prefix = f"{run_id}:%"
+        stmt2 = select(func.max(EvaluationPoint.virtual_time)).where(EvaluationPoint.run_id.like(candidate_prefix))
+        latest_time2 = session.execute(stmt2).scalar_one_or_none()
+        if latest_time2 is None:
+            return None
+        return float(latest_time2)
+    finally:
+        session.close()
 
 
 def get_run_progress_info(
@@ -236,10 +324,12 @@ def get_run_progress_info(
     simulation_settings: dict[str, Any] | None = None,
     combined_payload: dict[str, Any] | None = None,
 ) -> dict[str, float | None]:
-    current_sim_time = _current_sim_time_from_loki(run_id, architecture)
+    current_sim_time = _current_sim_time_from_loki(run_id, architecture, combined_payload)
     # Loki may be unavailable or not indexed; try DB/file fallbacks
     if current_sim_time is None:
-        current_sim_time = _current_sim_time_from_raw_sources(run_id, architecture)
+        current_sim_time = _current_sim_time_from_raw_sources(run_id, architecture, combined_payload)
+    if current_sim_time is None:
+        current_sim_time = _current_sim_time_from_evaluation_points(run_id, architecture, combined_payload)
     if current_sim_time is None and status in {"queued", "running"}:
         current_sim_time = 0.0
 
@@ -427,7 +517,7 @@ def persist_final_run(job: Any) -> None:
         record.final_summary_json = _dumps_json(_build_final_summary(job))
         # attempt to persist raw JSONL logs (non-blocking)
         try:
-            for candidate in _candidate_log_paths(job.run_id):
+            for candidate in _candidate_log_paths_for_run(job.run_id):
                 if candidate.exists():
                     try:
                         content = candidate.read_text(encoding="utf-8")

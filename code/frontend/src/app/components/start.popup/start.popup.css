@@ -27,7 +27,7 @@
 
 .popup-card {
   width: 94%;
-  max-width: 570px;
+  max-width: 530px;
   max-height: 90vh;
   overflow: auto;
   background: #0f0f0f;
@@ -239,14 +239,14 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 0.82rem;
+  gap: 5px;
+  font-size: 0.88rem;
   color: rgba(255, 255, 255, 0.75);
 }
 
@@ -259,6 +259,32 @@
   color: #fff;
   padding: 10px;
   font-size: 0.9rem;
+}
+
+/* PrimeNG input number styling */
+:host ::ng-deep .field p-inputNumber .p-inputnumber {
+  width: 100%;
+}
+
+:host ::ng-deep .field p-inputNumber .p-inputnumber .p-inputnumber-input {
+  border-radius: 10px !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  background: #000000 !important;
+  color: #fff !important;
+  padding: 10px !important;
+  font-size: 0.9rem !important;
+  min-height: 42px;
+  box-sizing: border-box;
+}
+
+/* PrimeNG input text directive styling */
+:host ::ng-deep .field input.p-inputtext {
+  border-radius: 10px !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  background: #000000 !important;
+  color: #fff !important;
+  padding: 10px !important;
+  font-size: 0.9rem !important;
 }
 
 .field.checkbox {

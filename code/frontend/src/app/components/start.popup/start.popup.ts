@@ -1,6 +1,8 @@
 import { Component, EventEmitter, Input, OnInit, Output, SimpleChanges, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { InputTextModule } from 'primeng/inputtext';
 import { StepperModule } from 'primeng/stepper';
 import { GraphApiService } from '../../services/graph-api.service';
 
@@ -54,7 +56,7 @@ type PersistedStartParams = {
 @Component({
   selector: 'app-start-popup',
   standalone: true,
-  imports: [CommonModule, FormsModule, StepperModule],
+  imports: [CommonModule, FormsModule, InputNumberModule, InputTextModule, StepperModule],
   templateUrl: './start.popup.html',
   styleUrl: './start.popup.css',
 })
@@ -220,16 +222,6 @@ export class StartPopup implements OnInit {
         },
       },
     });
-  }
-
-  public ngOnChanges(changes: SimpleChanges): void {
-    if (changes['hierflGraphId']) {
-      this.restoreHierflSettings();
-    }
-    if (changes['spykerGraphId']) {
-      this.restoreSpykerSettings();
-    }
-    this.applyEvaluateFlagForMode(this.selectedMode);
     this.persistSettingsIfChanged();
   }
 
@@ -257,16 +249,6 @@ export class StartPopup implements OnInit {
     }
 
     this.persistSettingsIfChanged();
-  }
-
-  public formatDecimal(value: number): string {
-    return Number.isFinite(value) ? value.toString() : '';
-  }
-
-  public parseDecimalInput(value: string, fallback: number): number {
-    const normalized = value.trim().replace(',', '.');
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : fallback;
   }
 
   public updateSeedSet(architecture: 'hierfl' | 'spyker', value: string): void {

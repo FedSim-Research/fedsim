@@ -5,8 +5,6 @@ from pydantic import BaseModel
 from backend.services import graph_service
 from backend.services import simulation_run_store
 from backend.services.simulation_run_queue import run_queue
-from backend.services.loki_sync_service import sync_run_to_loki
-from backend.services.loki_sync_service import sync_run_to_loki, reconstruct_from_loki
 from backend.services.simulation_seed_sets import normalize_simulation_settings, shared_seed_set_or_raise
 from backend.services.simulation_validation import validate_start_payload
 
@@ -208,23 +206,6 @@ def get_run_status(run_id: str):
     if run is None:
         logger.warning("get_run_status_not_found run_id=%s", run_id)
         raise HTTPException(status_code=404, detail="Run not found")
-    
-    # For completed runs, trigger Loki sync to reconstruct graphs from database
-    if run.get("status") == "completed":
-        try:
-            sync_run_to_loki(run_id)
-            logger.info("triggered_loki_sync_on_get run_id=%s", run_id)
-        except Exception as exc:
-            logger.warning("loki_sync_on_get_failed run_id=%s error=%s", run_id, str(exc))
-            # Don't fail the GET request if sync fails - still return the run data
-        # If sync had no data, try reconstructing from Loki first
-        try:
-            count = reconstruct_from_loki(run_id)
-            if count > 0:
-                sync_run_to_loki(run_id)
-                logger.info("reconstructed_and_synced_from_loki run_id=%s count=%d", run_id, count)
-        except Exception as exc2:
-            logger.debug("loki_reconstruction_skipped run_id=%s error=%s", run_id, str(exc2))
     
     logger.debug("get_run_status run_id=%s status=%s", run_id, run.get("status"))
     return run

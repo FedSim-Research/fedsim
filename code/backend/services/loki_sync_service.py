@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -12,12 +13,13 @@ from sqlalchemy import select
 from backend.db.database import SessionLocal
 from backend.db.models import EvaluationPoint, SimulationRun
 from backend.services.evaluation_point_store import ensure_run_points
-import re
 
 logger = logging.getLogger(__name__)
 
 LOKI_PUSH_URL = "http://loki:3100/loki/api/v1/push"
 LOKI_QUERY_URL = "http://loki:3100/loki/api/v1/query_range"
+LOKI_EVALUATION_JOB_LABEL = "fedsim-evaluation"
+_SUPPORTED_EVALUATOR_ARCHITECTURES = {"hierarchical", "spyker"}
 
 
 def _candidate_ray_log_dirs() -> list[Path]:
@@ -61,6 +63,16 @@ def _format_evaluation_log_line(row: EvaluationPoint) -> str:
     )
 
 
+def _evaluation_points_for_run(session, run_id: str) -> list[EvaluationPoint]:
+    return list(
+        session.execute(
+            select(EvaluationPoint)
+            .where(EvaluationPoint.run_id == run_id)
+            .order_by(EvaluationPoint.timestamp_real)
+        ).scalars().all()
+    )
+
+
 def sync_run_to_loki(run_id: str) -> bool:
     """
     Query evaluation points from DB for a completed run and push to Loki.
@@ -84,11 +96,7 @@ def sync_run_to_loki(run_id: str) -> bool:
             return False
 
         # Fetch evaluation points for this run, ordered by timestamp
-        eval_points = session.execute(
-            select(EvaluationPoint)
-            .where(EvaluationPoint.run_id == run_id)
-            .order_by(EvaluationPoint.timestamp_real)
-        ).scalars().all()
+        eval_points = _evaluation_points_for_run(session, run_id)
 
         if not eval_points:
             logger.info("No evaluation points to sync for run: %s", run_id)
@@ -117,7 +125,7 @@ def sync_run_to_loki(run_id: str) -> bool:
                     "stream": {
                         "run_id": run_id_key,
                         "architecture": architecture,
-                        "job": "fedsim-evaluation",
+                        "job": LOKI_EVALUATION_JOB_LABEL,
                     },
                     "values": values,
                 }
@@ -168,7 +176,7 @@ def reconstruct_from_loki(run_id: str) -> int:
         start_ns = now_ns - (86400 * 1_000_000_000)  # 24 hours ago
         
         # Use line filter for run_id to avoid label cardinality issues
-        query = f'{{job="fedsim-evaluation"}} |= "run_id={run_id}"'
+        query = f'{{job="{LOKI_EVALUATION_JOB_LABEL}"}} |= "run_id={run_id}"'
         
         response = requests.get(
             LOKI_QUERY_URL,
@@ -294,7 +302,7 @@ def fetch_run_logs(run_id: str) -> str | None:
     try:
         now_ns = int(datetime.now(timezone.utc).timestamp() * 1_000_000_000)
         start_ns = now_ns - (86400 * 1_000_000_000)
-        query = f'{{job="fedsim-evaluation"}} |= "run_id={run_id}"'
+        query = f'{{job="{LOKI_EVALUATION_JOB_LABEL}"}} |= "run_id={run_id}"'
 
         response = requests.get(
             LOKI_QUERY_URL,

@@ -47,14 +47,20 @@ export class FrameworkJobsPopupComponent implements OnInit, OnDestroy {
   }
 
   private getProgressPercent(run: SimulationRunResponse): number | null {
-    const currentSimTime = run.current_sim_time;
-    const runTimeLimit = run.run_time_limit;
-    if (currentSimTime === null || currentSimTime === undefined) {
+    const currentRaw = run.current_sim_time;
+    const limitRaw = run.run_time_limit;
+
+    const current = currentRaw === null || currentRaw === undefined ? Number.NaN : Number(currentRaw);
+    const limit = limitRaw === null || limitRaw === undefined ? Number.NaN : Number(limitRaw);
+
+    if (!Number.isFinite(current)) {
       return null;
     }
-    if (runTimeLimit === null || runTimeLimit === undefined || runTimeLimit <= 0) {
+    if (!Number.isFinite(limit) || limit <= 0) {
       return null;
     }
-    return Math.max(0, Math.min(100, (currentSimTime / runTimeLimit) * 100));
+
+    const percent = (current / limit) * 100;
+    return Math.max(0, Math.min(100, percent));
   }
 }

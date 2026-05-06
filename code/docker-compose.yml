@@ -13,6 +13,7 @@ services:
       - PYTHONPATH=/app/framework/impl:/app
     volumes:
       - ./backend:/app/backend
+      - ./framework/impl:/app/framework/impl
       - ./data:/app/data
       - ray_logs:/tmp/ray
       - ./hf-cache:/hf-cache
@@ -35,6 +36,7 @@ services:
       - FEDSIM_GRAFANA_INTERNAL_BASE_URL=http://grafana:3000
     volumes:
       - ./backend:/app/backend
+      - ./framework/impl:/app/framework/impl
       - ./data:/app/data
       - ./hf-cache:/hf-cache
       - ray_logs:/tmp/ray:ro
@@ -49,7 +51,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: fedsim-frontend-deploy
-    command: npm run start -- --host 0.0.0.0 --port 4200
+    command: npm run start -- --host 0.0.0.0 --port 4200 --poll 2000
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
     depends_on:
       - backend
     restart: unless-stopped
@@ -137,3 +142,4 @@ networks:
 
 volumes:
   ray_logs:
+  frontend_node_modules:

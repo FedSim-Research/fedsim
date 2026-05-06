@@ -118,15 +118,19 @@ export class SidebarDashboardPanelComponent implements OnInit, OnDestroy {
   }
 
   public formatProgress(run: SimulationRunResponse): string {
-    const currentSimTime = run.current_sim_time;
-    const runTimeLimit = run.run_time_limit;
-    if (currentSimTime === null || currentSimTime === undefined) {
+    const currentRaw = run.current_sim_time;
+    const limitRaw = run.run_time_limit;
+
+    const current = currentRaw === null || currentRaw === undefined ? Number.NaN : Number(currentRaw);
+    const limit = limitRaw === null || limitRaw === undefined ? Number.NaN : Number(limitRaw);
+
+    if (!Number.isFinite(current)) {
       return '-';
     }
-    if (runTimeLimit === null || runTimeLimit === undefined || runTimeLimit <= 0) {
+    if (!Number.isFinite(limit) || limit <= 0) {
       return '-';
     }
-    const percentage = Math.max(0, Math.min(100, (currentSimTime / runTimeLimit) * 100));
+    const percentage = Math.max(0, Math.min(100, (current / limit) * 100));
     return `${percentage.toFixed(1)}%`;
   }
 }
