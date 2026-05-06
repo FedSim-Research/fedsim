@@ -94,7 +94,8 @@
         }
       ],
       "title": "Ray Node CPU Utilization",
-      "type": "timeseries"
+      "type": "timeseries",
+      "transparent": true
     },
     {
       "datasource": "Prometheus",
@@ -172,7 +173,8 @@
         }
       ],
       "title": "Ray Node Memory Usage (GB)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "transparent": true
     },
     {
       "datasource": "Prometheus",
@@ -246,7 +248,8 @@
         }
       ],
       "title": "Ray Tasks Submitted",
-      "type": "timeseries"
+      "type": "timeseries",
+      "transparent": true
     },
     {
       "datasource": "Prometheus",
@@ -320,7 +323,8 @@
         }
       ],
       "title": "Ray Active Actors",
-      "type": "timeseries"
+      "type": "timeseries",
+      "transparent": true
     },
     {
       "datasource": "Prometheus",
@@ -374,7 +378,8 @@
         }
       ],
       "title": "Available Resources",
-      "type": "stat"
+      "type": "stat",
+      "transparent": true
     },
     {
       "datasource": "Prometheus",
@@ -424,7 +429,8 @@
         }
       ],
       "title": "Active Nodes",
-      "type": "stat"
+      "type": "stat",
+      "transparent": true
     },
     {
       "datasource": "Prometheus",
@@ -474,7 +480,8 @@
         }
       ],
       "title": "Tasks Running",
-      "type": "stat"
+      "type": "stat",
+      "transparent": true
     },
     {
       "datasource": "Prometheus",
@@ -524,7 +531,8 @@
         }
       ],
       "title": "Tasks Finished (5m rate)",
-      "type": "stat"
+      "type": "stat",
+      "transparent": true
     }
   ],
   "refresh": "10s",

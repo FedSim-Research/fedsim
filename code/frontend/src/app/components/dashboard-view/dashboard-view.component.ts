@@ -50,7 +50,7 @@ export class DashboardViewComponent {
 
   public telemetryPanels = [
     { title: 'Cluster Utilization', uid: 'rayDefaultDashboard', panelId: 41, height: 250 },
-    { title: 'All Actors by State', uid: 'rayDefaultDashboard', panelId: 35, height: 250 },
+    { title: 'All Actors by State', uid: 'rayDefaultDashboard', panelId: 33, height: 250 },
     { title: 'Node CPU Usage', uid: 'rayDefaultDashboard', panelId: 2, height: 250 },
     { title: 'Node Memory Usage', uid: 'rayDefaultDashboard', panelId: 4, height: 250 },
     { title: 'Node GPU Usage', uid: 'rayDefaultDashboard', panelId: 8, height: 250 },

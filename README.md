@@ -90,3 +90,5 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml down --remove-orp
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml build --no-cache
 docker compose -f docker-compose.yml up -d
 ```
+
+Note that that building with the flag ```--no-cache``` could result in *extreme* cache sizes. You can view the size of the docker cache with ```docker system df``` and clean the *whole* cache with ```docker system prune```. Please refer to the official Docker manual.

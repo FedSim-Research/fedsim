@@ -29,6 +29,7 @@
             "id": 1001,
             "title": "Overview and Health",
             "type": "row",
+            "transparent": true,
             "panels": []
         },
         {
@@ -141,6 +142,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -307,6 +309,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -433,6 +436,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -476,6 +480,7 @@
             "id": 1005,
             "title": "Hardware Utilization by Node",
             "type": "row",
+            "transparent": true,
             "panels": []
         },
         {
@@ -580,6 +585,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -706,6 +712,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -840,6 +847,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -966,6 +974,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -1100,6 +1109,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -1226,6 +1236,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -1360,6 +1371,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -1486,6 +1498,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -1620,6 +1633,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -1746,6 +1760,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -1880,6 +1895,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -2014,6 +2030,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -2057,6 +2074,7 @@
             "id": 1004,
             "title": "Hardware Utilization by Ray Component",
             "type": "row",
+            "transparent": true,
             "panels": []
         },
         {
@@ -2161,6 +2179,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -2303,6 +2322,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -2429,6 +2449,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -2563,6 +2584,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -2606,6 +2628,7 @@
             "id": 1003,
             "title": "Ray Resources by Node",
             "type": "row",
+            "transparent": true,
             "panels": []
         },
         {
@@ -2718,6 +2741,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -2860,6 +2884,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -2994,6 +3019,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -3128,6 +3154,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -3254,6 +3281,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -3297,6 +3325,7 @@
             "id": 1002,
             "title": "Ray Tasks, Actors and Placement Groups",
             "type": "row",
+            "transparent": true,
             "panels": []
         },
         {
@@ -3401,6 +3430,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -3535,6 +3565,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -3669,6 +3700,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -3795,6 +3827,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -3921,6 +3954,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -4047,6 +4081,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -4173,6 +4208,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -4307,6 +4343,7 @@
                 "value_type": "individual"
             },
             "type": "graph",
+            "transparent": true,
             "xaxis": {
                 "buckets": null,
                 "mode": "time",
@@ -4350,6 +4387,7 @@
             "id": 1006,
             "title": "TPU Utilization by Node",
             "type": "row",
+            "transparent": true,
             "panels": [
                 {
                     "aliasColors": {},
@@ -4445,6 +4483,7 @@
                         "value_type": "individual"
                     },
                     "type": "graph",
+                    "transparent": true,
                     "xaxis": {
                         "buckets": null,
                         "mode": "time",
@@ -4571,6 +4610,7 @@
                         "value_type": "individual"
                     },
                     "type": "graph",
+                    "transparent": true,
                     "xaxis": {
                         "buckets": null,
                         "mode": "time",
@@ -4697,6 +4737,7 @@
                         "value_type": "individual"
                     },
                     "type": "graph",
+                    "transparent": true,
                     "xaxis": {
                         "buckets": null,
                         "mode": "time",
@@ -4831,6 +4872,7 @@
                         "value_type": "individual"
                     },
                     "type": "graph",
+                    "transparent": true,
                     "xaxis": {
                         "buckets": null,
                         "mode": "time",
