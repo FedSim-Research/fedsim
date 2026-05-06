@@ -1,59 +1,193 @@
-# Angular
+# FedSim Frontend (Angular)
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.0.2.
+This repository contains the Angular-based frontend for **FedSim (Federated Learning Simulation in Geo-Distributed Settings)**.  
+It provides a graph-based UI for configuring, launching, and monitoring federated learning simulations.
 
-## Development server
+---
 
-To start a local development server, run:
+## Overview
+
+The frontend provides a visual control layer for configuring, launching, and monitoring federated learning simulations.
+
+It supports the following core functions:
+
+- Graph-based editor for defining simulation topologies (e.g., hierarchical federated learning structures)
+- Configuration of simulation parameters such as datasets, number of clients, and GPU budget
+- Triggering simulation runs via the backend API
+- Real-time monitoring and visualization of execution state and results
+
+The application communicates with a FastAPI backend and is served through an Nginx reverse proxy in production deployments.
+
+When running via Docker Compose, the frontend is accessible at:
+
+```
+http://<SERVER-IP>:8088
+```
+
+This port is defined by the Nginx service configuration in `docker-compose.yml`.
+
+---
+
+## Tech Stack
+
+- Angular 21
+- TypeScript
+- ngx-vflow (graph editor)
+- Vitest (unit testing)
+
+---
+
+## Prerequisites
+
+- Node.js (LTS recommended)
+- npm or yarn
+- Angular CLI
+
+Install Angular CLI if needed:
+
+```bash
+npm install -g @angular/cli
+````
+
+---
+
+## Installation
+
+From the frontend directory:
+
+```bash
+npm install
+```
+
+---
+
+## Development Server
+
+Start the local development server:
 
 ```bash
 ng serve
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+Then open:
 
-## Code scaffolding
+```
+http://localhost:4200/
+```
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+The app reloads automatically on file changes.
+
+---
+
+## API Configuration
+
+The frontend expects the backend API to be reachable via configuration in:
+
+```
+src/environments/environment.ts
+```
+
+Example:
+
+```ts
+export const environment = {
+  production: false,
+  apiUrl: "http://localhost:8088/api"
+};
+```
+
+For production, adjust accordingly in:
+
+```
+environment.prod.ts
+```
+
+---
+
+## Code Scaffolding
+
+Generate components:
 
 ```bash
 ng generate component component-name
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+List schematics:
 
 ```bash
 ng generate --help
 ```
 
-## Building
+---
 
-To build the project run:
+## Build
+
+Production build:
 
 ```bash
 ng build
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+Output is stored in:
 
-## Running unit tests
+```
+dist/
+```
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+---
+
+## Testing
+
+Run unit tests using Vitest:
 
 ```bash
 ng test
 ```
 
-## Running end-to-end tests
+---
 
-For end-to-end (e2e) testing, run:
+## End-to-End Testing
 
 ```bash
 ng e2e
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+No default framework is enforced; selection is project-specific.
 
-## Additional Resources
+---
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+## Docker Deployment
+
+In production, the frontend is served via Nginx inside the full FedSim stack.
+
+Default access:
+
+```
+http://<SERVER-IP>:8088
+```
+
+This is defined in:
+
+```
+docker-compose.yml
+```
+
+---
+
+## Project Context (FedSim)
+
+This frontend is part of a larger system:
+
+* Backend: FastAPI simulation orchestration
+* Framework: Federated learning engines (Hierarchical FL, Spyker FL)
+* Infrastructure: Docker-based deployment with optional GPU support
+
+---
+
+## Build Artifacts
+
+Angular build output is generated in:
+
+```
+dist/
+```
