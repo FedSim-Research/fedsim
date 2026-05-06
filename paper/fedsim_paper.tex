@@ -7,58 +7,76 @@
 \usepackage{graphicx}
 \usepackage{textcomp}
 \usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc}
 \usepackage[hidelinks]{hyperref}
+\newcommand{\figref}[1]{\hyperref[#1]{Fig.~\ref*{#1}}}
+\newcommand{\tabref}[1]{\hyperref[#1]{Table~\ref*{#1}}}
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
 \begin{document}
 
-\title{Conference Paper Title}
+\title{Federated Learning Simulation in Geo-Distributed Settings}
 
 \author{
-\IEEEauthorblockN{Deniz Altunkapan}
-\IEEEauthorblockA{\textit{University of Stuttgart}\\
-Stuttgart, Germany \\
-deniz.altunkapan@outlook.com}
-\and
-\IEEEauthorblockN{Maximilian Peresunchak}
-\IEEEauthorblockA{\textit{University of Stuttgart}\\
-Stuttgart, Germany \\
-max.peresunchak@gmail.com}
-\and
-\IEEEauthorblockN{Viorel Tsigos}
-\IEEEauthorblockA{\textit{University of Stuttgart}\\
-Stuttgart, Germany \\
-viorel.tsigos@gmail.com}
-\and
-\IEEEauthorblockN{Nico Reng}
-\IEEEauthorblockA{\textit{University of Stuttgart}\\
-Stuttgart, Germany \\
-n.reng@gmail.com}
-\and
-\IEEEauthorblockN{Silas Aidam}
-\IEEEauthorblockA{\textit{University of Stuttgart}\\
-Stuttgart, Germany \\
-silas@aidam.org}
-\and
-\IEEEauthorblockN{Michael Schramm}
-\IEEEauthorblockA{\textit{University of Stuttgart}\\
-Stuttgart, Germany \\
-michael.schramm@ipvs.uni-stuttgart.de}
-\and
-\IEEEauthorblockN{Christian Becker}
-\IEEEauthorblockA{\textit{University of Stuttgart}\\
-Stuttgart, Germany \\
-christian.becker@ipvs.uni-stuttgart.de}
+\begin{tabular}{ccc}
+\begin{tabular}{c}
+\textbf{Deniz Altunkapan}\\
+\textit{University of Stuttgart}\\
+Stuttgart, Germany\\
+deniz.altunkapan@outlook.com
+\vspace{0.5cm}
+
+\end{tabular}
+&
+\begin{tabular}{c}
+\textbf{Maximilian Peresunchak}\\
+\textit{University of Stuttgart}\\
+Stuttgart, Germany\\
+max.peresunchak@gmail.com
+\vspace{0.5cm}
+\end{tabular}
+&
+\begin{tabular}{c}
+\textbf{Viorel Tsigos}\\
+\textit{University of Stuttgart}\\
+Stuttgart, Germany\\
+viorel.tsigos@gmail.com
+\vspace{0.5cm}
+\end{tabular}
+\\[1em]
+\multicolumn{3}{c}{
+\begin{tabular}{cc}
+\begin{tabular}{c}
+\textbf{Nico Reng}\\
+\textit{University of Stuttgart}\\
+Stuttgart, Germany\\
+n.reng99@gmail.com
+\end{tabular}
+\hspace{0.5cm}
+&
+\hspace{0.5cm}
+\begin{tabular}{c}
+\textbf{Silas Aidam}\\
+\textit{University of Stuttgart}\\
+Stuttgart, Germany\\
+silas@aidam.org
+\end{tabular}
+\end{tabular}
+}
+\end{tabular}
 }
 
 \maketitle
+\pagestyle{plain}
 
 \begin{abstract}
-Federated Learning (FL) trains a shared global model by iterating between local client-side optimization and server-side aggregation of model updates, while raw data remains on client devices or at participating institutions. This training paradigm is attractive for privacy-sensitive and cross-organization settings, but practical deployments are often geo-distributed and heterogeneous. As a result, communication delays, slow-client bottlenecks, and unstable runtime conditions can significantly affect convergence and total training time. Multi-server approaches, including hierarchical FL and asynchronous designs such as Spyker, are proposed to reduce these limitations, yet reproducible and topology-aware evaluation tooling remains limited in practice.
+Federated Learning (FL) enables collaborative model training without centralizing raw data, making it a key approach for privacy-sensitive and cross-organization machine learning. Foundational algorithms such as FedAvg demonstrated that decentralized training can achieve competitive accuracy; however, as FL deployments scale to geo-distributed environments, network heterogeneity, regional latency asymmetries and multi-server coordination become critical system-level concerns. Advancing FL methods in these settings requires realistic simulation, since large-scale real-world testing is expensive and operationally complex. Existing simulation frameworks provide limited support for reproducible studies in geo-distributed multi-server configurations, where topology-induced latency and runtime heterogeneity strongly influence training dynamics.
 
-This paper presents a graph-configurable simulation framework for geo-distributed multi-server FL experimentation. The framework is built on top of Flower and extends it with support for hierarchical multi-tier aggregation and asynchronous multi-server coordination (including Spyker-style execution). It integrates a web-based topology editor, run lifecycle management, structured runtime logging, and observability hooks for metric inspection. The system is designed for controlled experimentation through explicit configuration of topology, runtime parameters, and seeds, while enforcing architecture-aware validation at both UI and backend levels.
+This paper presents FedSim, the simulation framework we developed for geo-distributed multi-server FL experimentation. FedSim is built on top of Flower and extends it with support for hierarchical multi-tier aggregation and asynchronous multi-server coordination (including Spyker-style execution). A defining feature is its interactive web-based Graph Editor, which enables explicit topology construction with per-link latency, bandwidth and packet-loss configuration alongside architecture-aware preflight validation. The system additionally provides a Dashboard for run lifecycle management, structured runtime logging and integrated live/post-hoc observability.
 
-Beyond implementation, the work positions the framework as an evaluation vehicle for comparing established FL simulation ecosystems with respect to multi-server support, topology expressiveness, scalability, observability, and extensibility. The resulting artifact provides a practical basis for reproducible benchmarking and method comparison in geo-distributed FL research settings.
+Beyond implementation, this work positions FedSim as an evaluation vehicle for comparing established FL simulation ecosystems with respect to multi-server support, topology expressiveness, scalability, observability and extensibility—providing a practical basis for reproducible benchmarking in geo-distributed FL research.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -66,246 +84,401 @@ federated learning, geo-distributed systems, multi-server simulation
 \end{IEEEkeywords}
 
 \section{Introduction}
-Federated Learning (FL) has matured from a conceptual privacy-preserving training paradigm into a practical systems problem. The core optimization loop is well known: clients train locally on private data, send model updates, and a coordinator aggregates them into a new global model. However, once deployments become geo-distributed, FL behavior is no longer driven by learning dynamics alone. Network heterogeneity, regional latency asymmetries, and runtime resource contention become first-order factors for convergence speed and stability \cite{kairouz2021}.
+Federated Learning (FL) is a distributed training paradigm in which clients keep raw data locally and only exchange model updates with coordinating servers. Since FedAvg, FL has become a core method for privacy-sensitive machine learning \cite{mcmahan2017}. In geo-distributed deployments, however, performance is shaped not only by optimization but also by systems effects such as network heterogeneity, regional latency asymmetries and resource contention \cite{kairouz2021}.
 
-This systems perspective has motivated multi-server approaches. Hierarchical FL introduces intermediate aggregation tiers to shorten communication paths and reduce synchronization pressure \cite{abad2020}. Asynchronous multi-server designs, including Spyker, relax strict round barriers to better tolerate slow clients and heterogeneous client completion times \cite{zuo2024}. These methods broaden the design space, but they also raise the bar for experimental infrastructure: researchers need simulation environments that can represent topology explicitly, execute architecture-specific control logic, and preserve traceability across runs.
+This systems perspective has motivated multi-server approaches. Hierarchical FL introduces intermediate aggregation tiers to shorten communication paths and reduce synchronization pressure \cite{abad2020}. Asynchronous multi-server designs -- including Spyker -- relax strict round barriers to better tolerate slow clients and heterogeneous client completion times \cite{zuo2024}. These methods broaden the design space but also raise the bar for experimental infrastructure as researchers need simulation environments that can represent topology explicitly, execute architecture-specific control logic and preserve traceability across runs.
 
-Existing frameworks provide valuable capabilities, but differ in their emphasis. Flower and FLSim offer flexible FL experimentation interfaces \cite{flower,flsim}; pfl-research and Pollen emphasize simulation throughput and large-scale studies \cite{granqvist2024,sani2023}. For geo-distributed multi-server questions, the practical challenge is to combine three requirements in one workflow: topology-aware configuration, robust and reproducible run control, and system-level observability during execution.
+Existing frameworks provide valuable capabilities but differ in their emphasis. Flower offers a modular runtime substrate with broad heterogeneity support \cite{flower}, while FLSim focuses on PyTorch-centric algorithm research \cite{flsim}, pfl-research and Pollen emphasize simulation throughput and large-scale studies \cite{granqvist2024,sani2023}. None of these frameworks natively combines interactive graph-based topology authoring with per-link latency and bandwidth modeling, architecture-specific execution semantics and lifecycle-governed run management—the capabilities that geo-distributed multi-server studies specifically require.
 
-This paper presents a framework designed around exactly these requirements. It is implemented as a Flower-based runtime extended with topology-aware orchestration components. The framework models deployments as editable graphs, executes hierarchical and Spyker-style asynchronous multi-server simulations through a unified run interface, and tracks each run via explicit lifecycle states (queued, running, completed, failed). The implementation couples frontend preflight checks with backend-authoritative validation, enforces consistent run identifiers and metadata propagation, and integrates structured logging and monitoring hooks for online inspection and post-hoc analysis.
+FedSim, the framework we developed, is designed around exactly these requirements. It models FL deployments as interactively editable graphs with explicit per-link network parameters (latency, bandwidth, packet loss, jitter), executes hierarchical and Spyker-style asynchronous multi-server simulations through a unified run interface and tracks each run through explicit lifecycle states (\textsc{queued}, \textsc{running}, \textsc{completed} and \textsc{failed}). Runtime execution is built on Ray's actor-based orchestration model, which provides deterministic event scheduling and concurrent server/client behavior under a shared simulation kernel \cite{moritz2018ray}. A web-based Graph Editor enables direct construction and validation of topology graphs; a Dashboard provides run submission, monitoring and comparative analysis.
 
-Beyond presenting the framework itself, the paper positions it as an evaluation vehicle for systematic framework-level comparison under geo-distributed assumptions. The goal is not to claim algorithmic novelty, but to provide an experimentally reliable basis for comparing architectures and tools under controlled, reproducible conditions.
+Beyond presenting the framework itself, the paper positions FedSim as an evaluation vehicle for systematic framework-level comparison under geo-distributed assumptions. The goal is not to claim algorithmic novelty, but to provide an experimentally reliable basis for comparing architectures and tools under controlled, reproducible conditions.
 
-The main contributions of this work are:
-\begin{itemize}
-\item A graph-based, topology-aware simulation environment for geo-distributed multi-server FL experiments.
-\item Support for hierarchical and asynchronous multi-server execution modes within a unified configuration and run interface.
-\item A reproducibility- and observability-oriented workflow including run lifecycle tracking, validation, and structured logging integration for dashboard-based analysis.
-\item A basis for systematic framework comparison using consistent criteria for multi-server capability, topology modeling, scalability, observability, and extensibility.
-\end{itemize}
+The main contributions of this work are fourfold. First, FedSim provides a graph-based, topology-aware simulation environment for geo-distributed multi-server FL, featuring an interactive web-based Graph Editor with per-link latency, bandwidth and packet-loss configuration, plus architecture-aware preflight validation that catches topology constraint violations before runtime. Second, it offers unified support for hierarchical and asynchronous multi-server execution within a single configuration and run interface, including a formalized \textit{both-mode} protocol that executes both architecture modes under identical graph snapshots, seed sets and evaluation budgets, making architecture the single controlled independent variable. Third, it establishes a reproducible and observable run workflow through explicit lifecycle tracking, backend-authoritative validation and structured JSON telemetry for both live monitoring and post-hoc audit. Fourth, it provides a basis for systematic framework comparison by applying consistent criteria (\tabref{tab:comparisoncriteria}) for multi-server capability, topology modeling, scalability, observability and extensibility across relevant FL simulation ecosystems.
 
-The remainder of the paper details the system design, implementation decisions, evaluation protocol, comparative analysis setup, and limitations.
+The current implementation focuses exclusively on the partitioning of IID data. The handling of non-IID data is considered a priority for future expansion.
 
-\section{Ease of Use}
+Section \ref{sec:background} introduces the FL background and the multi-server challenge, whereas Section \ref{sec:related} reviews related frameworks. Section \ref{sec:design} presents the system design and architecture rationale, while Section \ref{sec:engines} details the engine implementations and comparison protocol. Section \ref{sec:evaldesign} describes the evaluation design, and Section \ref{sec:eval} reports the results. Finally, Section \ref{sec:comparison} positions FedSim relative to existing frameworks, and Section \ref{sec:discussion} discusses limitations and future work.
 
-\subsection{Maintaining the Integrity of the Specifications}
+\section{Background}
+\label{sec:background}
+\subsection{Standard Federated Learning}
+Federated Learning was formalized by McMahan \textit{et al.} through FedAvg \cite{mcmahan2017}. In each training round, a coordinator sends the current global model to selected clients, each of which performs local optimization on private data and returns model updates. Based on this, the coordinator computes an aggregated global update (typically weighted by local sample counts). This loop enables collaborative training without centralizing raw data and is therefore central in privacy-sensitive settings \cite{kairouz2021}.
 
-The IEEEtran class file is used to format your paper and style the text. All margins, 
-column widths, line spaces, and text fonts are prescribed; please do not 
-alter them. You may note peculiarities. For example, the head margin
-measures proportionately more than is customary. This measurement 
-and others are deliberate, using specifications that anticipate your paper 
-as one part of the entire proceedings, and not as an independent document. 
-Please do not revise any of the current designations.
+In practical systems, FL quality and runtime depend on four coupled factors: statistical heterogeneity across clients, systems heterogeneity (compute speed, availability), communication constraints (latency, bandwidth, packet loss) and synchronization policy (strict rounds versus asynchronous progression). The last two factors become dominant in geo-distributed deployments and motivate architecture-level alternatives to single-server FL.
 
-\section{Prepare Your Paper Before Styling}
-Before you begin to format your paper, first write and save the content as a 
-separate text file. Complete all content and organizational editing before 
-formatting. Please note sections \ref{AA}--\ref{SCM} below for more information on 
-proofreading, spelling and grammar.
+\subsection{Hierarchical Federated Learning}
+Hierarchical FL (HierFL) addresses geo-distributed bottlenecks by introducing intermediate edge servers between clients and a global coordinator \cite{abad2020}. Edge-local aggregation reduces long-haul traffic and can reduce synchronization pressure for remote client groups. The trade-off is tighter dependence on tier-level synchronization semantics and topology validity constraints (e.g., client-group-to-edge assignment and edge-to-super-server connectivity).
 
-Keep your text and graphic files separate until after the text has been 
-formatted and styled. Do not number text heads---{\LaTeX} will do that 
-for you.
+\subsection{Asynchronous Multi-Server FL: Spyker}
+Asynchronous multi-server FL removes strict global barriers and progresses via event-driven interactions. Spyker is a representative design with asynchronous inter-server synchronization and staleness-aware fusion of model states \cite{zuo2024}. This can reduce idle time under straggler-heavy or highly heterogeneous completion patterns, but introduces more complex temporal state handling, like age tracking or drift-aware synchronization triggers.
 
-\subsection{Abbreviations and Acronyms}\label{AA}
-Define abbreviations and acronyms the first time they are used in the text, 
-even after they have been defined in the abstract. Abbreviations such as 
-IEEE, SI, MKS, CGS, ac, dc, and rms do not have to be defined. Do not use 
-abbreviations in the title or heads unless they are unavoidable.
+\subsection{Topology as a First-Class Experimental Variable}
+Both architecture classes critically depend on an explicit topology that specifies which servers exist, how they interconnect, and which latency, bandwidth, and packet-loss characteristics apply to each link. In geo-distributed simulations, these network parameters directly shape observed convergence behavior. A simulation framework for this domain must therefore treat topology as a first-class, explicitly configurable element—not an implicit deployment assumption. FedSim's graph-based topology model and per-link parameter configuration serve this role.
 
-\subsection{Units}
-\begin{itemize}
-\item Use either SI (MKS) or CGS as primary units. (SI units are encouraged.) English units may be used as secondary units (in parentheses). An exception would be the use of English units as identifiers in trade, such as ``3.5-inch disk drive''.
-\item Avoid combining SI and CGS units, such as current in amperes and magnetic field in oersteds. This often leads to confusion because equations do not balance dimensionally. If you must use mixed units, clearly state the units for each quantity that you use in an equation.
-\item Do not mix complete spellings and abbreviations of units: ``Wb/m\textsuperscript{2}'' or ``webers per square meter'', not ``webers/m\textsuperscript{2}''. Spell out units when they appear in text: ``. . . a few henries'', not ``. . . a few H''.
-\item Use a zero before decimal points: ``0.25'', not ``.25''. Use ``cm\textsuperscript{3}'', not ``cc''.)
-\end{itemize}
+From a design perspective, this also explains why FedSim focuses on exactly two architecture families in the current version: hierarchical FL and asynchronous multi-server FL. These families represent two complementary synchronization philosophies, namely explicit tiered coordination versus event-driven progression. Covering both is sufficient to expose meaningful architecture-level trade-offs while keeping implementation and analysis complexity bounded for reproducible experiments.
 
-\subsection{Equations}
-Number equations consecutively. To make your 
-equations more compact, you may use the solidus (~/~), the exp function, or 
-appropriate exponents. Italicize Roman symbols for quantities and variables, 
-but not Greek symbols. Use a long dash rather than a hyphen for a minus 
-sign. Punctuate equations with commas or periods when they are part of a 
-sentence, as in:
+\section{Related Work}
+\label{sec:related}
+\subsection{Simulation Frameworks: Capability Profiles and Research Fit}
+Open FL frameworks make different trade-offs across throughput, extensibility, topology realism and observability.
+
+\textbf{Flower} provides a flexible runtime substrate with strong support for heterogeneous and large-cohort experimentation \cite{flower}. \textbf{FLSim} focuses on PyTorch-centric algorithm research workflows \cite{flsim}. \textbf{FLUTE}, \textbf{pfl-research} and \textbf{Pollen} emphasize high-throughput simulation campaigns and scalable benchmarking operations \cite{flute2022,granqvist2024,sani2023}. \textbf{FedML} and \textbf{FedScale} contribute reusable benchmarking infrastructure and system-performance analysis at scale \cite{he2020fedml,lai2022fedscale}. \textbf{LEAF} and \textbf{TensorFlow Federated} remain influential references for benchmark standardization and framework-level experimentation \cite{caldas2018leaf,tff}.
+
+These ecosystems complement each other. Frameworks optimized for throughput maximize experimental volume, whereas frameworks centered on topology emphasize architectural interpretability and runtime traceability. Framework selection should be driven by the target research question. As shown in \tabref{tab:frameworkpositioning}, none of the surveyed frameworks integrates graph-native topology authoring, per-link network modeling and lifecycle-governed multi-server architecture comparison which the combination geo-distributed studies specifically require.
+
+\subsection{Implications for Multi-Server Evaluation Methodology}
+Across these simulators, the central gap for geo-distributed multi-server studies is not raw throughput but controlled comparability under explicit topology and architecture semantics. HierFL and Spyker-style experiments require topology-aware scenario definitions, architecture-specific validation rules, and run-traceable paired execution under shared seeds and budgets. FedSim is designed to fill this method gap while reusing proven runtime substrates (Flower/Ray).
+
+\subsection{Observability, Reproducibility and Lifecycle Governance}
+Production FL systems research has emphasized that credible results require more than final metrics; they require controlled lifecycle management, robust telemetry and reproducible execution contracts \cite{bonawitz2019}. Bonawitz \textit{et al.} \cite{bonawitz2019} demonstrate at industrial scale that infrastructure guarantees—immutable run identity, deterministic configuration capture and durable artifact persistence—are prerequisites for trustworthy FL evaluation. For simulation-based architecture studies, this translates into four concrete requirements: immutable run identity with explicit run states, deterministic scenario capture (topology, seeds and parameters), structured and queryable runtime telemetry and durable terminal artifacts for post-hoc reconstruction.
+
+Without these controls, architecture comparisons are vulnerable to hidden protocol drift, incomplete traceability and irreproducible claims.
+
+\section{System Design and Architectural Rationale}
+\label{sec:design}
+\subsection{Requirements-to-Architecture Decision Chain}
+The design follows a strict decision chain derived from the research objective. Architecture comparison requires explicit topology so that differences in observed behavior are attributable to architecture semantics rather than implicit topology assumptions. Explicit topology, in turn, requires architecture-aware validation because topology constraints differ between hierarchical and asynchronous modes and must be enforced before runtime. This validation requires canonical run contracts and lifecycle control, meaning each run must carry an immutable identifier, explicit state and a fully reproducible parameter set. Finally, lifecycle control requires structured observability and durable metadata, since both online inspection and post-hoc reconstruction depend on structured telemetry and persistent run artifacts.
+
+This chain prevents common methodological failure modes in FL studies, where topology, runtime behavior and evaluation artifacts are coupled only informally.
+
+\subsection{System Architecture Overview}
+FedSim consists of a \textit{Graph Editor}, a \textit{Dashboard}, a \textit{Backend} and two architecture-specific engines, as illustrated in \figref{fig:fedsim-architecture}. The Graph Editor provides interactive web-based topology construction with per-link parameter configuration and architecture-aware preflight validation for immediate user feedback. The Dashboard supports run submission, status tracking, progress inspection and comparative analysis views. The Backend enforces authoritative validation, orchestration, run lifecycle/state management, metadata persistence and telemetry integration. The Hierarchical Engine executes tiered multi-level aggregation semantics, while the Spyker-Oriented Engine executes asynchronous multi-server semantics. A database layer persists run metadata, telemetry records and terminal artifacts durably.
+
+This partition separates control-plane concerns from execution-plane concerns. The control plane enforces protocol integrity; the execution plane expresses architecture-specific behavior.
+
+\begin{figure*}[t]
+\centering
+\resizebox{0.92\textwidth}{!}{
+\begin{tikzpicture}[
+  node distance=7mm and 8mm,
+  box/.style={draw, rounded corners, align=center, minimum height=8mm, inner sep=3pt},
+  arr/.style={-Latex, thick}
+]
+\node[box, fill=blue!8, minimum width=4.2cm] (editor) {Graph Editor};
+\node[box, fill=blue!8, minimum width=4.2cm, right=of editor] (dash) {Dashboard};
+\node[box, fill=green!10, minimum width=9.6cm, below=1cm of $(editor)!0.5!(dash)$] (backend) {Backend\\Validation, run lifecycle, metadata, observability};
+\node[box, fill=orange!12, minimum width=4.2cm, below left=of backend] (h) {Hierarchical Engine};
+\node[box, fill=orange!12, minimum width=4.2cm, below right=of backend] (s) {Spyker-Oriented Engine};
+
+\draw[arr] (editor.south) -- (editor |- backend.north);
+\draw[arr] (dash.south) -- (dash |- backend.north);
+\draw[arr] (backend.south west) -- (h.north);
+\draw[arr] (backend.south east) -- (s.north);
+\draw[arr, dashed, <->] (h.east) -- node[above, font=\scriptsize]{both-mode comparative orchestration} (s.west);
+\end{tikzpicture}
+}
+\caption{FedSim architecture: the control-plane components (Graph Editor and Dashboard) are decoupled from architecture-specific execution engines. The dashed arrow indicates the \textit{both-mode} paired evaluation protocol.}
+\label{fig:fedsim-architecture}
+\end{figure*}
+
+\subsection{Graph Editor and Dashboard}
+The Graph Editor provides an interactive web interface for topology authoring. Users construct FL deployment graphs by placing typed nodes while placing server, client groups and configuring node-level attributes (e.g., client multiplicity and compute factor) together with directed edges carrying per-link parameters: latency (ms), bandwidth (Mbps), packet loss (\%) and jitter (ms). Architecture-aware preflight validation runs in the browser, providing immediate feedback on violations—such as a missing super-server connection or a client group not assigned to an edge server—before the topology is submitted.
+
+The design rationale is to move correctness checks as early as possible. Instead of detecting topology errors during expensive runtime execution, FedSim rejects structurally invalid graphs at authoring time and re-validates them in the backend before orchestration. This creates deterministic, auditable topology construction for each run and ensures that cross-topology comparisons reflect architecture and network assumptions rather than hidden scenario-definition drift. It also reduces wasted compute cycles by ensuring that only well-defined scenarios enter the experiment queue.
+
+The Dashboard is the central run management interface where users specify the target graph, architecture mode (hierarchical, Spyker, or both), dataset, strategy, seed sets and optimization budget before submitting a run. Submitted runs transition through lifecycle states (\textsc{queued} $\to$ \textsc{running} $\to$ \textsc{completed}/\textsc{failed}) with live progress indicators. Completed runs expose structured metric timelines, architecture-comparative views and downloadable run artifacts for post-hoc analysis. This centralization is deliberate: it binds configuration, execution and analysis to a single traceable workflow and thereby reduces manual handoff errors between tooling stages.
+
+\subsection{Why Flower as the Core Runtime}
+Flower serves as the runtime engine because its clear abstractions for client, strategy, and simulation orchestration enable the stable integration of heterogeneous federated learning workflows \cite{flower}. Its inherent modularity allows for the rapid incorporation of new orchestration logic and strategy variants while maintaining interface stability. Additionally, Flower's widely adopted ecosystem lowers replication barriers and eases the transition from simulated to real-world environments \cite{flower}. Ultimately, Flower functions purely as an enabling tool for architectural comparison rather than a proxy for underlying architectural assumptions.
+
+\subsection{Why Ray as the Distributed Execution Backend}
+FedSim uses Ray \cite{moritz2018ray} as the underlying distributed execution backend. Ray provides actor-based parallelism, a shared object store for efficient data distribution and a task scheduling model that integrates naturally with the event-driven simulation kernel. Concretely, simulated servers are represented as long-lived Ray actors, while client-side training is executed as actor-driven runtime work under the same scheduler, enabling concurrent client updates and server-side aggregation without blocking the orchestrator. Ray object storage prevents redundant data copies when distributing training datasets and model parameters to various actors, which is a critical factor for scaling to larger client groups. This actor-based design supports the concurrent interaction patterns required by both the Hierarchical and Spyker-Oriented engines.
+
+Ray provides the required performance and semantic fit, as both target architectures are naturally stateful and message driven. A process model centered on long-lived actors maps directly to this behavior, whereas purely stateless task execution would require additional coordination layers that obscure causality and complicate reproducibility.
+
+\subsection{Method-Mechanism Separation}
+FedSim explicitly separates \textit{method} (scenario families, fairness constraints, seed policy and reporting windows) from \textit{mechanism} (scheduler, synchronization model and update handling). This is essential for meaningful comparisons, as any observed differences should be based on the semantics of the architecture and not on hidden discrepancies in protocol implementation.
+
+\section{Engine Implementation and Comparative Orchestration}
+\label{sec:engines}
+This section moves from architectural intent to executable semantics where the central question is how each engine runs and why specific orchestration constraints are enforced so that resulting measurements remain comparable across architecture modes.
+
+\subsection{Execution Path: From Run Submission to Persisted Result}
+FedSim executes each experiment through a strict control-plane pipeline (as \figref{fig:fedsim-architecture}). Each run request is assigned an immutable identifier and transitions through explicit lifecycle states (\textsc{queued}, \textsc{running}, \textsc{completed} and \textsc{failed}). Before runtime starts, the backend validates topology constraints and numeric parameter ranges and rejects structurally invalid configurations. The builder modules materialize the stored graph objects (nodes, edges, link metrics and client multiplicities) into executable simulation objects by instantiating Ray actors for each simulated server and client. In the end a \textsc{SimulationController} applies seed control, builds the selected engine, executes the Ray-based runtime \cite{moritz2018ray}, optionally triggers model evaluation and persists terminal summaries as durable records for post-hoc reconstruction.
+
+This pipeline isolates control-plane concerns from engine internals and provides comparable lifecycle semantics across architecture modes.
+
+\subsection{Shared Engine Contract}
+Both engines run under a common contract enforced by the backend so that measured differences are attributable to architecture semantics rather than protocol drift.In concrete terms, normalized seed controls (\textsc{seed set}, repetitions, deterministic per-repetition \textsc{run ID}) align randomness sources across modes. Canonical metadata propagation (\textsc{run ID}, \textsc{graph ID}, architecture, timing fields) links results to their originating configuration. A strict telemetry schema ensures a uniform audit trail, and a persistent final summary (duration, output artifact, evaluation summary, failure context) enables post-hoc reconstruction.
+
+\subsection{Hierarchical Engine: Tiered Synchronization Semantics}
+The \textit{Hierarchical Engine} maps a graph with one super server, multiple edge servers and client groups to a tiered event runtime (cf.\ \figref{fig:fedsim-architecture}). Each edge server must connect to the super server and each client group must map to exactly one edge server; these topology constraints are validated before instantiation to prevent structurally ambiguous configurations and to keep tier-level synchronization semantics well defined. A logical client node with \textsc{count} is expanded into multiple concrete client instances with deterministic partition IDs, enabling reproducible data partitioning. During execution, each edge server buffers client updates and performs weighted aggregation once a fixed minimum of updates is reached, which decouples local convergence from global synchronization and reduces communication load for geographically remote clients. Aggregated edge updates are then transmitted upstream using link-specific latency and packet-loss models, while the super server broadcasts refreshed global weights downstream.
+
+Synchronization points are explicit and structurally tied to tier boundaries, enabling direct attribution of timing effects to topology and communication assumptions.
+
+\subsection{Spyker-Oriented Engine: Fully Asynchronous Progression}
+The \textit{Spyker-Oriented Engine} follows Spyker's rationale of the reducing global idle time by removing strict round barriers \cite{zuo2024} (cf.\ \figref{fig:fedsim-architecture}). In implementation, each server actor maintains model state age, peer age knowledge, token state and client activity statistics. Runtime behavior is event-driven: client scheduling is simulated through local completion times, which eliminates global barrier waits that would otherwise idle fast servers. Synchronization is triggered by inter- and intra-drift thresholds (\textsc{h\_inter} and \textsc{h\_intra}), so peer exchange occurs only when model divergence exceeds acceptable bounds; this reduces unnecessary synchronization overhead while bounding staleness. Server-side model fusion is staleness-aware via sigmoid weighting that down-weights contributions from peers with high model age. Decentralized synchronization initiation is coordinated through a token-ring mechanism to prevent simultaneous exchange storms across servers. Overall, progression remains continuous without global barrier rounds, maximizing useful computation under heterogeneous client completion times.
+
+This design captures asynchronous geo-distributed behavior where strict global synchronization would unnecessarily serialize useful progress.
+
+\subsection{Compute Model: Deriving Delays from Compute Factor}
+FedSim's compute-time model is parameterized by node-specific \textsc{compute\_factor} and \textsc{performance\_stddev}. Let
+$n=\textsc{dataset\_size}$, $E=\textsc{epochs}$, $\kappa=\textsc{model\_complexity}$,
+$\phi_c=\textsc{compute\_factor}_c$, and $\sigma_c=\textsc{performance\_stddev}_c$.
+Therefore the client-local training delay is
 \begin{equation}
-a+b=\gamma\label{eq}
+t_{\mathrm{train}}=\max\!\left(10^{-6},\,\frac{nE\kappa}{\phi_c}+\mathcal{N}(0,\sigma_c)\right).
+\label{eq:train-total}
 \end{equation}
+Equation~\ref{eq:train-total} models a simple but interpretable workload rule: training cost grows linearly with data volume ($n$), local work ($E$) and model difficulty proxy ($\kappa$), and decreases with available compute capacity ($\phi_c$). The additive zero-mean noise term captures short-term runtime fluctuations (OS scheduling, cache effects and transient contention) without introducing systematic bias across clients. The floor at $10^{-6}$ prevents non-physical negative or zero durations and keeps event scheduling numerically stable.
 
-Be sure that the 
-symbols in your equation have been defined before or immediately following 
-the equation. Use ``\eqref{eq}'', not ``Eq.~\eqref{eq}'' or ``equation \eqref{eq}'', except at 
-the beginning of a sentence: ``Equation \eqref{eq} is . . .''
+For server-side aggregation, the simulator defines
+$u=\textsc{num\_updates}$, $M=\textsc{model\_size}$,
+$\phi_s=\textsc{compute\_factor}_s$, and $\sigma_s=\textsc{performance\_stddev}_s$. Let
+$\epsilon_{\mathrm{agg}}\sim\mathcal{N}\!\left(\frac{uM}{\phi_s},\sigma_s\right)$.
+The backend-defined aggregation delay is:
+\begin{equation}
+t_{\mathrm{agg}}=\max\!\left(10^{-6},\,\frac{uM}{\phi_s}+\epsilon_{\mathrm{agg}}\right).
+\label{eq:agg-total}
+\end{equation}
+The rationale is analogous as larger update batches and model states increase aggregation effort, while stronger server compute reduces it. This model is intentionally lightweight because FedSim targets architecture-level comparison under controlled assumptions; a low-parameter delay model is easier to calibrate and audit than hardware-specific micro-models, and therefore better supports reproducibility-focused simulation studies.
+That is also why the equations~\ref{eq:train-total} and~\ref{eq:agg-total} appear and are used exactly as they are in the backend implementation. In the current engine execution paths, client simulation primarily uses $t_{\mathrm{train}}$ together with network delays; Eq.~\ref{eq:agg-total} documents an implemented backend model that is currently not on the active critical path of both engines.
 
-\subsection{\LaTeX-Specific Advice}
+\subsection{Runtime Kernel: Event Heap and Virtual Time}
+Both engines are executed over the same Ray-based orchestration kernel \cite{moritz2018ray}. The orchestrator stores events in a min-heap ordered by trigger time and sequence ID, advances global virtual time monotonically, dispatches actor callbacks and re-inserts newly generated events. This shared kernel provides deterministic event ordering under equal timestamps, ensuring reproducibility across runs with identical seeds; causality checks at actor boundaries, preventing temporal inconsistencies in asynchronous interactions and uniform timing semantics for hierarchical and asynchronous execution, enabling fair wall-clock and virtual-time comparison.
 
-Please use ``soft'' (e.g., \verb|\eqref{Eq}|) cross references instead
-of ``hard'' references (e.g., \verb|(1)|). That will make it possible
-to combine sections, add equations, or change the order of figures or
-citations without having to go through the file line by line.
+Let event $e_k$ have trigger time $\tau_k$ and insertion order $s_k$. Events are sorted lexicographically by $(\tau_k, s_k)$ and, when no actor callback is in flight, the orchestrator advances the global virtual simulation time to the next event time:
+\begin{equation}
+T_{\mathrm{sim}} \leftarrow \tau_k.
+\label{eq:virtual-time}
+\end{equation}
+At the end of \textsc{run\_until}($T_{\mathrm{target}}$), the implementation enforces
+\begin{equation}
+T_{\mathrm{sim}} \leftarrow \max(T_{\mathrm{sim}}, T_{\mathrm{target}}),
+\label{eq:run-until-final}
+\end{equation}
+which matches the backend's explicit target-time alignment.
 
-Please don't use the \verb|{eqnarray}| equation environment. Use
-\verb|{align}| or \verb|{IEEEeqnarray}| instead. The \verb|{eqnarray}|
-environment leaves unsightly spaces around relation symbols.
+For network delay, let $m$ be payload size (MB), $u_i$ sender upload speed, $d_j$ receiver download speed, $p_{ij}\sim\mathcal{N}(\mu^p_{ij},\sigma^p_{ij})$ be sampled packet loss, and $\lambda_{ij}\sim\mathcal{N}(\mu^\lambda_{ij},\sigma^\lambda_{ij})$ be sampled latency (ms) which results in the following backend computation:
+\begin{equation}
+t_{\mathrm{net}}=
+\frac{8m}{\min(u_i,d_j)\cdot\max(10^{-3},1-p_{ij})}
+\;+\;\max\!\left(0,\frac{\lambda_{ij}}{10^3}\right).
+\label{eq:total-delay}
+\end{equation}
+Equation~\ref{eq:total-delay} decomposes transmission into two interpretable parts: serialization delay (payload over effective bottleneck throughput) and propagation/queueing delay (latency term). Packet loss is modeled as throughput degradation rather than explicit retransmission state, which keeps the model tractable for large scenario sweeps while preserving the first-order effect that loss slows end-to-end transfer. The implementation deliberately does not clip sampled $p_{ij}$ to $[0,1]$; instead, numerical safety is enforced through $\max(0.001,1-p_{ij})$, ensuring finite delay values even under extreme samples.
+This is the simulator's exact ``as implemented'' network model. Variables are summarized in \tabref{tab:runtime-symbols}.
 
-Please note that the \verb|{subequations}| environment in {\LaTeX}
-will increment the main equation counter even when there are no
-equation numbers displayed. If you forget that, you might write an
-article in which the equation numbers skip from (17) to (20), causing
-the copy editors to wonder if you've discovered a new method of
-counting.
-
-{\BibTeX} does not work by magic. It doesn't get the bibliographic
-data from thin air but from .bib files. If you use {\BibTeX} to produce a
-bibliography you must send the .bib files. 
-
-{\LaTeX} can't read your mind. If you assign the same label to a
-subsubsection and a table, you might find that Table I has been cross
-referenced as Table IV-B3. 
-
-{\LaTeX} does not have precognitive abilities. If you put a
-\verb|\label| command before the command that updates the counter it's
-supposed to be using, the label will pick up the last counter to be
-cross referenced instead. In particular, a \verb|\label| command
-should not go before the caption of a figure or a table.
-
-Do not use \verb|\nonumber| inside the \verb|{array}| environment. It
-will not stop equation numbers inside \verb|{array}| (there won't be
-any anyway) and it might stop a wanted equation number in the
-surrounding equation.
-
-\subsection{Some Common Mistakes}\label{SCM}
-\begin{itemize}
-\item The word ``data'' is plural, not singular.
-\item The subscript for the permeability of vacuum $\mu_{0}$, and other common scientific constants, is zero with subscript formatting, not a lowercase letter ``o''.
-\item In American English, commas, semicolons, periods, question and exclamation marks are located within quotation marks only when a complete thought or name is cited, such as a title or full quotation. When quotation marks are used, instead of a bold or italic typeface, to highlight a word or phrase, punctuation should appear outside of the quotation marks. A parenthetical phrase or statement at the end of a sentence is punctuated outside of the closing parenthesis (like this). (A parenthetical sentence is punctuated within the parentheses.)
-\item A graph within a graph is an ``inset'', not an ``insert''. The word alternatively is preferred to the word ``alternately'' (unless you really mean something that alternates).
-\item Do not use the word ``essentially'' to mean ``approximately'' or ``effectively''.
-\item In your paper title, if the words ``that uses'' can accurately replace the word ``using'', capitalize the ``u''; if not, keep using lower-cased.
-\item Be aware of the different meanings of the homophones ``affect'' and ``effect'', ``complement'' and ``compliment'', ``discreet'' and ``discrete'', ``principal'' and ``principle''.
-\item Do not confuse ``imply'' and ``infer''.
-\item The prefix ``non'' is not a word; it should be joined to the word it modifies, usually without a hyphen.
-\item There is no period after the ``et'' in the Latin abbreviation ``et al.''.
-\item The abbreviation ``i.e.'' means ``that is'', and the abbreviation ``e.g.'' means ``for example''.
-\end{itemize}
-An excellent style manual for science writers is \cite{b7}.
-
-\subsection{Authors and Affiliations}
-\textbf{The class file is designed for, but not limited to, six authors.} A 
-minimum of one author is required for all conference articles. Author names 
-should be listed starting from left to right and then moving down to the 
-next line. This is the author sequence that will be used in future citations 
-and by indexing services. Names should not be listed in columns nor group by 
-affiliation. Please keep your affiliations as succinct as possible (for 
-example, do not differentiate among departments of the same organization).
-
-\subsection{Identify the Headings}
-Headings, or heads, are organizational devices that guide the reader through 
-your paper. There are two types: component heads and text heads.
-
-Component heads identify the different components of your paper and are not 
-topically subordinate to each other. Examples include Acknowledgments and 
-References and, for these, the correct style to use is ``Heading 5''. Use 
-``figure caption'' for your Figure captions, and ``table head'' for your 
-table title. Run-in heads, such as ``Abstract'', will require you to apply a 
-style (in this case, italic) in addition to the style provided by the drop 
-down menu to differentiate the head from the text.
-
-Text heads organize the topics on a relational, hierarchical basis. For 
-example, the paper title is the primary text head because all subsequent 
-material relates and elaborates on this one topic. If there are two or more 
-sub-topics, the next level head (uppercase Roman numerals) should be used 
-and, conversely, if there are not at least two sub-topics, then no subheads 
-should be introduced.
-
-\subsection{Figures and Tables}
-\paragraph{Positioning Figures and Tables} Place figures and tables at the top and 
-bottom of columns. Avoid placing them in the middle of columns. Large 
-figures and tables may span across both columns. Figure captions should be 
-below the figures; table heads should appear above the tables. Insert 
-figures and tables after they are cited in the text. Use the abbreviation 
-``Fig.~\ref{fig}'', even at the beginning of a sentence.
-
-\begin{table}[htbp]
-\caption{Table Type Styles}
-\begin{center}
-\begin{tabular}{|c|c|c|c|}
+\begin{table}[t]
+\caption{Core Runtime Variables}
+\label{tab:runtime-symbols}
+\centering
+{\setlength{\tabcolsep}{5.5pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{|p{1.9cm}|p{5.30cm}|}
 \hline
-\textbf{Table}&\multicolumn{3}{|c|}{\textbf{Table Column Head}} \\
-\cline{2-4} 
-\textbf{Head} & \textbf{\textit{Table column subhead}}& \textbf{\textit{Subhead}}& \textbf{\textit{Subhead}} \\
+\textbf{Variable} & \textbf{Meaning} \\
 \hline
-copy& More table copy$^{\mathrm{a}}$& &  \\
+$\phi_c,\phi_s$ & Client/server \textsc{compute\_factor} \\
 \hline
-\multicolumn{4}{l}{$^{\mathrm{a}}$Sample of a Table footnote.}
+$\sigma_c,\sigma_s$ & Client/server \textsc{performance\_stddev} \\
+\hline
+$n,\kappa, E$ & \textsc{dataset\_size}, \textsc{model\_complexity, \textsc{epochs}} \\
+\hline
+$u,M$ & \textsc{num\_updates}, \textsc{model\_size} \\
+\hline
+$m$ & \textsc{payload\_size\_mb} \\
+\hline
+$u_i,d_j$ & \textsc{upload\_speed}, \textsc{download\_speed} on link $(i,j)$ \\
+\hline
+$\mu^p_{ij},\sigma^p_{ij}$ & \textsc{packet\_loss\_avg}, \textsc{packet\_loss\_stddev} \\
+\hline
+$\mu^\lambda_{ij},\sigma^\lambda_{ij}$ & \textsc{latency\_avg}, \textsc{latency\_stddev} (ms) \\
+\hline
+$t_{\mathrm{train}},t_{\mathrm{agg}},t_{\mathrm{net}}$ & Effective client/server/network delays \\
+\hline
+$T_{\mathrm{sim}},T_{\mathrm{target}}$ & Global virtual time and run-until target (Eq.~\ref{eq:run-until-final}) \\
+\hline
 \end{tabular}
-\label{tab1}
-\end{center}
+}
 \end{table}
 
-\begin{figure}[htbp]
-\centerline{\fbox{\rule{0pt}{1.2in}\rule{0.9\columnwidth}{0pt}}}
-\caption{Example of a figure caption.}
-\label{fig}
+\subsection{both-mode as a Formal Comparison Protocol}
+\textit{both-mode} is a controlled orchestration policy for paired architecture evaluation, not a third FL algorithm. For each comparison batch, both engines are executed under a shared envelope. They receive an identical graph snapshot, which is an immutable capture of topology at submission time containing node roles, edge connections and per-link parameters (latency, bandwidth, packet loss, jitter), so observed differences in communication cost or convergence rate arise from architecture semantics rather than from differing network assumptions. They also use the same dataset and partitioning configuration, the same seed sets and repetition counts across all randomness sources (data partitioning, client sampling, local training, scheduling) and the same optimization budget with identical evaluation cadence. Finally, architecture-specific outputs are linked through a common \textsc{comparison\_id}, enabling automatic side-by-side analysis in the Dashboard.
+
+Consequently, architecture mode is the only intended independent variable. This operationalizes fairness as enforceable runtime logic instead of post-hoc manual curation.
+
+\subsection{Validation Strategy and Concurrency Safety}
+Validation is split into frontend preflight checks and backend-authoritative enforcement of architecture-specific constraints. Frontend checks catch user errors immediately during topology authoring; backend checks preserve correctness under non-UI invocation paths (e.g., API-driven automation). This dual-layer design ensures that every run accepted by the backend is structurally valid and metrically comparable.
+
+Concurrency safety is enforced through run-context isolation, per-run metadata capture and controlled worker scheduling. In \textit{both-mode}, shared seed-set enforcement and synchronized repetition indices keep paired comparisons aligned across concurrent engine executions. This is an explicit design decision to prevent hidden cross-run interference, which is a common source of irreproducible variance in distributed simulations.
+
+\subsection{Telemetry and Artifact Governance}
+FedSim emits structured JSON telemetry records with immutable run identity and architecture labels. Periodic evaluator actors collect model-quality metrics during runtime (virtual-time indexed), while run-store persistence captures terminal metadata, summaries and architecture-linked result bundles. This dual online/offline observability supports both dashboard inspection and publication-grade regeneration.
+
+\section{Evaluation Design and Reporting Protocol}
+\label{sec:evaldesign}
+The evaluation design is intentionally framed as a contract between configuration, runtime and reporting. Its purpose is to ensure that any observed performance gap can be interpreted as a direct result of architectural differences rather than a protocol mismatch or hidden simulation variance. 
+
+To reduce the confounding variables—often present in distributed machine learning studies—we enforce strict invariants across our comparative runs. Both evaluated architectures—synchronous hierarchical and asynchronous flat multi-server—are subjected to the exact same dataset partitioning regime, identical neural network initializations, matched optimization budgets, and identical random seed sets. By strictly controlling these factors, we isolate the network topology and the underlying synchronization mechanism as the sole independent variables determining performance.
+
+Our reporting protocol focuses on three core metrics that align with the framework comparison dimensions discussed later in \tabref{tab:comparisoncriteria}. First, we measure model convergence quality by tracking accuracy and loss trajectories over relative simulation completion. Second, we assess architectural robustness by observing model performance under deliberately imbalanced client-to-server load distributions. Finally, we evaluate system-level orchestration efficiency by comparing the physical wall-clock duration required by our Ray-based backend to simulate the respective virtual timeframes.
+
+\section{Evaluation}
+\label{sec:eval}
+In this section, we evaluate the proposed FedSim simulation engine by comparing a classic synchronous Hierarchical Multi-Server topology against an asynchronous flat multi-server topology inspired by Spyker \cite{zuo2024}. All experiments utilize the CIFAR-10 dataset, which is partitioned among clients in an Independent and Identically Distributed (IID) manner. Local training is performed using a foundational 3-Convolution, 2-Fully-Connected Layer CNN without advanced data augmentations, utilizing only basic resizing to $32\times32$ pixels, tensor conversion, and normalization. 
+
+For the hierarchical setup, we deploy one Super Server (compute factor $\phi=3000$, 10 Gbps symmetric bandwidth) connected to four Edge Servers ($\phi=1000$). Each Edge Server acts as a regional aggregator for 50 clients ($\phi=500$, 1 Gbps) which results in a total of 200 clients.
+
+Conversely, the asynchronous Spyker-oriented setup utilizes four strongly connected Servers ($\phi=1000$) managing a total of 100 clients ($\phi=500$). To ensure parity in the local optimization budget, clients in both architectures perform one local epoch per round using Stochastic Gradient Descent with a learning rate of $\eta=0.04$ and a batch size of $32$. All simulated inter-region and edge-to-client network links share a Gaussian latency profile of $\mu=20$ ms ($\sigma=2$) and a packet loss rate of $0.001$.
+
+\subsection{Baseline Convergence for Simulations}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{convergence_graph_both.png}
+    \caption{Baseline convergence comparison charting Evaluation Accuracy (solid lines, left axis) and Evaluation Loss (solid lines, right axis) for the Hierarchical (green/red) and Spyker (blue/yellow) architectures over relative run completion.}
+    \label{fig:convergence}
 \end{figure}
 
-Figure Labels: Use 8 point Times New Roman for Figure labels. Use words 
-rather than symbols or abbreviations when writing Figure axis labels to 
-avoid confusing the reader. As an example, write the quantity 
-``Magnetization'', or ``Magnetization, M'', not just ``M''. If including 
-units in the label, present them within parentheses. Do not label axes only 
-with units. In the example, write ``Magnetization (A/m)'' or ``Magnetization 
-\{A[m(1)]\}'', not just ``A/m''. Do not label axes with a ratio of 
-quantities and units. For example, write ``Temperature (K)'', not 
-``Temperature/K''.
+Evaluating the baseline convergence of both architectures reveals distinct behavioral profiles. As shown in \figref{fig:convergence}, charting both accuracy and evaluation loss against the relative run completion percentage provides a normalized view of their training dynamics. The hierarchical architecture demonstrates a highly stable and logarithmic convergence trajectory, progressing smoothly to a peak accuracy of 70.06\% while its evaluation loss proportionally and cleanly decreases to 0.92. Conversely, the asynchronous Spyker-oriented engine demonstrates an exceptionally rapid initial convergence—steeply climbing to 50\% accuracy in the earliest phases of the run—but ultimately plateaus at approximately 62.53\% accuracy. 
 
-\section*{Acknowledgment}
+Notably, the asynchronous model exhibits a significantly higher and highly oscillatory loss trajectory. This variance is a direct mathematical consequence of continuous, staleness-aware aggregation without strict global barrier rounds. Since servers are constantly being updated by clients providing slightly outdated gradients, this continuous and uncoordinated model fusion inherently injects noise into the global loss landscape, keeping the average loss elevated and volatile even as the classification accuracy improves.
 
-The preferred spelling of the word ``acknowledgment'' in America is without 
-an ``e'' after the ``g''. Avoid the stilted expression ``one of us (R. B. 
-G.) thanks $\ldots$''. Instead, try ``R. B. G. thanks$\ldots$''. Put sponsor 
-acknowledgments in the unnumbered footnote on the first page.
+Comparing these results to the original Spyker literature \cite{zuo2024} reveals an interesting inversion. In the original study's CIFAR-10 benchmarks, the Spyker architecture scales gracefully to roughly 75\% accuracy, visibly outperforming their hierarchical baseline (HierFAVG), which plateaus near 62\%. In our isolated simulation environment, however, the synchronous hierarchical baseline (70.06\%) actually outperforms the asynchronous architecture (63\%). 
 
-\section*{References}
+We attribute these architectural discrepancies, alongside the overall difference in absolute peak accuracy, to critical methodological boundaries we intentionally set for our simulation. Our simulation employs a strict IID dataset partition, whereas the primary advantage of Spyker's asynchronous design is its ability to mitigate statistical heterogeneity (non-IID data) by preventing fast clients from biasing the global model. In our cleanly distributed IID environment, the penalty for delayed updates is inherently minimal, allowing the synchronous hierarchical architecture to aggregate optimal, unbiased gradient steps without suffering from data divergence. Furthermore, while the network topology and asynchronous token-passing mechanisms were faithfully replicated, our engine configuration isolated the systems-level network effects by intentionally omitting the advanced ML-specific staleness-penalization weighting and milestone-based schedules for learning rate decay utilized in the original Spyker paper. Finally, we utilized a basic CNN to ensure tractable simulation times and clear systems observability, explicitly omitting the heavy data augmentations—such as random crops and horizontal flips—and deeper network architectures that are typically required to push CIFAR-10 accuracy into the 75\% to 90\% regime.
 
-Please number citations consecutively within brackets \cite{b1}. The 
-sentence punctuation follows the bracket \cite{b2}. Refer simply to the reference 
-number, as in \cite{b3}---do not use ``Ref. \cite{b3}'' or ``reference \cite{b3}'' except at 
-the beginning of a sentence: ``Reference \cite{b3} was the first $\ldots$''
+\subsection{Load Distribution Comparison}
+A primary theoretical advantage of asynchronous multi-server FL is its resilience to regional stragglers and structural load imbalances. To test this capability within our simulation engine, we subject the asynchronous Spyker architecture to varying degrees of client-to-server allocation skew while maintaining a constant total of 100 clients. We exclusively run this load distribution comparison for the asynchronous engine to observe its specific degradation profile. We measure the final model stability across client distribution scenarios highlighting a balanced baseline (25/25/25/25), a moderate skew (52/16/16/16), a heavy skew (63/13/12/12) and an extreme skew (70/10/10/10). 
 
-Number footnotes separately in superscripts. Place the actual footnote at 
-the bottom of the column in which it was cited. Do not put footnotes in the 
-abstract or reference list. Use letters for table footnotes.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{convergence_graph_acc.png}
+    \caption{Evaluation Accuracy of the asynchronous Spyker architecture under varying client load distributions (balanced, moderately skewed, and extremely skewed) across 4 servers.}
+    \label{fig:imbalance_acc}
+\end{figure}
 
-Unless there are six authors or more give all authors' names; do not use 
-``et al.''. Papers that have not been published, even if they have been 
-submitted for publication, should be cited as ``unpublished'' \cite{b4}. Papers 
-that have been accepted for publication should be cited as ``in press'' \cite{b5}. 
-Capitalize only the first word in a paper title, except for proper nouns and 
-element symbols.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{convergence_graph_loss.png}
+    \caption{Evaluation Loss of the asynchronous Spyker architecture under the same varying client load distributions, demonstrating reduced volatility under higher skew.}
+    \label{fig:imbalance_loss}
+\end{figure}
 
-For papers published in translation journals, please give the English 
-citation first, followed by the original foreign-language citation \cite{b6}.
+As observed in \figref{fig:imbalance_acc} and \figref{fig:imbalance_loss}, the resulting evaluation data reveals a highly uncharacteristic performance trend. In the original Spyker literature evaluating the MNIST dataset, structural imbalances severely degraded accuracy (by up to 14.5\%) and prolonged convergence times. In our CIFAR-10 simulation, however, as the imbalance increases towards the extreme 70/10/10/10 distribution, the asynchronous architecture actually demonstrates an \textit{improvement} in both peak accuracy and loss stability. The highly skewed setup consistently outperforms the evenly balanced 25/25/25/25 baseline, achieving higher accuracy and a significantly smoother, lower loss trajectory.
 
+We attribute this divergence from the original literature to the interaction between the asynchronous algorithm's synchronization triggers and our specific dataset partitioning methodology. In the Spyker protocol, global server-to-server model exchanges are triggered asynchronously whenever the age difference between two server models exceeds a predefined threshold ($h_{inter}$). Under a severe load imbalance (e.g., one server processing 70 clients while others process 10), the heavily loaded server processes local updates at a vastly accelerated rate. Consequently, its model age advances much faster than its peers, intentionally and repeatedly breaching the $h_{inter}$ threshold. 
+
+This mechanical behavior results in much more frequent global synchronizations initiated by the heavily loaded server. Crucially, because our simulation employs a strict IID dataset partition, the heavily loaded server does not suffer from the statistical class biases (non-IID data) that caused accuracy degradation in the original paper's experiments. Instead, the 70-client server acts as a highly active, robust ``leader'' that rapidly aggregates a generalized, high-quality model from a large pool of unbiased data, and frequently broadcasts this superior model to the slower servers. Thus, in an IID environment, an extreme structural imbalance combined with age-based synchronization thresholds inadvertently creates a highly efficient, accelerated consensus mechanism, fully bypassing the expected straggler penalties.
+
+\subsection{Computational efficiency of discrete-event simulation}
+Beyond model metrics, we evaluated the computational efficiency of the Ray-based \textsc{SimulationOrchestrator} by observing the physical wall-clock execution time required to simulate these environments. The hierarchical setup proved to be highly efficient for discrete-event simulation. Because synchronous training explicitly batches \textsc{start\_fit} calls for all clients simultaneously, the orchestrator's concurrency dispatcher can densely pack independent Ray actor futures, executing the complete simulation (encompassing 200 clients) in approximately 1,579 physical seconds (27 minutes). In contrast, the asynchronous simulation requires roughly three times more physical wall-clock time at 4,593 seconds (76 minutes) to process its respective timeframe (encompassing 100 clients) as referenced in \figref{fig:convergence}. Our systems telemetry reveals that this discrepancy is driven by the continuous, unbatched nature of asynchronous message passing. Because clients update servers completely independently, the event heap frequently encounters strictly sequential causal dependencies. This drastically lowers host CPU utilization, as the orchestrator must wait for individual asynchronous events to resolve before safely advancing virtual time. This highlights a critical insight in discrete-event simulation: while an asynchronous architecture successfully eliminates idle time for the simulated federated servers, it inherently limits the parallelization opportunities for the physical simulation engine running it.
+
+\begin{table}[t]
+\caption{Framework-Level Comparison Axes Used in FedSim}
+\label{tab:comparisoncriteria}
+\centering
+{\setlength{\tabcolsep}{5.5pt}
+\renewcommand{\arraystretch}{1.18}
+\begin{tabular}{|p{2.05cm}|p{4.85cm}|}
+\hline
+\textbf{Dimension} & \textbf{Operationalized Question} \\
+\hline
+Multi-server semantics & Are hierarchical and asynchronous multi-server modes supported natively? \\
+\hline
+Topology expressiveness & Are node roles/links explicit, editable and architecture-validated? \\
+\hline
+Reproducibility controls & Are seeds, configurations, topology snapshots and outputs linked by run identity? \\
+\hline
+Observability depth & Are runtime and evaluation metrics queryable online and post-hoc? \\
+\hline
+Extensibility model & Can engines/strategies be added through stable low-coupling interfaces? \\
+\hline
+Scalability practice & Can scenario-family batches run robustly with lifecycle and failure governance? \\
+\hline
+\end{tabular}
+}
+\end{table}
+
+\section{Comparative Positioning Across FL Frameworks}
+\label{sec:comparison}
+\tabref{tab:frameworkpositioning} summarizes the high-level positioning of relevant FL frameworks across the comparison dimensions of \tabref{tab:comparisoncriteria}. This comparison is intentionally fit-for-purpose: no framework is expected to dominate all axes simultaneously. The appropriate choice depends on the target research question—throughput-first studies call for different tools than controlled architecture comparison.
+
+\textbf{Flower} is a strong substrate when modularity, heterogeneity support and broad interoperability are required \cite{flower}. \textbf{FLSim} is effective for PyTorch-centered algorithm iteration \cite{flsim}. \textbf{FLUTE} and \textbf{pfl-research} are strong references for throughput-first and large-scale simulation campaigns \cite{flute2022,granqvist2024}. \textbf{Pollen} emphasizes resource-aware scheduling efficiency \cite{sani2023}. \textbf{FedScale} and \textbf{FedML} contribute benchmark-oriented large-scale infrastructure and reusable experimentation tooling \cite{lai2022fedscale,he2020fedml}.
+
+FedSim's niche is architecture-comparison governance: explicit topology modeling with per-link network parameters, architecture-aware execution semantics and run-traceable comparability in one Flower-oriented stack. As \tabref{tab:frameworkpositioning} shows, this combination is not offered by any surveyed framework, making FedSim specifically suited to research questions that require controlled, reproducible comparison of hierarchical and asynchronous multi-server FL architectures under geo-distributed assumptions.
+
+\begin{table}[t]
+\caption{High-Level Positioning of Relevant FL Frameworks}
+\label{tab:frameworkpositioning}
+\centering
+{\setlength{\tabcolsep}{5.5pt}
+\renewcommand{\arraystretch}{1.18}
+\begin{tabular}{|p{1.45cm}|p{1.65cm}|p{2.0cm}|p{1.65cm}|}
+\hline
+\textbf{Framework} & \textbf{Primary Strength} & \textbf{Typical Best Use} & \textbf{Relation to FedSim} \\
+\hline
+Flower \cite{flower} & Modular interoperable runtime & Extensible heterogeneous FL workflows & Core substrate \\
+\hline
+FLSim \cite{flsim} & Algorithm iteration speed & PyTorch-centric strategy studies & Baseline reference \\
+\hline
+FLUTE \cite{flute2022} & High simulation throughput & Large-scale benchmark sweeps & Throughput reference \\
+\hline
+pfl-research \cite{granqvist2024} & Private-FL simulation pipeline & Scalable private-FL benchmarking & Method reference \\
+\hline
+Pollen \cite{sani2023} & Resource-aware scheduling & Cluster-efficient simulation campaigns & Scheduling reference \\
+\hline
+FedML \cite{he2020fedml} & Reusable benchmarking infrastructure & Large-scale FL research and system benchmarks & Benchmark reference \\
+\hline
+FedScale \cite{lai2022fedscale} & Realistic FL benchmarking at scale & Joint system/ML benchmark studies & Benchmark reference \\
+\hline
+FedSim (this work) & Topology-aware architecture governance & Controlled geo-distributed architecture comparison & Integration focus \\
+\hline
+\end{tabular}
+}
+\end{table}
+
+\section{Discussion and Future Work}
+\label{sec:discussion}
+\subsection{What FedSim Adds Beyond Baseline Framework Usage}
+As reflected in Tables~\ref{tab:comparisoncriteria} and~\ref{tab:frameworkpositioning}, FedSim contributes an architecture-comparison workflow for geo-distributed FL studies: graph-native scenario specification with per-link network parameters, backend-enforced execution constraints and lifecycle-governed telemetry persistence with replayable run artifacts. This combination is not available in any surveyed framework.
+
+\subsection{Current Limitations}
+Current limitations include finite scenario realism, limited dataset breadth, current IID-only partitioning and sensitivity to environment drift. Asynchronous analyses further depend on the fidelity of delay and resource models; therefore, conclusions should be interpreted under explicit simulation assumptions.
+
+\subsection{Future Work}
+
+Future development could be organized along four complementary directions.
+
+First, a formal plug-in architecture would enhance extensibility and modularity. An engine plug-in interface with lifecycle hooks (init/start/step/finalize), validation and metric-export contracts, and capability descriptors for supported topology and synchronization classes would enable third-party engine integration without core codebase modification. Strategy plug-ins with typed parameter schemas (e.g., FedAvg \cite{mcmahan2017}, FedProx \cite{li2020fedprox}) would similarly allow algorithm-level customization while preserving interface stability. A single-server baseline mode with configuration parity to multi-server modes would provide controlled reference points for isolating multi-server coordination overhead.
+
+Second, statistical and reporting automation could reduce manual analysis overhead. An integrated analytics pipeline would support one-command benchmark regeneration with partial-failure continuation across multi-seed batches, automated computation of confidence intervals, effect sizes and significance tests, and generation of reproducibility bundles containing configuration snapshots, logs, round-level metrics, environment metadata and plot-ready exports. This would align simulation outputs with publication-grade reporting requirements and reduce manual post-processing.
+
+Third, the experimental scope could be broadened in two valuable ways. While our current GPU setup only supports model evaluation, further development will unlock realistic training performance for production-scale deep learning workloads. Additionally, although we already support multiple datasets, optimizing dataset-specific input dimensions and channel configurations will help us maximize our accuracy.
+
+Fourth, architectural and fault-tolerance extensions would improve deployment realism. Non-IID data partitioning controls (class imbalance, quantity skew, feature distribution shift) would address statistical heterogeneity scenarios where asynchronous architectures are theoretically advantageous—conditions our current IID-only evaluation in Section~\ref{sec:eval} does not capture. Controlled fault injection (client dropout, server unavailability, transient link failures) and long-horizon stress testing beyond current queue and resource guardrails would evaluate resilience under degraded or adversarial conditions. Custom topology support—including peer-to-peer architectures, ring topologies and hybrid configurations—would extend FedSim beyond hierarchical and flat multi-server paradigms, requiring validation semantics for cycle detection, gossip-protocol aggregation and decentralized convergence criteria. Reusable regional topology templates capturing realistic geo-distributed network characteristics would further reduce scenario authoring overhead.
+
+Together, these extensions would position FedSim as a comprehensive comparative benchmark platform for geo-distributed federated learning research.
+
+\section{Conclusion}
+FedSim provides a Flower-oriented framework for topology-aware multi-server FL simulation with an explicit architecture-comparison methodology. The system integrates a web-based Graph Editor, Dashboard and Backend with two architecture-specific engines (Hierarchical and Spyker-Oriented), while \textit{both-mode} enables controlled paired evaluation under identical experimental conditions.
+
+Its main contribution is methodological rigor in experimental infrastructure: architecture semantics remain comparable under shared constraints and run artifacts are traceable end-to-end (\tabref{tab:comparisoncriteria}). FedSim addresses a gap in the FL simulation landscape (\tabref{tab:frameworkpositioning}) by providing a practical basis for reproducible and auditable geo-distributed studies.
+
+\section*{Artifact Availability}
+The artifact package is organized for reproducibility and includes source code, deployment configuration, seeded scenario graphs, run metadata persistence and dashboard provisioning assets. Together, these components provide a concrete base for independent reconstruction and extension of benchmark campaigns.
+
+%\section*{Acknowledgment}
+%The authors thank Christian Becker, Michael Schramm and Eva Str\"ahle for guidance on architecture framing, methodological scope and evaluation design.
 \begin{thebibliography}{00}
+\bibitem{mcmahan2017} B. McMahan \textit{et al.}, ``Communication-efficient learning of deep networks from decentralized data,'' in \textit{Proc. 20th Int. Conf. Artificial Intelligence and Statistics (AISTATS)}, 2017, pp. 1273--1282.
 \bibitem{kairouz2021} P. Kairouz \textit{et al.}, ``Advances and open problems in federated learning,'' \textit{Foundations and Trends in Machine Learning}, vol. 14, no. 1--2, pp. 1--210, 2021.
 \bibitem{abad2020} M. S. H. Abad \textit{et al.}, ``Hierarchical federated learning across heterogeneous cellular networks,'' in \textit{Proc. IEEE ICASSP}, 2020, pp. 8866--8870.
 \bibitem{zuo2024} Y. Zuo \textit{et al.}, ``Spyker: Asynchronous multi-server federated learning for geo-distributed clients,'' in \textit{Proc. 25th Int. Middleware Conf.}, 2024, pp. 367--378.
-\bibitem{flower} Flower AI, ``Flower,'' https://flower.ai, accessed: 2026-04-02.
-\bibitem{flsim} Meta Research, ``FLSim,'' https://github.com/facebookresearch/FLSim, accessed: 2026-04-02.
-\bibitem{granqvist2024} F. Granqvist \textit{et al.}, ``pfl-research: Simulation framework for accelerating research in private federated learning,'' in \textit{Advances in Neural Information Processing Systems}, vol. 37, 2024.
+\bibitem{li2020fedprox} T. Li \textit{et al.}, ``Federated optimization in heterogeneous networks,'' in \textit{Proc. MLSys}, 2020.
+\bibitem{flower} D. J. Beutel \textit{et al.}, ``Flower: A friendly federated learning research framework,'' \textit{arXiv preprint arXiv:2007.14390}, 2020.
+\bibitem{flsim} Meta Research, ``FLSim,'' \url{https://github.com/facebookresearch/FLSim}, accessed: 2026-04-27.
+\bibitem{flute2022} M. H. Garcia \textit{et al.}, ``FLUTE: A scalable, extensible framework for high-performance federated learning simulations,'' \textit{arXiv preprint arXiv:2203.13789}, 2022.
+\bibitem{granqvist2024} F. Granqvist \textit{et al.}, ``pfl-research: Simulation framework for accelerating research in private federated learning,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS), Datasets and Benchmarks Track}, vol. 37, 2024.
 \bibitem{sani2023} L. Sani \textit{et al.}, ``Pollen: High-throughput federated learning simulation via resource-aware client placement,'' \textit{arXiv preprint arXiv:2306.17453}, 2023.
-\bibitem{b1} G. Eason, B. Noble, and I. N. Sneddon, ``On certain integrals of Lipschitz-Hankel type involving products of Bessel functions,'' Phil. Trans. Roy. Soc. London, vol. A247, pp. 529--551, April 1955.
-\bibitem{b2} J. Clerk Maxwell, A Treatise on Electricity and Magnetism, 3rd ed., vol. 2. Oxford: Clarendon, 1892, pp.68--73.
-\bibitem{b3} I. S. Jacobs and C. P. Bean, ``Fine particles, thin films and exchange anisotropy,'' in Magnetism, vol. III, G. T. Rado and H. Suhl, Eds. New York: Academic, 1963, pp. 271--350.
-\bibitem{b4} K. Elissa, ``Title of paper if known,'' unpublished.
-\bibitem{b5} R. Nicole, ``Title of paper with only first word capitalized,'' J. Name Stand. Abbrev., in press.
-\bibitem{b6} Y. Yorozu, M. Hirano, K. Oka, and Y. Tagawa, ``Electron spectroscopy studies on magneto-optical media and plastic substrate interface,'' IEEE Transl. J. Magn. Japan, vol. 2, pp. 740--741, August 1987 [Digests 9th Annual Conf. Magnetics Japan, p. 301, 1982].
-\bibitem{b7} M. Young, The Technical Writer's Handbook. Mill Valley, CA: University Science, 1989.
+\bibitem{he2020fedml} C. He \textit{et al.}, ``FedML: A research library and benchmark for federated machine learning,'' \textit{arXiv preprint arXiv:2007.13518}, 2020.
+\bibitem{lai2022fedscale} F. Lai \textit{et al.}, ``FedScale: Benchmarking model and system performance of federated learning at scale,'' in \textit{Proc. 39th Int. Conf. Machine Learning (ICML)}, 2022, pp. 11814--11827.
+\bibitem{caldas2018leaf} S. Caldas \textit{et al.}, ``LEAF: A benchmark for federated settings,'' \textit{arXiv preprint arXiv:1812.01097}, 2018.
+\bibitem{tff} Google, ``TensorFlow Federated,'' \url{https://www.tensorflow.org/federated}, accessed: 2026-04-27.
+\bibitem{bonawitz2019} K. Bonawitz \textit{et al.}, ``Towards federated learning at scale: System design,'' in \textit{Proc. MLSys}, 2019.
+\bibitem{moritz2018ray} P. Moritz \textit{et al.}, ``Ray: A distributed framework for emerging {AI} applications,'' in \textit{Proc. 13th USENIX Symp. Operating Systems Design and Implementation (OSDI)}, 2018, pp. 561--577.
 \end{thebibliography}
-\vspace{12pt}
-\color{red}
-IEEE conference templates contain guidance text for composing and formatting conference papers. Please ensure that all template text is removed from your conference paper prior to submission to the conference. Failure to remove the template text from your paper may result in your paper not being published.
 
 \end{document}
