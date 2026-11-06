@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { GraphService } from '../graph.service';
 import { SpykerGraphHistoryService } from './spyker-graph-history.service';
-import { Node } from 'ngx-vflow';
+import { StaticNode as Node } from 'ngx-vflow';
 import { ServerNode } from '../nodes/server-node/server-node';
 import { v4 as uuidv4 } from 'uuid';
 

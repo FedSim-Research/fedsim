@@ -22,6 +22,8 @@ embedded dashboards. This configuration is intended for a local research
 workstation; configure authentication before exposing it to other machines.
 
 Set `DEPLOY_HTTP_PORT=8090` in a root `.env` file to change the HTTP port.
+Compose sets Uvicorn's `UVICORN_ROOT_PATH=/api` for the reverse-proxy prefix.
+Native deployments behind a subpath should set this server option too.
 
 ## Runtime state
 
@@ -47,7 +49,11 @@ paths on every node. Dataset files and checkpoints are not distributed by the AP
 
 ## NVIDIA GPUs
 
-With Docker configured for NVIDIA GPU access:
+The GPU image uses PyTorch 2.15 with CUDA 13.2. It requires a compatible NVIDIA
+driver; a working older CUDA installation is not sufficient. The bundled CPU
+image is the default for workstations that do not meet that requirement.
+
+With Docker configured for compatible NVIDIA GPU access:
 
 ```bash
 docker compose -f compose.yaml -f compose.gpu.yaml up -d --build
@@ -56,3 +62,10 @@ docker compose -f compose.yaml -f compose.gpu.yaml down
 
 The overlay selects the CUDA image for both Python services. GPU resource budgets
 are selected per run. Current training clients run on CPU; evaluation can use a GPU.
+
+## Dependency updates
+
+Container images are pinned by version and digest. Python environments are
+installed from `uv.lock`; the frontend uses `package-lock.json` and its declared
+npm version. Update pins and lockfiles together, rebuild, and rerun integration
+checks before adopting a new stack.

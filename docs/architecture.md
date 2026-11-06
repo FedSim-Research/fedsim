@@ -40,3 +40,8 @@ their TypeScript source.
 `deploy/` holds container, reverse-proxy, and monitoring configuration. Root
 Compose files assemble these components and mount a shared runtime directory;
 runtime state is not source code.
+
+The editor keeps serializable graph state separate from ngx-vflow's signal-based
+render models. `FlowRenderer` preserves render-model identity by node or edge ID
+while reconciling data changes, so edits and history updates do not reset an
+in-progress drag.

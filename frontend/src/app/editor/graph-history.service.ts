@@ -1,5 +1,5 @@
 import { Injectable, WritableSignal, signal } from '@angular/core';
-import { Node, Edge } from 'ngx-vflow';
+import { StaticNode as Node, StaticEdge as Edge } from 'ngx-vflow';
 
 export interface State{
   nodes: Node[];

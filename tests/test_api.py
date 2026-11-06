@@ -1,4 +1,6 @@
+import pytest
 import ray
+from fastapi.testclient import TestClient
 
 
 def test_graph_round_trip_and_cascade_delete(api):
@@ -41,3 +43,15 @@ def test_startup_seeds_default_topologies_and_serves_openapi(api):
     assert all(graph["architecture"] in {"hierfl", "spyker"} for graph in response.json())
     assert "/graphs/" in api.get("/openapi.json").json()["paths"]
     assert not ray.is_initialized()
+
+
+@pytest.mark.parametrize("root_path", ["", "/api"])
+def test_api_root_redirect_preserves_proxy_prefix(root_path):
+    from fedsim.api.app import app
+
+    with TestClient(
+        app, root_path=root_path, base_url="http://testserver:8088", follow_redirects=False
+    ) as client:
+        response = client.get("/")
+        assert response.status_code == 307
+        assert response.headers["location"] == f"{root_path}/docs"

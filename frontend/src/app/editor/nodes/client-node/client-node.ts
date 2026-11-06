@@ -42,11 +42,11 @@ export class ClientNode extends CustomNodeComponent {
     })
   );
 
-  public isSelected = computed(() => Boolean((this.node().data as any)?.selected));
+  public isSelected = computed(() => Boolean((this.data() as any)?.selected));
 
   public client = computed(() => {
-    const config = ((this.node().data as any)?.config) ?? {};
-    const environment = ((this.node().data as any)?.environment) ?? (config.environment ?? 'spyker');
+    const config = ((this.data() as any)?.config) ?? {};
+    const environment = ((this.data() as any)?.environment) ?? (config.environment ?? 'spyker');
 
     const rawType = config.type ?? '';
     const type = typeof rawType === 'string' && rawType.length

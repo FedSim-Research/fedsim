@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Edge, Node } from 'ngx-vflow';
+import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
 
 type SupportedArchitecture = 'spyker' | 'hierfl';
 type FlowNodeData = { type?: string; config?: Record<string, unknown> };

@@ -1,9 +1,8 @@
 import logging
-import os
 from contextlib import asynccontextmanager
 
 import ray
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
 
@@ -40,7 +39,7 @@ async def lifespan(app: FastAPI):
 # Start the API with: uvicorn fedsim.api.app:app --reload
 # Swagger UI: http://127.0.0.1:8000/docs
 _install_access_log_filter()
-app = FastAPI(lifespan=lifespan, root_path=os.environ.get("FEDSIM_ROOT_PATH", ""))
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:4200", "http://127.0.0.1:4200"],
@@ -51,8 +50,8 @@ app.add_middleware(
 
 
 @app.get("/", include_in_schema=False)
-def root():
-    return RedirectResponse(url="/docs", status_code=307)
+def root(request: Request):
+    return RedirectResponse(url=request.url_for("swagger_ui_html").path, status_code=307)
 
 
 @app.get("/favicon.ico", include_in_schema=False)

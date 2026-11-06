@@ -9,22 +9,25 @@
   @if (activeView() === 'editor') {
   <vflow
     [class.shift-selection-mode]="shortcuts.shiftDown"
-    [nodes]="nodes()"
-    [edges]="edges()"
+    [nodes]="renderNodes()"
+    [edges]="renderEdges()"
     [entitiesSelectable]="true"
     [elevateEdgesOnSelect]="true"
-    [connection]="connectionModel"
+    [connection]="connectionSettings"
     (connect)="handleConnect($event)"
-    (onNodesChange.position)="handleNodePositionChange($event)"
-    (onEdgesChange.select)="shortcuts.onEdgeSelectionChange($event)"
+    (nodesChanges.position)="handleNodePositionChange($event)"
+    (edgesChanges.select)="shortcuts.onEdgeSelectionChange($event)"
     view="auto"
     [background]="{ type: 'dots', backgroundColor: 'transparent' }"
     [alignmentHelper]="true">
     <ng-template edgeLabelHtml let-labelContext>
-      <app-edge-metrics-box
-        [edge]="labelContext.edge"
-        [graphService]="activeGraph()"
-      ></app-edge-metrics-box>
+      @let edge = graphEdge(labelContext.edge.id);
+      @if (edge) {
+        <app-edge-metrics-box
+          [edge]="edge"
+          [graphService]="activeGraph()"
+        ></app-edge-metrics-box>
+      }
     </ng-template>
     </vflow>
   <ngx-selecto

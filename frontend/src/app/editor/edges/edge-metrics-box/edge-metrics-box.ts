@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, Input, OnChanges, SimpleChanges } from '@angular/core';
-import { Edge } from 'ngx-vflow';
+import { StaticEdge as Edge } from 'ngx-vflow';
 import { EdgeMetrics, EDGE_METRIC_DEFAULTS } from '../../../api/edge-metrics';
 import { GraphService } from '../../graph.service';
 

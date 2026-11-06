@@ -29,7 +29,7 @@ export class ServerNode extends CustomNodeComponent {
   } as const;
   public isEditing = computed(() => this.nodeEditUi.activeId() === this.node().id);
   public showDelete = computed(() => this.nodeDeleteUi.activeId() === this.node().id || this.isEditing());
-  public isSelected = computed(() => Boolean((this.node().data as any)?.selected));
+  public isSelected = computed(() => Boolean((this.data() as any)?.selected));
   public editDraft = computed(() =>
     this.nodeEditUi.getDraft(this.node().id, {
       name: String(this.server().name ?? ''),
@@ -41,8 +41,8 @@ export class ServerNode extends CustomNodeComponent {
   );
 
   public server = computed(() => {
-    const config = ((this.node().data as any)?.config) ?? {};
-    const environment = ((this.node().data as any)?.environment) ?? (config.environment ?? 'spyker');
+    const config = ((this.data() as any)?.config) ?? {};
+    const environment = ((this.data() as any)?.environment) ?? (config.environment ?? 'spyker');
     return {
       name: config.name ?? '',
       id: config.id ?? '',

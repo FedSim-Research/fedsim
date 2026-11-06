@@ -1,5 +1,5 @@
 import { Injectable, WritableSignal, signal, inject } from '@angular/core';
-import { Node, Edge, NodePositionChange } from 'ngx-vflow';
+import { StaticNode as Node, StaticEdge as Edge, NodePositionChange } from 'ngx-vflow';
 import { GraphHistoryService, State } from './graph-history.service';
 import { GraphApiService } from '../api/graph-api.service';
 import { EdgeMetrics, EDGE_METRIC_DEFAULTS } from '../api/edge-metrics';
@@ -266,8 +266,8 @@ export abstract class GraphService<T extends GraphHistoryService> {
       y: typeof point.y === 'number' ? point.y : 0,
     };
     const payload = {
-      type: data.type,
-      config: data.config ?? {},
+      type: data['type'],
+      config: data['config'] ?? {},
       position,
     };
     void this.api.createNode(this.graphId, payload).then((created) => {

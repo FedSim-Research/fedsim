@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.27,<2"]
+requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -7,26 +7,28 @@ name = "fedsim-research"
 version = "1.0.0"
 description = "Simulation of geo-distributed federated learning"
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12,<3.15"
 license = "Apache-2.0"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 dependencies = [
-    "fastapi==0.123.5",
-    "uvicorn==0.38.0",
-    "pydantic==2.12.5",
-    "ray[default]==2.51.1",
-    "requests==2.32.5",
-    "sqlalchemy==2.0.45",
-    "numpy>=1.26,<3",
-    "torch>=2.7.1",
-    "torchvision>=0.22.1",
-    "flwr-datasets[vision]==0.5.0",
-    "datasets>=2.14.6,<=3.1.0",
-    "filelock>=3.18,<4",
+    "fastapi==0.162.0",
+    "uvicorn==0.54.0",
+    "pydantic==2.14.3",
+    "ray[default]==2.60.0",
+    "requests==2.34.2",
+    "sqlalchemy==2.1.8",
+    "numpy==2.5.4",
+    "torch==2.15.0",
+    "torchvision==0.29.2",
+    "flwr-datasets[vision]==0.6.1",
+    "datasets==4.8.5",
+    "filelock==4.2.9",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<9", "httpx>=0.27,<1", "ruff>=0.14,<0.15"]
+cpu = ["torch", "torchvision"]
+gpu = ["torch", "torchvision"]
+dev = ["pytest==9.2.0", "httpx2==2.16.0", "ruff==0.17.4"]
 
 [project.urls]
 Repository = "https://github.com/FedSim-Research/fedsim"
@@ -35,7 +37,10 @@ Repository = "https://github.com/FedSim-Research/fedsim"
 packages = ["src/fedsim"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/fedsim", "pyproject.toml", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md"]
+include = [
+    "src/fedsim", "tests", "docs", "pyproject.toml", "uv.lock", ".python-version",
+    "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -50,3 +55,27 @@ select = ["E4", "E7", "E9", "F", "I"]
 
 [tool.ruff.format]
 line-ending = "lf"
+
+[tool.uv]
+required-version = "==0.13.7"
+conflicts = [[{ extra = "cpu" }, { extra = "gpu" }]]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu132", extra = "gpu" },
+]
+torchvision = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu132", extra = "gpu" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu132"
+url = "https://download.pytorch.org/whl/cu132"
+explicit = true

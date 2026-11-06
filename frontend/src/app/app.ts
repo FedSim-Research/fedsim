@@ -1,6 +1,7 @@
 import { Component, inject, ViewChild, computed, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Vflow, VflowComponent, Node, Edge, NodePositionChange, Connection, ɵConnectionModel as ConnectionModel } from 'ngx-vflow';
+import { Vflow, VflowComponent, StaticNode as Node, StaticEdge as Edge, NodePositionChange, Connection, ConnectionSettings } from 'ngx-vflow';
+import { FlowRenderer } from './editor/flow-renderer';
 import { NgxSelectoModule } from 'ngx-selecto';
 import { Shortcuts } from './editor/shortcuts.directive';
 import { SidebarComponent } from './shell/sidebar/sidebar';
@@ -68,6 +69,14 @@ export class App implements OnInit{
     return this.activeGraph().edges();
   });
 
+  private readonly renderer = new FlowRenderer();
+  public renderNodes = computed(() => this.renderer.nodes(this.nodes()));
+  public renderEdges = computed(() => this.renderer.edges(this.edges()));
+
+  public graphEdge(id: string): Edge | undefined {
+    return this.edges().find(edge => edge.id === id);
+  }
+
   public hierflGraphId(): number | null {
     return this.graphServiceHierfl.getGraphId() ?? this.graphServiceHierfl.loadGraphIdFromStorage();
   }
@@ -82,10 +91,10 @@ export class App implements OnInit{
   private _lastPosChanges: NodePositionChange[] | null = null;
   private _dragPrimaryId: string | null = null;
 
-  public connectionModel = new ConnectionModel({
+  public connectionSettings: ConnectionSettings = {
     mode: 'loose',
     validator: (connection) => this.canConnect(connection),
-  });
+  };
 
   public ngOnInit(): void {
     void this.graphPersistence.initializeGraph(this.graphServiceSpyker, 'spyker', false);

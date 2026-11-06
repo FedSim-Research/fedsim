@@ -22,30 +22,40 @@
   },
   "private": true,
   "license": "Apache-2.0",
-  "packageManager": "npm@11.6.4",
+  "packageManager": "npm@12.2.2",
   "dependencies": {
-    "@angular/common": "^21.0.0",
-    "@angular/compiler": "^21.0.0",
-    "@angular/core": "^21.0.0",
-    "@angular/forms": "^21.0.0",
-    "@angular/platform-browser": "^21.0.0",
-    "@angular/router": "^21.0.0",
-    "@primeuix/themes": "^2.0.2",
-    "ngx-selecto": "^1.26.3",
-    "ngx-vflow": "^1.16.4",
-    "primeicons": "^7.0.0",
-    "primeng": "^21.0.2",
-    "rxjs": "~7.8.0",
-    "selecto": "^1.26.3",
-    "tslib": "^2.3.0",
-    "uuid": "^13.0.1"
+    "@angular/common": "21.2.26",
+    "@angular/compiler": "21.2.26",
+    "@angular/core": "21.2.26",
+    "@angular/forms": "21.2.26",
+    "@angular/platform-browser": "21.2.26",
+    "@angular/router": "21.2.26",
+    "@primeuix/themes": "2.0.3",
+    "ngx-selecto": "1.26.3",
+    "ngx-vflow": "2.7.0",
+    "primeicons": "7.0.0",
+    "primeng": "21.1.10",
+    "rxjs": "7.8.2",
+    "selecto": "1.26.3",
+    "tslib": "2.9.1",
+    "uuid": "14.0.3"
   },
   "devDependencies": {
-    "@angular/build": "^21.0.2",
-    "@angular/cli": "^21.0.2",
-    "@angular/compiler-cli": "^21.0.0",
-    "jsdom": "^27.1.0",
-    "typescript": "~5.9.2",
-    "vitest": "^4.0.8"
+    "@angular/build": "21.2.29",
+    "@angular/cli": "21.2.29",
+    "@angular/compiler-cli": "21.2.26",
+    "jsdom": "31.0.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  },
+  "engines": {
+    "node": "^24.15.0 || ^26.13.0",
+    "npm": "12.2.2"
+  },
+  "allowScripts": {
+    "@parcel/watcher@2.6.0": true,
+    "msgpackr-extract@3.0.7": true,
+    "esbuild@0.28.1": true,
+    "lmdb@3.5.1": true
   }
 }

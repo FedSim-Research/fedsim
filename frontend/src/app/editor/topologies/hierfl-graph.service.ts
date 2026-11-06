@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { GraphService } from '../graph.service';
-import { Edge, Node } from 'ngx-vflow';
+import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
 import { SuperServerNode } from '../nodes/super-server-node/super-server-node';
 import { HierflGraphHistoryService } from './hierfl-graph-history.service';
 import { State } from '../graph-history.service';

@@ -2,15 +2,15 @@
 
 ## Flower Datasets
 
-FedSim uses [Flower Datasets](https://pypi.org/project/flwr-datasets/0.5.0/)
-(`flwr-datasets`, version 0.5.0) for dataset loading and IID partitioning.
+FedSim uses [Flower Datasets](https://pypi.org/project/flwr-datasets/0.6.1/)
+(`flwr-datasets`, version 0.6.1) for dataset loading and IID partitioning.
 Its source is maintained in the
-[Flower repository](https://github.com/flwrlabs/flower/tree/v1.26.0/datasets).
+[Flower repository](https://github.com/flwrlabs/flower/tree/main/datasets).
 
 Flower Datasets is licensed under Apache-2.0. The IID partitioner carries
 `Copyright 2023 Flower Labs GmbH. All Rights Reserved.` The license text is
 included in [LICENSE](LICENSE). Upstream source files retain their copyright and license
-headers; the 0.5.0 wheel does not bundle a separate full license text, so this
+headers; the 0.6.1 wheel does not bundle a separate full license text, so this
 repository includes it explicitly.
 
 FedSim depends on the published package and does not vendor its source. Its
@@ -41,7 +41,9 @@ container serves alongside the application at `/3rdpartylicenses.txt`. Preserve
 this file when redistributing the compiled frontend. It includes dependency
 licenses and copyright notices, including those for Angular, PrimeNG Community,
 PrimeIcons, ngx-vflow, and Selecto. The installed PrimeNG version is a Community
-release; the separate upstream LTS terms apply to versions with an `-lts` suffix.
+release (21.1.10), with MIT-licensed themes and PrimeIcons. The separate upstream
+LTS terms apply to versions with an `-lts` suffix. PrimeNG 22 and the newer PrimeUI
+packages use different terms and are not included in this dependency set.
 
 ## Python and container distributions
 
@@ -49,6 +51,12 @@ Python dependencies are installed as published distributions, including their
 bundled license and notice files. Preserve those files when redistributing the
 Python environment or container image. Base images and bundled components retain
 their own terms; this document is not a complete bill of materials.
+
+The API images also include [uv 0.13.7](https://github.com/astral-sh/uv/tree/0.13.7),
+copyright (c) 2025 Astral Software Inc. uv is dual-licensed under MIT or Apache-2.0;
+FedSim redistributes it under
+[Apache-2.0](https://github.com/astral-sh/uv/blob/0.13.7/LICENSE-APACHE), whose full
+text is included in [LICENSE](LICENSE).
 
 Compose references the following separate upstream services:
 

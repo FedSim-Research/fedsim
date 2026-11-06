@@ -1,7 +1,7 @@
 import { Directive, HostListener, inject, ElementRef, input, ChangeDetectorRef} from '@angular/core';
 import { HierflGraphService } from './topologies/hierfl-graph.service';
 import { SpykerGraphService } from './topologies/spyker-graph.service';
-import { Node } from 'ngx-vflow';
+import { StaticNode as Node } from 'ngx-vflow';
 import { ClientNode } from './nodes/client-node/client-node';
 import { ServerNode } from './nodes/server-node/server-node';
 import { SuperServerNode } from './nodes/super-server-node/super-server-node';

@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Node, Edge } from 'ngx-vflow';
+import { StaticNode as Node, StaticEdge as Edge } from 'ngx-vflow';
 import { GraphApiService, GraphDetail, VflowGraph } from '../api/graph-api.service';
 import { GraphService } from './graph.service';
 import { ClientNode } from './nodes/client-node/client-node';

@@ -34,6 +34,7 @@ between engines still need validation before drawing scientific conclusions.
 
 - [Development](docs/development.md): installation, tests, and frontend development.
 - [Architecture](docs/architecture.md): simulation engines and component boundaries.
+- [Reproducibility](docs/reproducibility.md): historical source and experiment environments.
 - [Operations](docs/operations.md): monitoring, configuration, and GPU deployment.
 - [Third-party notices](THIRD_PARTY_NOTICES.md): dependency and source attributions.
 

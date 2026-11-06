@@ -31,7 +31,7 @@ services:
     environment:
       <<: *python-environment
       RAY_ADDRESS: ray://ray:10001
-      FEDSIM_ROOT_PATH: /api
+      UVICORN_ROOT_PATH: /api
       FEDSIM_GRAFANA_INTERNAL_BASE_URL: http://grafana:3000
       FEDSIM_LOKI_INTERNAL_BASE_URL: http://loki:3100
     volumes:
@@ -50,7 +50,7 @@ services:
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06
+    image: prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -62,14 +62,14 @@ services:
     restart: unless-stopped
 
   loki:
-    image: grafana/loki@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
+    image: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - ./deploy/monitoring/loki.yml:/etc/loki/local-config.yaml:ro
     restart: unless-stopped
 
   alloy:
-    image: grafana/alloy@sha256:8ab871206bd2d8f89277f53abffee5f452a293980788d52f85fa183a87a505a4
+    image: grafana/alloy:v1.21.3@sha256:8ab871206bd2d8f89277f53abffee5f452a293980788d52f85fa183a87a505a4
     command: run /etc/alloy/config.alloy --server.http.listen-addr=0.0.0.0:12345
     volumes:
       - ./deploy/monitoring/alloy.config.alloy:/etc/alloy/config.alloy:ro
@@ -79,7 +79,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
+    image: grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_SECURITY_ALLOW_EMBED_INIT_STATE_TOKEN: "true"
@@ -96,7 +96,7 @@ services:
     restart: unless-stopped
 
   nginx:
-    image: nginx:1.27-alpine
+    image: nginx:1.31.8-alpine@sha256:713fc2ebfd92e8217db451477182ee91944b123d2b1ee9fd5a8c6e91ca6c3a11
     ports:
       - 127.0.0.1:${DEPLOY_HTTP_PORT:-8088}:80
     volumes:
