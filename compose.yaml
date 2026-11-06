@@ -1,0 +1,113 @@
+name: fedsim
+
+x-api-build: &api-build
+  context: .
+  dockerfile: deploy/docker/api.Dockerfile
+
+x-python-environment: &python-environment
+  FEDSIM_DATA_DIR: /var/lib/fedsim
+  FEDSIM_TELEMETRY_LOG_DIR: /var/lib/fedsim/logs
+  HF_HOME: /var/lib/fedsim/cache/huggingface
+  HF_DATASETS_CACHE: /var/lib/fedsim/cache/datasets
+
+services:
+  ray:
+    image: fedsim-api:local
+    build: *api-build
+    command: >-
+      ray start --head --port=6379 --ray-client-server-port=10001
+      --metrics-export-port=8080 --include-dashboard=true
+      --dashboard-host=0.0.0.0 --dashboard-port=8265 --disable-usage-stats --block
+    environment: *python-environment
+    volumes:
+      - ./var:/var/lib/fedsim
+      - ray_logs:/tmp/ray
+    shm_size: 1gb
+    restart: unless-stopped
+
+  backend:
+    image: fedsim-api:local
+    build: *api-build
+    environment:
+      <<: *python-environment
+      RAY_ADDRESS: ray://ray:10001
+      FEDSIM_ROOT_PATH: /api
+      FEDSIM_GRAFANA_INTERNAL_BASE_URL: http://grafana:3000
+      FEDSIM_LOKI_INTERNAL_BASE_URL: http://loki:3100
+    volumes:
+      - ./var:/var/lib/fedsim
+      - ray_logs:/tmp/ray:ro
+    depends_on:
+      - ray
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/docker/frontend.Dockerfile
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.listen-address=:9010
+    volumes:
+      - ./deploy/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - ray
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./deploy/monitoring/loki.yml:/etc/loki/local-config.yaml:ro
+    restart: unless-stopped
+
+  alloy:
+    image: grafana/alloy@sha256:8ab871206bd2d8f89277f53abffee5f452a293980788d52f85fa183a87a505a4
+    command: run /etc/alloy/config.alloy --server.http.listen-addr=0.0.0.0:12345
+    volumes:
+      - ./deploy/monitoring/alloy.config.alloy:/etc/alloy/config.alloy:ro
+      - ./var/logs:/var/lib/fedsim/logs:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ALLOW_EMBED_INIT_STATE_TOKEN: "true"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_SERVER_ROOT_URL: http://localhost:${DEPLOY_HTTP_PORT:-8088}/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    volumes:
+      - ./deploy/monitoring/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./deploy/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - 127.0.0.1:${DEPLOY_HTTP_PORT:-8088}:80
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+      - ray
+      - prometheus
+      - grafana
+    restart: unless-stopped
+
+volumes:
+  ray_logs:

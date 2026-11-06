@@ -1,0 +1,16 @@
+services:
+  ray:
+    build:
+      dockerfile: deploy/docker/api.gpu.Dockerfile
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    gpus: all
+
+  backend:
+    build:
+      dockerfile: deploy/docker/api.gpu.Dockerfile
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    gpus: all

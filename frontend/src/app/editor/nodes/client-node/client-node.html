@@ -1,0 +1,167 @@
+<div class="node-wrapper" [attr.data-id]="node().id">
+  <handle type="target" position="top" id="client-in" />
+  <handle type="source" position="top" id="client-out" />
+  <div class="node-card" (click)="onNodeClick($event)" [class.node-selected]="isSelected()">
+    <div class="node-header">
+      <div class="node-title">
+        <span class="status-dot"></span>
+        <span>Client</span>
+      </div>
+      <button
+        *ngIf="!isEditing()"
+        class="action-button edit-button"
+        type="button"
+        [class.action-button--visible]="showDelete()"
+        (mousedown)="$event.stopPropagation()"
+        (click)="onStartEdit($event)"
+        aria-label="Knoten bearbeiten"
+        title="Edit"
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path
+            d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zm17.71-10.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.96 1.96 3.75 3.75 2.13-1.79z"
+            fill="currentColor"
+          />
+        </svg>
+      </button>
+      <button
+        *ngIf="!isEditing()"
+        pButton
+        type="button"
+        icon="pi pi-arrow-left"
+        class="action-button action-button--visible forward-button"
+        (mousedown)="$event.stopPropagation()"
+        (click)="onForwardNode($event)"
+        aria-label="Copy values to sidebar"
+        title="Fill in sidebar"
+      ></button>
+      <button
+        *ngIf="isEditing()"
+        class="action-button save-button action-button--visible"
+        type="button"
+        (mousedown)="$event.stopPropagation()"
+        (click)="onSaveEdit($event)"
+        aria-label="Knoten speichern"
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path
+            d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zM7 5h8v4H7V5zm5 14H8v-6h4v6z"
+            fill="currentColor"
+          />
+        </svg>
+      </button>
+      <button
+        class="delete-button"
+        type="button"
+        [class.delete-button--visible]="showDelete()"
+        (mousedown)="$event.stopPropagation()"
+        (click)="onDelete($event)"
+        aria-label="Knoten loeschen"
+        title="Delete"
+      >
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+          <path
+            d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h2v9H7V9z"
+            fill="currentColor"
+          />
+        </svg>
+      </button>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;">
+        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+        <line x1="6" y1="6" x2="6.01" y2="6"></line>
+        <line x1="6" y1="18" x2="6.01" y2="18"></line>
+      </svg>
+    </div>
+
+  <div class="node-body">
+
+    <div class="spec-row">
+      <span>Clientanzahl</span>
+      <span *ngIf="!isEditing()" class="spec-value">{{ client().count }}</span>
+      <input
+        *ngIf="isEditing()"
+        class="spec-input"
+        type="number"
+        [value]="editDraft().count"
+        (mousedown)="$event.stopPropagation()"
+        (click)="$event.stopPropagation()"
+        (input)="updateNumberField('count', $event)"
+      />
+    </div>
+     <div class="spec-row">
+      <span>Client type</span>
+      <span *ngIf="!isEditing()" class="spec-value">{{ client().type || '—' }}</span>
+      <select
+        *ngIf="isEditing()"
+        class="spec-input spec-select"
+        [value]="editDraft().type || 'Laptop'"
+        (mousedown)="$event.stopPropagation()"
+        (click)="$event.stopPropagation()"
+        (change)="updateTextField('type', $event)"
+      >
+        <option value="Laptop">Laptop</option>
+        <option value="Workstation">Workstation</option>
+        <option value="Mobile">Mobile</option>
+      </select>
+    </div>
+     <div class="spec-row">
+      <span>Compute factor</span>
+      <span *ngIf="!isEditing()" class="spec-value">{{ client().computeFactor }}</span>
+      <input
+        *ngIf="isEditing()"
+        class="spec-input"
+        type="number"
+        step="0.1"
+        [value]="editDraft().computeFactor"
+        (mousedown)="$event.stopPropagation()"
+        (click)="$event.stopPropagation()"
+        (input)="updateNumberField('computeFactor', $event)"
+      />
+    </div>
+    <div class="spec-row">
+      <span>Performance σ</span>
+      <span *ngIf="!isEditing()" class="spec-value">{{ client().performanceSigma }}</span>
+      <input
+        *ngIf="isEditing()"
+        class="spec-input"
+        type="number"
+        step="0.1"
+        [value]="editDraft().performanceSigma"
+        (mousedown)="$event.stopPropagation()"
+        (click)="$event.stopPropagation()"
+        (input)="updateNumberField('performanceSigma', $event)"
+      />
+    </div>
+    <div class="spec-row">
+      <span>Upload</span>
+      <span *ngIf="!isEditing()" class="spec-value">{{ client().uploadMbps }} Mbps</span>
+      <input
+        *ngIf="isEditing()"
+        class="spec-input"
+        type="number"
+        [value]="editDraft().uploadMbps"
+        (mousedown)="$event.stopPropagation()"
+        (click)="$event.stopPropagation()"
+        (input)="updateNumberField('uploadMbps', $event)"
+      />
+    </div>
+    <div class="spec-row">
+      <span>Download</span>
+      <span *ngIf="!isEditing()" class="spec-value">{{ client().downloadMbps }} Mbps</span>
+      <input
+        *ngIf="isEditing()"
+        class="spec-input"
+        type="number"
+        [value]="editDraft().downloadMbps"
+        (mousedown)="$event.stopPropagation()"
+        (click)="$event.stopPropagation()"
+        (input)="updateNumberField('downloadMbps', $event)"
+      />
+    </div>
+  </div>
+    <div class="node-footer">
+      {{ client().environment === 'hierfl' ? 'HIERARCHICAL' : 'SPYKER' }}
+    </div>
+  </div>
+</div>

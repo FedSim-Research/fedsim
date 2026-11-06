@@ -1,0 +1,65 @@
+<div
+  class="canvas-wrapper"
+  appShortcuts
+  [activeService]="activeGraph()"
+  #shortcuts="appShortcuts"
+  #canvasWrapper
+  (dragover)="onDragOver($event)"
+  (drop)="onDrop($event)">
+  @if (activeView() === 'editor') {
+  <vflow
+    [class.shift-selection-mode]="shortcuts.shiftDown"
+    [nodes]="nodes()"
+    [edges]="edges()"
+    [entitiesSelectable]="true"
+    [elevateEdgesOnSelect]="true"
+    [connection]="connectionModel"
+    (connect)="handleConnect($event)"
+    (onNodesChange.position)="handleNodePositionChange($event)"
+    (onEdgesChange.select)="shortcuts.onEdgeSelectionChange($event)"
+    view="auto"
+    [background]="{ type: 'dots', backgroundColor: 'transparent' }"
+    [alignmentHelper]="true">
+    <ng-template edgeLabelHtml let-labelContext>
+      <app-edge-metrics-box
+        [edge]="labelContext.edge"
+        [graphService]="activeGraph()"
+      ></app-edge-metrics-box>
+    </ng-template>
+    </vflow>
+  <ngx-selecto
+    [className]="'selecto-selection'"
+    [dragContainer]="canvasWrapper"
+    [rootContainer]="canvasWrapper"
+    [boundContainer]="canvasWrapper"
+    [selectableTargets]="['.canvas-wrapper [data-id]']"
+    [selectByClick]="false"
+    [selectFromInside]="false"
+    [continueSelect]="false"
+    [preventDefault]="false"
+    [keyContainer]="keyContainer"
+    [hitRate]="50"
+    (dragStart)="shortcuts.onSelectoDragStart($event)"
+    (select)="shortcuts.onSelectoSelect($event)"
+    (selectEnd)="shortcuts.onSelectoSelectEnd($event)">
+  </ngx-selecto>
+  } @else {
+  <app-dashboard-view [sidebarOpen]="sidebarOpen()"></app-dashboard-view>
+  }
+  <app-sidebar
+    [shortcuts]="shortcuts"
+    [hierflGraphId]="hierflGraphId()"
+    [spykerGraphId]="spykerGraphId()"
+    [activeView]="activeView()"
+    (resetGraph)="handleReset()"
+    (undoRequested)="undo()"
+    (redoRequested)="redo()"
+    (modeChange)="changeMode($event)"
+    (viewChange)="changeView($event)"
+    (sidebarOpenChange)="onSidebarOpenChange($event)"
+    (graphSelected)="handleGraphSelected($event)"
+    (simulationRequested)="handleSimulation($event)">
+  </app-sidebar>
+
+  <app-framework-jobs-popup></app-framework-jobs-popup>
+</div>

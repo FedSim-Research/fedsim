@@ -1,0 +1,13 @@
+.git
+.venv
+.pytest_cache
+.ruff_cache
+**/__pycache__
+**/*.py[cod]
+**/node_modules
+**/.angular
+**/dist
+**/out-tsc
+tests
+var
+docs

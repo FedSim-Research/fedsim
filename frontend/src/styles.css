@@ -1,0 +1,176 @@
+@import "primeicons/primeicons.css";
+
+:root {
+  --panel: #0b0b0b;
+  --text: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.6);
+  --border: rgba(255, 255, 255, 0.12);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --node-bg: rgba(15, 15, 15, 0.95);
+
+  --bg: #18181b;  /* Backgroundcolor */
+}
+
+body.light-mode {
+  --panel: #ffffff;
+  --text: #111827;
+  --text-muted: rgba(0, 0, 0, 0.5);
+  --border: rgba(0, 0, 0, 0.1);
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --node-bg: rgba(235, 25, 25, 0.9);
+
+  --bg: #d4d4d8; /* Backgroundcolor */
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  margin: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body,
+.p-component,
+.p-dialog {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+body .pi,
+body .pi:before {
+  font-family: 'primeicons' !important;
+}
+
+.vflow-node > foreignObject {
+  overflow: visible;
+}
+
+.vflow-node .node-card,
+.vflow-node .node-card button,
+.vflow-node .delete-button,
+.vflow-node .action-button,
+.vflow-node handle,
+.vflow-node handle *,
+.vflow-node .vflow-handle,
+.vflow-node .vflow-handle *,
+.vflow-node .default-handle {
+  cursor: pointer !important;
+}
+
+.vflow-node .spec-input {
+  cursor: text !important;
+}
+
+
+body.light-mode .edge {
+  stroke: #000;
+}
+
+body.light-mode .edge_selected {
+  stroke: #0f4c75;
+}
+
+body:not(.light-mode) g[alignmentHelper] line {
+  stroke: #fff;
+}
+
+body.light-mode g[alignmentHelper] line {
+  stroke: #1b262c;
+}
+
+body.light-mode .p-toast {
+  position: fixed;
+}
+
+body.light-mode .p-toast-message {
+  margin-bottom: 1em;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  border: none;
+}
+
+body.light-mode .p-toast-message.p-toast-message-error {
+  background: #fee2e2;
+  color: #111827;
+  border-left: 4px solid #ef4444;
+}
+
+body.light-mode .p-toast-message.p-toast-message-error .p-toast-summary {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+body.light-mode .p-toast-message.p-toast-message-error .p-toast-detail {
+  color: #7f1d1d;
+}
+
+body.light-mode .p-toast-message.p-toast-message-warn {
+  background: #fef3c7;
+  color: #111827;
+  border-left: 4px solid #f59e0b;
+}
+
+body.light-mode .p-toast-message.p-toast-message-warn .p-toast-summary {
+  color: #d97706;
+  font-weight: 700;
+}
+
+body.light-mode .p-toast-message.p-toast-message-warn .p-toast-detail {
+  color: #78350f;
+}
+
+body.light-mode .p-toast-message.p-toast-message-info {
+  background: #dbeafe;
+  color: #111827;
+  border-left: 4px solid #3b82f6;
+}
+
+body.light-mode .p-toast-message.p-toast-message-info .p-toast-summary {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+body.light-mode .p-toast-message.p-toast-message-info .p-toast-detail {
+  color: #1e3a8a;
+}
+
+body.light-mode .p-toast-message.p-toast-message-success {
+  background: #dcfce7;
+  color: #111827;
+  border-left: 4px solid #22c55e;
+}
+
+body.light-mode .p-toast-message.p-toast-message-success .p-toast-summary {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+body.light-mode .p-toast-message.p-toast-message-success .p-toast-detail {
+  color: #15803d;
+}
+
+body.light-mode .p-toast-icon-close {
+  color: #6b7280 !important;
+}
+
+body.light-mode .p-toast-icon-close:hover {
+  color: #111827 !important;
+}
+
+.node-selected {
+  outline: 4px solid #007BFF;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+}
+
+/* Larger connection sockets */
+.default-handle {
+  r: 8px;
+  stroke-width: 2.5px;
+}
+
+.vflow-handle {
+  width: 16px !important;
+  height: 16px !important;
+}

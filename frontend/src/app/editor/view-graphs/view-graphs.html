@@ -1,0 +1,159 @@
+<p-dialog
+  [(visible)]="visible"
+  [modal]="true"
+  [closable]="hasGraphsForMode(selectedMode)"
+  [draggable]="false"
+  [resizable]="false"
+  [closeOnEscape]="hasGraphsForMode(selectedMode)"
+  [dismissableMask]="hasGraphsForMode(selectedMode)"
+  header="Load Graph from Database"
+  [style]="{ width: '500px', maxWidth: '90vw' }"
+  (onHide)="onClose()"
+>
+  <div class="dialog-current">
+    <div class="dialog-current__row">
+      <span>Hierfl:</span>
+      <strong>{{ currentGraphLabel('hierfl') }}</strong>
+    </div>
+    <div class="dialog-current__row">
+      <span>Spyker:</span>
+      <strong>{{ currentGraphLabel('spyker') }}</strong>
+    </div>
+  </div>
+  <div class="dialog-tabs">
+    <button
+      class="dialog-tab"
+      type="button"
+      [class.dialog-tab--active]="selectedMode === 'hierfl'"
+      (click)="setMode('hierfl')"
+    >
+      Hierfl
+    </button>
+    <button
+      class="dialog-tab"
+      type="button"
+      [class.dialog-tab--active]="selectedMode === 'spyker'"
+      (click)="setMode('spyker')"
+    >
+      Spyker
+    </button>
+  </div>
+  <div class="dialog-body">
+    @if (isLoading) {
+    <div class="loading-container">
+      <p-progressSpinner
+        styleClass="custom-spinner"
+        strokeWidth="4"
+        animationDuration="1s"
+      />
+      <p>Loading graphs...</p>
+    </div>
+    } @else if (!hasGraphsForMode(selectedMode)) {
+    <div class="empty-state">
+      <p>No {{ selectedMode }} graphs found</p>
+      <div class="empty-state__create">
+        <input
+          type="text"
+          [(ngModel)]="createName"
+          placeholder="Graph name"
+        />
+        <p-button
+          label="Create {{ selectedMode }} Graph"
+          severity="primary"
+          (onClick)="createEmptyGraph()"
+          [disabled]="isLoading"
+        />
+      </div>
+    </div>
+    } @else {
+    <p-listbox
+      [options]="graphsForMode(selectedMode)"
+      [(ngModel)]="selectedGraph"
+      optionLabel="name"
+      [filter]="false"
+      [style]="{ width: '100%' }"
+      [listStyle]="{ 'max-height': '400px' }"
+    >
+      <ng-template let-graph pTemplate="item">
+        <div class="graph-item">
+          <div class="graph-item__header">
+            <div class="graph-item__name-wrap" (dblclick)="startRename(graph, $event)">
+              @if (editingGraphId === graph.graph_id) {
+              <input
+                class="graph-item__name-edit"
+                type="text"
+                [(ngModel)]="editingName"
+                (click)="$event.stopPropagation()"
+                (mousedown)="$event.stopPropagation()"
+                (mouseup)="$event.stopPropagation()"
+                (keydown)="$event.stopPropagation()"
+                (keydown.enter)="saveRename(graph, $event)"
+                (keydown.escape)="cancelRename($event)"
+                (blur)="saveRename(graph, $event)"
+                autofocus
+              />
+              } @else {
+              <strong class="graph-item__name">{{ graph.name || 'Untitled Graph' }}</strong>
+              <button
+                class="graph-item__edit"
+                type="button"
+                (click)="startRename(graph, $event)"
+                aria-label="Edit graph name"
+              >
+                <i class="pi pi-pencil"></i>
+              </button>
+              <button
+                class="graph-item__delete"
+                type="button"
+                (click)="deleteGraph(graph, $event)"
+                aria-label="Delete graph"
+              >
+                <i class="pi pi-trash"></i>
+              </button>
+              }
+            </div>
+            <span class="graph-item__architecture">{{ graph.architecture }}</span>
+          </div>
+          <div class="graph-item__meta">
+            <span>ID: {{ graph.graph_id }}</span>
+          </div>
+        </div>
+      </ng-template>
+    </p-listbox>
+    }
+  </div>
+
+  <ng-template pTemplate="footer">
+    <div class="dialog-footer">
+      <p-button
+        label="Import"
+        severity="secondary"
+        (onClick)="onImport()"
+        [disabled]="isLoading"
+        icon="pi pi-upload"
+      />
+      <p-button
+        label="Export"
+        severity="secondary"
+        (onClick)="onExport()"
+        [disabled]="isLoading"
+        icon="pi pi-download"
+      />
+      <p-button
+        label="New"
+        severity="secondary"
+        (onClick)="createEmptyGraph()"
+        [disabled]="isLoading"
+        icon="pi pi-plus"
+      />
+      <p-button
+        label="Load"
+        severity="primary"
+        (onClick)="onLoadGraph()"
+        [disabled]="!selectedGraph || isLoading"
+      />
+    </div>
+  </ng-template>
+</p-dialog>
+
+<p-toast position="top-right" />

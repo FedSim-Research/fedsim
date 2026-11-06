@@ -1,0 +1,26 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.cta {
+  width: 100%; /* Damit er die ganze Breite füllt */
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  padding: 12px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.cta:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.cta--secondary {
+  background: transparent;
+  border-style: dashed;
+}

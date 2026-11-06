@@ -1,94 +1,43 @@
-# Federated Learning Simulation in Geo-Distributed Settings (FedSim)
+# FedSim
 
-FedSim is a graph-based federated learning simulation platform with a FastAPI backend, an Angular frontend, and two simulation engines (Hierarchical FL and Spyker FL).
+**Explore geo-distributed federated learning through interactive network topologies.**
 
-## Repository Overview
+FedSim combines a graph editor with Ray-based simulation engines for hierarchical
+and Spyker-inspired asynchronous federated learning. PyTorch clients train real
+models while an event scheduler tracks virtual computation and communication time.
+Grafana dashboards display evaluation results and runtime metrics.
 
-- [`code/backend/`](code/backend): FastAPI API, persistence layer, simulation orchestration
-- [`code/frontend/`](code/frontend): Angular UI (graph editor + simulation start flow)
-- [`code/framework/impl/`](code/framework/impl): Simulation implementations (Hierarchical, Spyker)
-- [`code/framework/flower/framework/`](code/framework/flower/framework): local Flower framework fork
+## Run locally
 
-See [`code/README.md`](code/README.md) for a compact code directory overview.
-
-- Open the port in the server firewall (example with `ufw`):
+With Docker and Docker Compose installed, run from the repository root:
 
 ```bash
-sudo ufw allow 8088/tcp
+git clone https://github.com/FedSim-Research/fedsim.git
+cd fedsim
+docker compose up -d --build
 ```
 
-You can change the port inside [`docker-compose.yml`](code/docker-compose.yml)
+Open **[localhost:8088](http://localhost:8088)** to edit a topology and submit a run.
+The initial build and dataset download require internet access.
 
-URLs:
+The bundled stack is configured for local use. Its database, downloaded datasets,
+checkpoints, and evaluation logs are stored in the ignored `var/` directory.
 
-- Frontend URL: `http://<SERVER-IP>:8088`  
-  (Port mapping is defined in `code/docker-compose.yml` at the nginx `ports` entry: `${DEPLOY_HTTP_PORT:-8088}:80`.)
-- Grafana URL: `http://<SERVER-IP>:8088/grafana/`
-- Ray URL: `http://<SERVER-IP>:8088/ray/`
+## Research scope
 
+The current implementation uses IID partitions and a fixed CNN, with CIFAR-10 as
+the baseline dataset. Training clients run on CPU. The optional GPU deployment
+supports evaluation. Additional dataset paths and the semantics of comparisons
+between engines still need validation before drawing scientific conclusions.
 
-## One-Command Docker Startup (No GPU-Support)
+## Documentation
 
-```bash
-cd code
-docker compose -f docker-compose.yml up -d
-```
+- [Development](docs/development.md): installation, tests, and frontend development.
+- [Architecture](docs/architecture.md): simulation engines and component boundaries.
+- [Operations](docs/operations.md): monitoring, configuration, and GPU deployment.
+- [Third-party notices](THIRD_PARTY_NOTICES.md): dependency and source attributions.
 
+## License
 
-## One-Command Docker Startup (With GPU-Support)
-
-GPU allocation is configured per simulation run via the frontend/API `gpu_budget` setting. 
-
-Note that GPU currently only supports evaluation.
-
-```bash
-cd code
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
-```
-
-##  Stop Containers
-
-```bash
-cd code
-docker compose -f docker-compose.yml down
-```
-or
-```bash
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml down
-```
-
-## Debugging
-
-View logs:
-
-- Single service (example: backend):
-
-```bash
-cd code
-docker compose logs -f fedsim-backend-deploy
-```
-
-- All services:
-
-```bash
-cd code
-docker compose logs -f
-```
-
-## Rebuild containers from scratch:
-- Without GPU-Support:
-```bash
-cd code
-docker compose -f docker-compose.yml down --remove-orphans
-docker compose -f docker-compose.yml build --no-cache
-docker compose -f docker-compose.yml up -d
-```
-- With GPU-Support:
-```bash
-cd code
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml down --remove-orphans
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml build --no-cache
-docker compose -f docker-compose.yml up -d
-```
-
-Note that that building with the flag ```--no-cache``` could result in *extreme* cache sizes. You can view the size of the docker cache with ```docker system df``` and clean the *whole* cache with ```docker system prune```. Please refer to the official Docker manual.
+FedSim is licensed under [Apache-2.0](LICENSE). Third-party components retain
+their own licenses; see [Third-party notices](THIRD_PARTY_NOTICES.md).

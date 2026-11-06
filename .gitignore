@@ -1,24 +1,27 @@
-# Linux venv
-bin/
-lib/
-lib64
-share/
-include/
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+/build/
+/dist/
 
-# Windows venv
-Scripts/
-Include/
-Lib/
+# Frontend
+node_modules/
+.angular/
+/frontend/dist/
+/frontend/out-tsc/
 
-pyvenv.cfg
-final_model.pt
-final_model_hierarchical.pth
-data/
-# ML model artifacts
-*.pth
-# Grafana runtime directories
-code/frontend/grafana-data/
-code/frontend/grafana-logs/
-code/frontend/grafana-plugins/
-
+# Runtime data and local configuration
+/var/
+.env
+.env.*
+!.env.example
+*.log
 .vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,35 @@
+.canvas-wrapper {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  position: relative;
+}
+
+vflow.shift-selection-mode {
+  pointer-events: none !important;
+}
+
+vflow.shift-selection-mode * {
+  pointer-events: none !important;
+}
+
+.muted {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.75rem;
+  margin-top: 4px;
+}
+
+:host ::ng-deep .selecto-selection {
+  border: 1.5px dashed #10b981 !important;
+  background: rgba(16, 185, 129, 0.1) !important;
+}
+
+ngx-selecto {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+}

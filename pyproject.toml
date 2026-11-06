@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fedsim-research"
+version = "1.0.0"
+description = "Simulation of geo-distributed federated learning"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "Apache-2.0"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+dependencies = [
+    "fastapi==0.123.5",
+    "uvicorn==0.38.0",
+    "pydantic==2.12.5",
+    "ray[default]==2.51.1",
+    "requests==2.32.5",
+    "sqlalchemy==2.0.45",
+    "numpy>=1.26,<3",
+    "torch>=2.7.1",
+    "torchvision>=0.22.1",
+    "flwr-datasets[vision]==0.5.0",
+    "datasets>=2.14.6,<=3.1.0",
+    "filelock>=3.18,<4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9", "httpx>=0.27,<1", "ruff>=0.14,<0.15"]
+
+[project.urls]
+Repository = "https://github.com/FedSim-Research/fedsim"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fedsim"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/fedsim", "pyproject.toml", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.format]
+line-ending = "lf"
