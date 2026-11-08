@@ -35,6 +35,20 @@ new measurements.
 
 ## Recording new experiments
 
+New API submissions freeze the validated topology and normalized requested
+settings at submission time. Later graph edits or deletion cannot change a
+queued run. Download `GET /runs/{run_id}/export/definition` and retain its
+SHA-256 checksum with the results. The same definition is included in final
+run metadata and the CSV export's `metadata_json` field. Node and edge list
+order is preserved; JSON object key order does not change the checksum.
+
+Both-mode GPU scaling leaves the requested definition unchanged. Each
+repetition records the settings passed to its controller under
+`runs[].simulation_settings` (inside `results_by_architecture` for Both mode).
+These controller inputs do not establish the exact CPU/GPU allocation or
+resolve random-stream isolation and event-order determinism. A definition
+checksum alone is insufficient to reproduce the complete experiment.
+
 Freeze the software environment for each experiment campaign. Record:
 
 - the source commit, lockfile checksums, and container image digests;

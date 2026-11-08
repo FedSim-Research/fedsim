@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel
 
 from fedsim.services import graph_service, simulation_run_store
+from fedsim.services.run_definition import RunDefinition, read_archived_definition
 from fedsim.services.simulation_run_queue import run_queue
 from fedsim.services.simulation_seed_sets import (
     normalize_simulation_settings,
@@ -120,6 +121,16 @@ def start_simulation(payload: SimulationStartRequest):
             simulation_settings=simulation_settings,
             spyker_config=spyker_config,
         )
+        definition = RunDefinition.capture(
+            {
+                graph.architecture: {
+                    "graph": graph,
+                    "training_config": training_config,
+                    "simulation_settings": simulation_settings,
+                    "spyker_config": spyker_config,
+                }
+            }
+        )
     except ValueError as exc:
         logger.warning(
             "start_simulation_validation_failed graph_id=%s architecture=%s error=%s",
@@ -129,13 +140,7 @@ def start_simulation(payload: SimulationStartRequest):
         )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    run = run_queue.enqueue(
-        graph_id=graph.id,
-        architecture=graph.architecture,
-        training_config=training_config,
-        simulation_settings=simulation_settings,
-        spyker_config=spyker_config,
-    )
+    run = run_queue.enqueue(definition)
     logger.info(
         "start_simulation_queued run_id=%s graph_id=%s architecture=%s",
         run.run_id,
@@ -192,24 +197,25 @@ def start_simulation_both(payload: SimulationStartBothRequest):
             simulation_settings=spyker_settings,
             spyker_config=spyker_algo,
         )
+        definition = RunDefinition.capture(
+            {
+                "hierfl": {
+                    "graph": hierfl_graph,
+                    "training_config": hierfl_training,
+                    "simulation_settings": hierfl_settings,
+                },
+                "spyker": {
+                    "graph": spyker_graph,
+                    "training_config": spyker_training,
+                    "simulation_settings": spyker_settings,
+                    "spyker_config": spyker_algo,
+                },
+            }
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    run = run_queue.enqueue_combined(
-        {
-            "hierfl": {
-                "graph_id": hierfl_graph.id,
-                "training_config": hierfl_training,
-                "simulation_settings": hierfl_settings,
-            },
-            "spyker": {
-                "graph_id": spyker_graph.id,
-                "training_config": spyker_training,
-                "simulation_settings": spyker_settings,
-                "spyker_config": spyker_algo,
-            },
-        }
-    )
+    run = run_queue.enqueue(definition)
     return run.to_api_dict()
 
 
@@ -255,3 +261,11 @@ def export_run_to_csv(run_id: str):
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=run_{run_id}.csv"},
     )
+
+
+@router.get("/runs/{run_id}/export/definition")
+def export_run_definition(run_id: str):
+    definition = read_archived_definition(run_id)
+    if definition is None:
+        raise HTTPException(status_code=404, detail="Run definition not available")
+    return definition

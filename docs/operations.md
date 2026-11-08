@@ -37,6 +37,7 @@ Compose mounts `var/` at `/var/lib/fedsim` in the Python services:
 | `var/models/` | Checkpoints with relative output filenames |
 | `var/logs/` | Per-run JSONL evaluation telemetry |
 | `var/exports/` | CSV run exports |
+| `var/exports/run-definitions/` | Captured run inputs and checksums, archived before queue acceptance |
 
 `docker compose down` preserves these files. To back up the SQLite database,
 stop the stack before copying `var/`. Ray's own temporary logs use a named volume.
@@ -46,6 +47,17 @@ default. Set `FEDSIM_DATA_DIR` to an absolute path to choose another location.
 `FEDSIM_TELEMETRY_LOG_DIR` and `HF_DATASETS_CACHE` can override the corresponding
 subdirectories. With an external Ray cluster, use shared storage and consistent
 paths on every node. Dataset files and checkpoints are not distributed by the API.
+
+Each new run definition can be downloaded as JSON from
+`GET /runs/{run_id}/export/definition` (with `/api` in the Compose deployment).
+The archive is written before queue acceptance using a temporary file and
+atomic replacement. An archive write failure rejects submission. Deleting a
+completed or failed run also removes its definition archive.
+
+The definition survives a backend restart, but the in-memory queue is not
+automatically restored or resumed. An interrupted run's definition remains
+downloadable with its run ID even when no final run record exists. Legacy runs
+without an archive return HTTP 404 for this export.
 
 ## CPU capacity
 

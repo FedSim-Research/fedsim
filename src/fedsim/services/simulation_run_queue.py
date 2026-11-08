@@ -13,10 +13,11 @@ from uuid import uuid4
 import ray
 
 from fedsim.runtime import ensure_ray_initialized, managed_ray_runtime
-from fedsim.services import graph_service, simulation_run_store
+from fedsim.services import simulation_run_store
 from fedsim.services.controller import SimulationController
 from fedsim.services.grafana_snapshot_service import create_accuracy_loss_snapshot_url
 from fedsim.services.loki_sync_service import sync_run_to_loki
+from fedsim.services.run_definition import RunDefinition, delete_archived_definition
 from fedsim.services.simulation_seed_sets import (
     build_seeded_output_filename,
     shared_seed_set_or_raise,
@@ -88,6 +89,7 @@ class RunJob:
     training_config: dict[str, Any] | None
     simulation_settings: dict[str, Any] | None
     spyker_config: dict[str, Any] | None
+    definition: RunDefinition
     combined_payload: dict[str, Any] | None = None
     status: RunStatus = "queued"
     queued_at: str = field(default_factory=_utcnow_iso)
@@ -134,6 +136,7 @@ class RunJob:
             "runs": result.get("runs"),
             "results_by_architecture": result.get("results_by_architecture"),
             "error": self.error,
+            "run_metadata": simulation_run_store.build_run_metadata(self),
         }
 
     def _primary_simulation_settings(self) -> dict[str, Any]:
@@ -236,53 +239,31 @@ class SimulationRunQueue:
             worker.join(timeout=timeout_seconds)
             logger.info("simulation_queue_worker_stopped")
 
-    def enqueue(
-        self,
-        *,
-        graph_id: int,
-        architecture: str,
-        training_config: dict[str, Any] | None,
-        simulation_settings: dict[str, Any] | None,
-        spyker_config: dict[str, Any] | None,
-    ) -> RunJob:
+    def enqueue(self, definition: RunDefinition) -> RunJob:
         run_id = str(uuid4())
+        architecture = definition.architecture
+        configurations = definition.configurations()
+        config = configurations.get(architecture, {})
         job = RunJob(
             run_id=run_id,
-            graph_id=graph_id,
+            graph_id=config.get("graph_id"),
             architecture=architecture,
-            training_config=training_config,
-            simulation_settings=simulation_settings,
-            spyker_config=spyker_config,
+            training_config=config.get("training_config"),
+            simulation_settings=config.get("simulation_settings"),
+            spyker_config=config.get("spyker_config"),
+            combined_payload=configurations if architecture == "both" else None,
+            definition=definition,
         )
+        # Archive before publishing: an I/O failure must not accept an unrecorded run.
+        definition.archive(run_id)
         with self._lock:
             self._jobs[run_id] = job
         self._queue.put(run_id)
         logger.info(
             "simulation_run_enqueued run_id=%s graph_id=%s architecture=%s queue_size=%s",
             run_id,
-            graph_id,
+            job.graph_id,
             architecture,
-            self._queue.qsize(),
-        )
-        return job
-
-    def enqueue_combined(self, combined_payload: dict[str, Any]) -> RunJob:
-        run_id = str(uuid4())
-        job = RunJob(
-            run_id=run_id,
-            graph_id=None,
-            architecture="both",
-            training_config=None,
-            simulation_settings=None,
-            spyker_config=None,
-            combined_payload=combined_payload,
-        )
-        with self._lock:
-            self._jobs[run_id] = job
-        self._queue.put(run_id)
-        logger.info(
-            "simulation_combined_run_enqueued run_id=%s queue_size=%s",
-            run_id,
             self._queue.qsize(),
         )
         return job
@@ -338,6 +319,8 @@ class SimulationRunQueue:
             with self._lock:
                 self._jobs.pop(run_id, None)
 
+        if deleted or job is not None:
+            delete_archived_definition(run_id)
         return deleted or job is not None
 
     def _worker_loop(self) -> None:
@@ -374,15 +357,14 @@ class SimulationRunQueue:
             if job.architecture == "both":
                 result = self._run_combined_job(job)
             else:
-                graph = graph_service.get_graph(job.graph_id)
-                if graph is None:
-                    raise ValueError("graph_not_found")
+                config = job.definition.configurations()[job.architecture]
+                graph = job.definition.graph(job.architecture)
                 result = self._run_architecture_series(
                     architecture=job.architecture,
                     graph=graph,
-                    training_config=job.training_config,
-                    simulation_settings=job.simulation_settings,
-                    spyker_config=job.spyker_config,
+                    training_config=config["training_config"],
+                    simulation_settings=config["simulation_settings"],
+                    spyker_config=config["spyker_config"],
                     run_id_prefix=job.run_id,
                     progress_callback=lambda partial_result: self._update_job_partial_result(
                         job.run_id, partial_result
@@ -557,6 +539,7 @@ class SimulationRunQueue:
         result["seed"] = seed
         result["repetition_index"] = repetition_index
         result["duration_seconds"] = duration_seconds
+        result["simulation_settings"] = per_run_settings
         return result
 
     def _update_job_partial_result(self, run_id: str, partial_result: dict[str, Any]) -> None:
@@ -593,16 +576,12 @@ class SimulationRunQueue:
         if not job.combined_payload:
             raise ValueError("combined_payload_missing")
 
-        payload = job.combined_payload
+        payload = job.definition.configurations()
         hier_cfg = payload["hierfl"]
         spyker_cfg = payload["spyker"]
 
-        hier_graph = graph_service.get_graph(int(hier_cfg["graph_id"]))
-        spyker_graph = graph_service.get_graph(int(spyker_cfg["graph_id"]))
-        if hier_graph is None or hier_graph.architecture != "hierfl":
-            raise ValueError("hierfl_graph_not_found")
-        if spyker_graph is None or spyker_graph.architecture != "spyker":
-            raise ValueError("spyker_graph_not_found")
+        hier_graph = job.definition.graph("hierfl")
+        spyker_graph = job.definition.graph("spyker")
 
         hier_settings = dict(hier_cfg.get("simulation_settings") or {})
         spyker_settings = dict(spyker_cfg.get("simulation_settings") or {})

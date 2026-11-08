@@ -458,8 +458,8 @@ def _datetime_to_iso(value: datetime | None) -> str | None:
     return value.isoformat()
 
 
-def _build_run_metadata(job: Any) -> dict[str, Any]:
-    return {
+def build_run_metadata(job: Any) -> dict[str, Any]:
+    metadata = {
         "graph_id": job.graph_id,
         "architecture": job.architecture,
         "training_config": job.training_config,
@@ -467,6 +467,10 @@ def _build_run_metadata(job: Any) -> dict[str, Any]:
         "spyker_config": job.spyker_config,
         "combined_payload": job.combined_payload,
     }
+    definition = getattr(job, "definition", None)
+    if definition is not None:
+        metadata["run_definition"] = definition.to_metadata()
+    return metadata
 
 
 def _build_final_summary(job: Any) -> dict[str, Any] | None:
@@ -518,7 +522,7 @@ def persist_final_run(job: Any) -> None:
         record.finished_at = _iso_to_datetime(job.finished_at)
         record.duration_seconds = job.duration_seconds
         record.error = job.error
-        record.metadata_json = _dumps_json(_build_run_metadata(job))
+        record.metadata_json = _dumps_json(build_run_metadata(job))
         record.result_json = _dumps_json(job.result)
         record.final_summary_json = _dumps_json(_build_final_summary(job))
         # attempt to persist raw JSONL logs (non-blocking)

@@ -46,6 +46,27 @@ render models. `FlowRenderer` preserves render-model identity by node or edge ID
 while reconciling data changes, so edits and history updates do not reset an
 in-progress drag.
 
+## Captured run definitions
+
+After preflight validation, the API captures the exact graph objects and
+normalized settings into an immutable JSON definition. Nodes and edges retain
+their captured list order because server registration, token order, and client
+partition assignment depend on it. JSON object keys are canonicalized; schema
+version 1 and the complete captured input are covered by a SHA-256 checksum.
+This is a content checksum, not a signature or a complete environment record.
+
+The queue archives the definition before accepting a job. Execution creates
+independent transient graph objects from that definition; it never reloads
+the editor graph. Both mode captures both topologies in one definition. Runtime
+GPU budget scaling changes an execution copy, while the requested definition
+stays unchanged. Per-repetition results record the simulation settings passed
+to the controller; these are not measurements of actual resource usage.
+
+Queued responses and final run metadata include the definition and checksum;
+the existing CSV metadata field preserves them. The JSON export reads the
+archive independently of the in-memory queue. Historical records without a
+captured definition remain readable and have no invented snapshot.
+
 ## Runtime lifecycle
 
 Managed controllers register their use of Ray before dataset preload and keep

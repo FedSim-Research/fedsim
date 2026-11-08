@@ -1,12 +1,25 @@
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
-from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
 
 from fedsim import runtime
+from fedsim.persistence.models import Graph
 from fedsim.services import simulation_run_queue as module
+from fedsim.services.run_definition import RunDefinition
+
+
+def combined_definition(seeds, gpu_budget=None):
+    return RunDefinition.capture(
+        {
+            arch: {
+                "graph": Graph(id=graph_id, name=arch, architecture=arch),
+                "simulation_settings": {"seed_set": seeds, "gpu_budget": gpu_budget},
+            }
+            for arch, graph_id in [("hierfl", 1), ("spyker", 2)]
+        }
+    )
 
 
 @pytest.mark.parametrize("failure", [None, "hierfl", "spyker"])
@@ -18,11 +31,6 @@ def test_combined_pair_waits_for_both_engines_before_shutdown(monkeypatch, failu
     resume = Event()
     shutdown = Mock()
     monkeypatch.setattr(runtime, "shutdown_ray", shutdown)
-    monkeypatch.setattr(
-        module.graph_service,
-        "get_graph",
-        lambda graph_id: SimpleNamespace(architecture="hierfl" if graph_id == 1 else "spyker"),
-    )
 
     def gpu_capacity():
         assert runtime._active_users > 0
@@ -45,12 +53,7 @@ def test_combined_pair_waits_for_both_engines_before_shutdown(monkeypatch, failu
             return {"seed": kwargs["seed"], "output_filename": None}
 
     monkeypatch.setattr(queue, "_run_architecture_once", run)
-    job = queue.enqueue_combined(
-        {
-            arch: {"graph_id": graph_id, "simulation_settings": {"seed_set": [42], "gpu_budget": 1}}
-            for arch, graph_id in [("hierfl", 1), ("spyker", 2)]
-        }
-    )
+    job = queue.enqueue(combined_definition([42], gpu_budget=1))
     with ThreadPoolExecutor(max_workers=1) as threads:
         result = threads.submit(queue._run_combined_job, job)
         try:
@@ -74,11 +77,6 @@ def test_combined_repetitions_release_runtime_between_seed_pairs(monkeypatch):
     queue = module.SimulationRunQueue()
     shutdown = Mock()
     monkeypatch.setattr(runtime, "shutdown_ray", shutdown)
-    monkeypatch.setattr(
-        module.graph_service,
-        "get_graph",
-        lambda graph_id: SimpleNamespace(architecture="hierfl" if graph_id == 1 else "spyker"),
-    )
 
     def run(seed, repetition_index, **kwargs):
         assert runtime._active_users > 0
@@ -86,12 +84,7 @@ def test_combined_repetitions_release_runtime_between_seed_pairs(monkeypatch):
         return {"seed": seed, "output_filename": None}
 
     monkeypatch.setattr(queue, "_run_architecture_once", run)
-    job = queue.enqueue_combined(
-        {
-            arch: {"graph_id": graph_id, "simulation_settings": {"seed_set": [42, 17]}}
-            for arch, graph_id in [("hierfl", 1), ("spyker", 2)]
-        }
-    )
+    job = queue.enqueue(combined_definition([42, 17]))
     result = queue._run_combined_job(job)
     assert result["completed_repetitions"] == 2
     assert shutdown.call_count == 2
