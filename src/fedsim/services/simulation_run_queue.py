@@ -12,7 +12,7 @@ from uuid import uuid4
 
 import ray
 
-from fedsim.runtime import ensure_ray_initialized
+from fedsim.runtime import ensure_ray_initialized, managed_ray_runtime
 from fedsim.services import graph_service, simulation_run_store
 from fedsim.services.controller import SimulationController
 from fedsim.services.grafana_snapshot_service import create_accuracy_loss_snapshot_url
@@ -566,11 +566,7 @@ class SimulationRunQueue:
                 return
             job.result = partial_result
 
-    def _run_combined_job(self, job: RunJob) -> dict[str, Any]:
-        if not job.combined_payload:
-            raise ValueError("combined_payload_missing")
-
-        payload = job.combined_payload
+    def _scale_combined_gpu_budgets(self, payload: dict[str, Any]) -> None:
         hier_cfg = payload["hierfl"]
         spyker_cfg = payload["spyker"]
 
@@ -593,6 +589,14 @@ class SimulationRunQueue:
                     spyker_scaled,
                 )
 
+    def _run_combined_job(self, job: RunJob) -> dict[str, Any]:
+        if not job.combined_payload:
+            raise ValueError("combined_payload_missing")
+
+        payload = job.combined_payload
+        hier_cfg = payload["hierfl"]
+        spyker_cfg = payload["spyker"]
+
         hier_graph = graph_service.get_graph(int(hier_cfg["graph_id"]))
         spyker_graph = graph_service.get_graph(int(spyker_cfg["graph_id"]))
         if hier_graph is None or hier_graph.architecture != "hierfl":
@@ -609,7 +613,13 @@ class SimulationRunQueue:
         total_repetitions = len(seed_set)
 
         for repetition_index, seed in enumerate(seed_set, start=1):
-            with ThreadPoolExecutor(max_workers=2) as pool:
+            # Keep Ray alive through resource probing, preloads and both futures.
+            # Release each completed seed pair before starting the next one.
+            with managed_ray_runtime(), ThreadPoolExecutor(max_workers=2) as pool:
+                if repetition_index == 1:
+                    self._scale_combined_gpu_budgets(payload)
+                    hier_settings = dict(hier_cfg.get("simulation_settings") or {})
+                    spyker_settings = dict(spyker_cfg.get("simulation_settings") or {})
                 fut_hier = pool.submit(
                     self._run_architecture_once,
                     architecture="hierfl",

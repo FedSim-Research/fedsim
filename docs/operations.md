@@ -57,6 +57,10 @@ capacity and CPU reservations for its lifetime. Shutting down its owning Ray
 job releases the pool. Standalone Python callers should call `ray.shutdown()`
 when finished.
 
+Managed runs release Ray after their last active caller finishes. Both mode
+keeps each seed pair alive until both engines exit, then releases it before
+starting the next pair. Engine failures also release their registrations.
+
 If fewer than one CPU is free, startup fails with
 `fedsim_requires_available_cpu`. If competing allocations prevent workers from
 starting within 30 seconds, startup fails with `fedsim_cpu_workers_unavailable`.

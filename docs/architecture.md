@@ -46,6 +46,22 @@ render models. `FlowRenderer` preserves render-model identity by node or edge ID
 while reconciling data changes, so edits and history updates do not reset an
 in-progress drag.
 
+## Runtime lifecycle
+
+Managed controllers register their use of Ray before dataset preload and keep
+that registration through training, checkpoint saving, and final evaluation.
+The runtime initializes lazily. Registration, initialization, and final shutdown
+share one lock; shutdown cannot use a stale zero-user decision while another
+caller registers. Explicit `shutdown_ray()` rejects active managed users.
+
+Both mode holds an additional registration for each seed pair, including the
+GPU capacity probe and the completion of both executor futures. An engine
+failure therefore waits for its partner to exit before releasing the runtime.
+Each finished pair releases its registration before the next seed starts.
+When no other managed callers remain, Ray shuts down between pairs. This
+coordination applies within the driver process; direct `ray.shutdown()` calls
+outside FedSim bypass it.
+
 ## CPU execution
 
 Coordination, dataset, evaluator, and client actors explicitly request zero

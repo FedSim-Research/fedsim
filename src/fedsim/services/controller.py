@@ -1,12 +1,11 @@
 import logging
 import random
-import threading
 from typing import Any, Callable
 
 import numpy as np
 import torch
 
-from fedsim.runtime import shutdown_ray
+from fedsim.runtime import managed_ray_runtime
 from fedsim.services.hierfl_simulation_builder import (
     build_hierfl_simulation,
     get_hierfl_evaluate_model,
@@ -21,9 +20,6 @@ logger = logging.getLogger(__name__)
 
 
 class SimulationController:
-    _active_runs = 0
-    _active_runs_lock = threading.Lock()
-
     def __init__(
         self,
         architecture: str,
@@ -40,6 +36,7 @@ class SimulationController:
         self.spyker_config = spyker_config
         self.run_id = run_id
 
+    @managed_ray_runtime()
     def start(self):
         # Pre-download the dataset before simulation engines run in multiple Ray actors
         from fedsim.learning import preload_dataset
@@ -63,7 +60,7 @@ class SimulationController:
             raise ValueError(f"{self.architecture}_requires_graph")
 
         if self.architecture == "hierfl":
-            return self._run_managed_simulation(
+            return self._run_simulation(
                 builder=lambda: build_hierfl_simulation(
                     self.graph,
                     training_config=self.training_config,
@@ -79,7 +76,7 @@ class SimulationController:
             )
 
         if self.architecture == "spyker":
-            return self._run_managed_simulation(
+            return self._run_simulation(
                 builder=lambda: build_spyker_simulation(
                     self.graph,
                     training_config=self.training_config,
@@ -97,17 +94,6 @@ class SimulationController:
             )
 
         raise NotImplementedError(f"Architecture not supported: {self.architecture}")
-
-    def _run_managed_simulation(
-        self,
-        builder: Callable[[], Any],
-        evaluator: Callable[[], Callable[[str], dict[str, float]]],
-    ) -> dict[str, Any]:
-        self._retain_runtime()
-        try:
-            return self._run_simulation(builder=builder, evaluator=evaluator)
-        finally:
-            self._release_runtime()
 
     def _run_simulation(
         self,
@@ -152,21 +138,3 @@ class SimulationController:
         np.random.seed(seed)
         torch.manual_seed(seed)
         logger.info("simulation_seed_applied architecture=%s seed=%s", self.architecture, seed)
-
-    @classmethod
-    def _retain_runtime(cls) -> None:
-        with cls._active_runs_lock:
-            cls._active_runs += 1
-
-    @classmethod
-    def _release_runtime(cls) -> None:
-        should_shutdown = False
-        with cls._active_runs_lock:
-            cls._active_runs = max(0, cls._active_runs - 1)
-            should_shutdown = cls._active_runs == 0
-        if should_shutdown:
-            cls._shutdown_runtime()
-
-    @staticmethod
-    def _shutdown_runtime() -> None:
-        shutdown_ray()
