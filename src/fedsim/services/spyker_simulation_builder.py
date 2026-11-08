@@ -5,20 +5,18 @@ from functools import lru_cache
 from typing import Any
 
 from fedsim.persistence.models import Edge, Graph, Node
+from fedsim.services.node_performance import parse_node_performance
 
 DEFAULT_RUN_TIME_LIMIT = 5000.0
-MIN_PERF_STDDEV = 0.01
 
 
 @lru_cache(maxsize=1)
 def _import_spyker():
     from fedsim.engines.spyker.simulation import SpykerSimulation
     from fedsim.evaluation import evaluate_model
-    from fedsim.simulation.spyker_config import FullConfiguration
     from fedsim.specs.network_metrics import Network
-    from fedsim.specs.performance_metrics import Performance
 
-    return SpykerSimulation, FullConfiguration, Performance, Network, evaluate_model
+    return SpykerSimulation, Network, evaluate_model
 
 
 def _node_config(node: Node) -> dict[str, Any]:
@@ -40,18 +38,11 @@ def _edge_config(edge: Edge) -> dict[str, Any]:
 
 
 def _performance_for(node_type: str, config: dict[str, Any]):
-    _, _, Performance, _, _ = _import_spyker()
-    if "computeFactor" not in config or config["computeFactor"] is None:
-        raise ValueError(f"spyker_missing_{node_type}_computeFactor")
-    compute_factor = float(config["computeFactor"])
-    if compute_factor <= 0:
-        raise ValueError(f"spyker_invalid_{node_type}_computeFactor")
-    perf_stddev = max(MIN_PERF_STDDEV, compute_factor * 0.1)
-    return Performance(compute_factor=compute_factor, performance_stddev=perf_stddev)
+    return parse_node_performance(node_type, config, prefix="spyker")
 
 
 def _network_for_edge(edge: Edge):
-    _, _, _, Network, _ = _import_spyker()
+    _, Network, _ = _import_spyker()
     config = _edge_config(edge)
     if "pingMs" not in config or config["pingMs"] is None:
         raise ValueError("spyker_missing_edge_pingMs")
@@ -131,6 +122,7 @@ def validate_spyker_graph(graph: Graph) -> None:
         for key in required_common:
             if key not in config or config[key] is None:
                 raise ValueError(f"spyker_missing_{node.type}_{key}")
+        _performance_for(node.type, config)
 
     for client in client_nodes:
         client_config = _node_config(client)
@@ -224,7 +216,7 @@ def build_spyker_simulation(
     graph_id: int | None = None,
     eval_interval: float | None = None,
 ):
-    SpykerSimulation, _, _, _, _ = _import_spyker()
+    SpykerSimulation, _, _ = _import_spyker()
     validate_spyker_graph(graph)
 
     nodes = list(graph.nodes)
@@ -353,5 +345,5 @@ def build_spyker_simulation(
 
 
 def get_spyker_evaluate_model():
-    _, _, _, _, evaluate_model = _import_spyker()
+    _, _, evaluate_model = _import_spyker()
     return evaluate_model

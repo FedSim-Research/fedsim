@@ -125,13 +125,13 @@ export class HelpDialog {
       note: 'Treat it as relative performance, not an absolute CPU or GPU benchmark.',
     },
     {
-      label: 'Performance sigma',
+      label: 'Runtime sigma',
       key: 'performanceSigma',
       appliesTo: ['Super Server', 'Server', 'Client'],
-      description: 'The plus/minus spread around compute performance.',
-      effect: 'Use it to describe how stable or unstable a device class is. Small sigma means consistent performance; larger sigma means stronger fluctuations.',
-      format: 'Number, minimum 0',
-      note: 'In the current project the runtime mainly derives effective performance spread from compute factor, so sigma is best read as the intended variability shown in the editor and presets.',
+      description: 'Standard deviation of additive Gaussian variation in simulated training time, measured in virtual seconds.',
+      effect: 'Zero disables added runtime variation. Larger values increase timing fluctuations around the nominal training duration.',
+      format: 'Seconds, minimum 0',
+      note: 'Values are in seconds, independently of compute factor. Server aggregation delays are currently not applied by the simulation engines.',
     },
   ];
 

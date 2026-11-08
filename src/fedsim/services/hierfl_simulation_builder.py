@@ -5,9 +5,9 @@ from functools import lru_cache
 from typing import Any
 
 from fedsim.persistence.models import Edge, Graph, Node
+from fedsim.services.node_performance import parse_node_performance
 
 DEFAULT_RUN_TIME_LIMIT = 5000.0
-MIN_PERF_STDDEV = 0.01
 
 
 @lru_cache(maxsize=1)
@@ -15,9 +15,8 @@ def _import_hierfl():
     from fedsim.engines.hierarchical.simulation import HierarchicalSimulation
     from fedsim.evaluation import evaluate_model
     from fedsim.specs.network_metrics import Network
-    from fedsim.specs.performance_metrics import Performance
 
-    return HierarchicalSimulation, Performance, Network, evaluate_model
+    return HierarchicalSimulation, Network, evaluate_model
 
 
 def _node_config(node: Node) -> dict[str, Any]:
@@ -39,18 +38,11 @@ def _edge_config(edge: Edge) -> dict[str, Any]:
 
 
 def _performance_for(node_type: str, config: dict[str, Any]):
-    _, Performance, _, _ = _import_hierfl()
-    if "computeFactor" not in config or config["computeFactor"] is None:
-        raise ValueError(f"hierfl_missing_{node_type}_computeFactor")
-    compute_factor = float(config["computeFactor"])
-    if compute_factor <= 0:
-        raise ValueError(f"hierfl_invalid_{node_type}_computeFactor")
-    perf_stddev = max(MIN_PERF_STDDEV, compute_factor * 0.1)
-    return Performance(compute_factor=compute_factor, performance_stddev=perf_stddev)
+    return parse_node_performance(node_type, config, prefix="hierfl")
 
 
 def _network_for_edge(edge: Edge):
-    _, _, Network, _ = _import_hierfl()
+    _, Network, _ = _import_hierfl()
     config = _edge_config(edge)
     if "pingMs" not in config or config["pingMs"] is None:
         raise ValueError("hierfl_missing_edge_pingMs")
@@ -135,6 +127,7 @@ def validate_hierfl_graph(graph: Graph) -> None:
         for key in required_common:
             if key not in config or config[key] is None:
                 raise ValueError(f"hierfl_missing_{node.type}_{key}")
+        _performance_for(node.type, config)
 
     for client in client_nodes:
         client_config = _node_config(client)
@@ -197,9 +190,7 @@ def build_hierfl_simulation(
     graph_id: int | None = None,
     eval_interval: float | None = None,
 ):
-    from fedsim.specs.network_metrics import Network
-
-    HierarchicalSimulation, _, _, _ = _import_hierfl()
+    HierarchicalSimulation, Network, _ = _import_hierfl()
     validate_hierfl_graph(graph)
 
     nodes = list(graph.nodes)
@@ -337,5 +328,5 @@ def build_hierfl_simulation(
 
 
 def get_hierfl_evaluate_model():
-    _, _, _, evaluate_model = _import_hierfl()
+    _, _, evaluate_model = _import_hierfl()
     return evaluate_model

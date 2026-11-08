@@ -160,6 +160,7 @@ class HierarchicalSimulation:
         )
 
         client_config = {
+            "dataset_id": self.dataset_id,
             "dataset_partition_id": dataset_partition_id,
             "total_partitions": total_partitions,
             "seed": seed,

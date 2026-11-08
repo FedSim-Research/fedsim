@@ -369,6 +369,7 @@ class SpykerServer(BaseAsyncServer):
         config = {
             "server_id": self.server_id,
             "epochs": train_config.local_epochs,
+            "batch_size": train_config.batch_size,
             "lr": client_lr,
             "model_complexity": train_config.model_complexity,
             "model_age": self.model_age,

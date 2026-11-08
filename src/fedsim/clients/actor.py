@@ -18,6 +18,7 @@ class VirtualClientActor:
         self.inner_client = TrainingClient(
             partition_id=client_config["dataset_partition_id"],
             num_partitions=client_config["total_partitions"],
+            dataset_id=client_config.get("dataset_id"),
             seed=client_config.get("seed"),
         )
         self.current_virtual_time = 0.0
@@ -78,8 +79,8 @@ class VirtualClientActor:
         res_size_mb = sum([a.nbytes for a in res_arrays]) / (1024 * 1024)
 
         t_upload = estimate_transmission_time(
-            sender_spec=server_spec,
-            receiver_spec=client_spec,
+            sender_spec=client_spec,
+            receiver_spec=server_spec,
             network_metrics=server_spec.network_metrics,
             metrics_id=self.client_id,
             payload_size_mb=res_size_mb,

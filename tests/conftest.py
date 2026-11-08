@@ -1,6 +1,7 @@
 import logging
 import os
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 
 import pytest
 
@@ -33,3 +34,18 @@ def api():
 
     with TestClient(app) as client:
         yield client
+
+
+@pytest.fixture
+def local_actor(monkeypatch):
+    """Exercise pinned Ray actor implementations without starting worker processes."""
+    import ray
+
+    runtime = SimpleNamespace(current_actor=object())
+    monkeypatch.setattr(ray, "get_runtime_context", lambda: runtime)
+    monkeypatch.setattr(ray, "put", lambda value: value)
+
+    def create(actor_type, *args, **kwargs):
+        return actor_type.__ray_metadata__.modified_class(*args, **kwargs)
+
+    return create

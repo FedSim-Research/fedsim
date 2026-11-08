@@ -63,6 +63,7 @@ class TrainingClient:
                 trainloader.dataset,
                 batch_size=batch_size,
                 shuffle=True,
+                generator=trainloader.generator,
             )
 
         loss = train(self.net, trainloader, epochs, lr, self.device)
