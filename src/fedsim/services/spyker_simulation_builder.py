@@ -104,6 +104,10 @@ def validate_spyker_graph(graph: Graph) -> None:
         raise ValueError("spyker_requires_client_nodes")
 
     server_ids = {n.id for n in server_nodes}
+    for server in server_nodes:
+        if not (server_ids - {server.id}).issubset(adjacency.get(server.id, set())):
+            raise ValueError("spyker_requires_fully_connected_servers")
+
     for client in client_nodes:
         neighbors = adjacency.get(client.id, set())
         connected_servers = [nid for nid in neighbors if nid in server_ids]

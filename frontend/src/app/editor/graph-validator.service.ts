@@ -190,6 +190,16 @@ export class GraphValidatorService {
     const serverIds = new Set(serverNodes.map((n) => n.id));
     const superId = superNodes[0]?.id;
 
+    if (architecture === 'spyker') {
+      for (const server of serverNodes) {
+        const neighbors = adjacency.get(server.id) ?? new Set<string>();
+        if (serverNodes.some((peer) => peer.id !== server.id && !neighbors.has(peer.id))) {
+          errors.push('spyker: each Server must be directly connected to every other Server');
+          break;
+        }
+      }
+    }
+
     if (architecture === 'hierfl' && superId) {
       for (const server of serverNodes) {
         const neighbors = adjacency.get(server.id) ?? new Set<string>();

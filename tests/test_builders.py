@@ -82,6 +82,32 @@ def test_builders_reject_disconnected_clients(architecture):
         builder(graph, training_config={"epochs": 1, "lr": 0.01})
 
 
+@pytest.mark.parametrize("complete", [False, True])
+def test_spyker_requires_direct_links_between_every_pair_of_servers(complete):
+    graph = topology("spyker")
+    for node_id in ("peer", "third"):
+        graph.nodes.append(
+            Node(id=node_id, type="ServerNode", config_json=graph.nodes[0].config_json)
+        )
+    pairs = [("server", "peer"), ("peer", "third")]
+    if complete:
+        pairs.append(("third", "server"))
+    for source, target in pairs:
+        graph.edges.append(
+            Edge(
+                source_node_id=source, target_node_id=target, config_json=graph.edges[0].config_json
+            )
+        )
+    if complete:
+        simulation = build_spyker_simulation(graph, training_config={"epochs": 1, "lr": 0.01})
+        assert set(simulation.server_registry) == {"server", "peer", "third"}
+    else:
+        with pytest.raises(ValueError, match="spyker_requires_fully_connected_servers"):
+            validate_start_payload("spyker", graph, {"epochs": 1, "lr": 0.01}, None, None)
+        with pytest.raises(ValueError, match="spyker_requires_fully_connected_servers"):
+            build_spyker_simulation(graph, training_config={"epochs": 1, "lr": 0.01})
+
+
 @pytest.mark.parametrize("architecture", ["hierfl", "spyker"])
 def test_selected_dataset_and_batch_size_reach_training(monkeypatch, local_actor, architecture):
     builder = build_hierfl_simulation if architecture == "hierfl" else build_spyker_simulation

@@ -54,12 +54,10 @@ class SpykerServer(BaseAsyncServer):
         # Self-Reference for scheduling events back to this actor
         self.self_ref = None
 
-        # Maps a sync_id (bid) to the number of models received for that sync
-        self.sync_counts: Dict[str, int] = {}
-
-        # Set of sync_ids that we have already broadcasted our model for
-        self.did_broadcast_ids: OrderedDict = OrderedDict()
-        self.MAX_BROADCAST_CACHE = 1000  # Used inside LRU cache to throw out stale IDs
+        # A round includes our own broadcast and one contribution per peer.
+        self._sync_participants: OrderedDict[str, set[str]] = OrderedDict()
+        self._sync_sequence = 0
+        self.MAX_BROADCAST_CACHE = 1000
 
         self._cached_global_weights_ref = None
 
@@ -83,16 +81,18 @@ class SpykerServer(BaseAsyncServer):
     def set_topology(
         self,
         peer_connections: Dict[str, Network],
-        next_token_peer: str,
+        next_token_peer: str | None,
         assigned_clients: List[str],
     ):
-        self.peer_connections = peer_connections
+        self.peer_connections = {
+            peer: network for peer, network in peer_connections.items() if peer != self.server_id
+        }
         self.next_token_peer = next_token_peer
         self.assigned_clients = assigned_clients
-        self.total_servers = len(peer_connections) + 1  # self referenced + 1
+        self.total_servers = len(self.peer_connections) + 1
         print(f"[{self.server_id}] Total Servers set to {self.total_servers}")
 
-        for peer in peer_connections:
+        for peer in self.peer_connections:
             self.server_ages[peer] = 0
         self.server_ages[self.server_id] = 0
 
@@ -223,7 +223,7 @@ class SpykerServer(BaseAsyncServer):
 
     def _check_synchronization(self):
         """Spyker Algorithm 2: Server Sync Decision."""
-        if not self.has_token or self.ongoing_sync:
+        if not self.has_token or self.ongoing_sync or not self.peer_connections:
             return
 
         min_age = min(self.server_ages.values()) if self.server_ages else 0
@@ -234,58 +234,56 @@ class SpykerServer(BaseAsyncServer):
 
         if inter_drift >= self.spyker_config.h_inter:
             reason = f"Inter-Drift {inter_drift} >= {self.spyker_config.h_inter}"
-            self.age_at_last_sync = self.model_age
             self._broadcast_model_to_all(reason)
         elif intra_drift >= self.spyker_config.h_intra:
             reason = f"Intra-Drift {intra_drift} >= {self.spyker_config.h_intra}"
-            self.age_at_last_sync = self.model_age
             self._broadcast_model_to_all(reason)
         else:
             self._pass_token()
 
     def _broadcast_model_to_all(self, reason="Unknown"):
+        if self.ongoing_sync or not self.peer_connections:
+            return
+
         self.ongoing_sync = True
-
-        # Unique Broadcast ID
-        bid = f"{self.server_id}_{self.model_age}"
+        self.age_at_last_sync = self.model_age
+        self._sync_sequence += 1
+        bid = f"{self.server_id}_{self._sync_sequence}"
         self.current_bid = bid
-
-        self.did_broadcast_ids[bid] = True
-
-        self.sync_counts[bid] = 1
+        self._remember_sync(bid)
 
         print(f"[{self.server_id}] Initiating SYNC {bid}. Reason: {reason}")
 
         self._perform_broadcast(bid)
 
+    def _remember_sync(self, bid):
+        participants = {self.server_id}
+        self._sync_participants[bid] = participants
+        if len(self._sync_participants) > self.MAX_BROADCAST_CACHE:
+            expired = next(key for key in self._sync_participants if key != self.current_bid)
+            del self._sync_participants[expired]
+        return participants
+
     def _handle_model_broadcast(self, sender_id, payload, direct_refs):
+        if sender_id == self.server_id or sender_id not in self.peer_connections:
+            return
+
         bid = payload["bid"]
         sender_age = payload["age"]
+        self.server_ages[sender_id] = max(self.server_ages.get(sender_id, 0), sender_age)
 
-        if bid == self.current_bid:
-            if self.has_token:
-                self.sync_counts[bid] += 1
-                if self.sync_counts[bid] >= self.total_servers:
-                    print(f"[{self.server_id}] Sync {bid} Complete. Releasing Token.")
-                    self.current_bid = ""
-                    self.ongoing_sync = False
-                    self._pass_token(immediate_sync_after_release=True)
-            return  # Do not aggregate own broadcasted model
-
-        if bid in self.did_broadcast_ids:
-            return  # Do not aggregate seen broadcast as duplicates
-
-        # New broadcast. Process and forward
-        self.did_broadcast_ids[bid] = True
-
-        if len(self.did_broadcast_ids) > self.MAX_BROADCAST_CACHE:
-            self.did_broadcast_ids.popitem(last=False)
-
-        self._perform_broadcast(bid)
+        participants = self._sync_participants.get(bid)
+        if participants is None:
+            participants = self._remember_sync(bid)
+            self.age_at_last_sync = self.model_age
+            # Publish the pre-aggregation snapshot once, as in Spyker Algorithm 2.
+            self._perform_broadcast(bid)
+        if sender_id in participants:
+            return
+        participants.add(sender_id)
 
         # --- Peer Weight Aggregations ---
         peer_weights = direct_refs
-        self.server_ages[sender_id] = sender_age
 
         # Calculate Sigmoid Weight
         delta_age = sender_age - self.model_age
@@ -311,11 +309,18 @@ class SpykerServer(BaseAsyncServer):
         self.model_age = int(round(weighted_age))
 
         self.model_age = max(old_age, self.model_age)
+        self.server_ages[self.server_id] = self.model_age
 
         if self.model_age > old_age:
             print(
                 f"[{self.server_id}] Aggregated model from {sender_id}. Age jumped {old_age} -> {self.model_age}"
             )
+
+        if self.has_token and bid == self.current_bid and len(participants) == self.total_servers:
+            print(f"[{self.server_id}] Sync {bid} Complete. Releasing Token.")
+            self.current_bid = ""
+            self.ongoing_sync = False
+            self._pass_token(immediate_sync_after_release=True)
 
     def _handle_token_arrival(self, sender_id, payload):
         self.has_token = True
@@ -330,7 +335,7 @@ class SpykerServer(BaseAsyncServer):
         self._check_synchronization()
 
     def _pass_token(self, immediate_sync_after_release: bool = False):
-        if not self.next_token_peer:
+        if not self.next_token_peer or self.next_token_peer == self.server_id:
             return  # single server setup
 
         self.has_token = False

@@ -224,12 +224,10 @@ class SpykerSimulation:
             outbound_edges = {
                 k: v
                 for k, v in self.server_registry.get(s_id).network_metrics.items()
-                if k in server_ids_set
+                if k in server_ids_set and k != s_id
             }
 
-            next_peer_id = self.server_ids[
-                (i + 1) % count
-            ]  # TODO: implement cohesive selection strategy for ring
+            next_peer_id = self.server_ids[(i + 1) % count] if count > 1 else None
 
             assigned_client_ids = [c_id for c_id, _ in self.client_map[s_id]]
 
@@ -246,6 +244,11 @@ class SpykerSimulation:
                 ray.get(actor.set_token_holder.remote(True))
 
     def build(self):
+        server_ids = set(self.server_ids)
+        for server_id in server_ids:
+            peers = set(self.server_registry[server_id].network_metrics)
+            if not server_ids.difference({server_id}).issubset(peers):
+                raise ValueError("spyker_requires_fully_connected_servers")
         ensure_ray_initialized()
 
         self._server_actor_options = self._resolve_server_actor_options()

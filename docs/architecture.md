@@ -70,3 +70,34 @@ The aggregation-time helper uses the same zero-mean noise convention. Its
 delay is currently not scheduled by either engine. These corrections change
 effective settings and virtual timings; historical results must retain their
 original code and configuration rather than being relabeled as new results.
+
+## Spyker peer synchronization
+
+Multi-server Spyker graphs require a direct link between every pair of servers.
+The editor and backend reject incomplete meshes; the engine also checks this
+before starting Ray. A single server is supported without a token successor
+or peer synchronization. Self-links do not add synchronization participants.
+The first registered server starts with the token. The ring follows the engine's
+server registration order (`server_ids`) and wraps from the last server to the
+first.
+
+Following [Spyker Algorithm 2](https://arxiv.org/pdf/2406.01439v2), each server
+broadcasts its current model once per synchronization ID, before aggregating
+the first incoming peer model. It then aggregates one contribution from each
+distinct peer, including at the initiating server. Broadcast-once tracking does
+not suppress other peers' contributions. Client training continues while the
+server exchange is in progress.
+
+The initiator releases the token only after aggregating every peer's response.
+Duplicate, self-originated, and unknown-sender model messages cannot complete
+the round. IDs use an increasing counter per initiating actor, independently
+of model age. The duplicate cache retains up to 1,000 recent rounds and protects
+the active round from eviction; arbitrarily old duplicates are not covered.
+
+The existing model-weighting formula, integer monotonic model ages, and token
+circulation policy are retained. Peer aggregation remains asynchronous and
+can depend on arrival order. These protocol corrections do not establish full
+equivalence with the original Spyker implementation or validate paper results.
+The scheduler assigns tie-breaking sequence IDs when callbacks complete.
+Fixed seeds therefore do not by themselves guarantee identical event order
+across runs.
