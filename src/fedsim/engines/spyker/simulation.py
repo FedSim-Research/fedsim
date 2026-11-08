@@ -8,6 +8,7 @@ from fedsim.engines.spyker.server import SpykerServer
 from fedsim.learning import Net
 from fedsim.runtime import ensure_ray_initialized
 from fedsim.simulation.context import SimulationContext, set_global_context
+from fedsim.simulation.cpu_execution import get_cpu_execution_pool
 from fedsim.simulation.orchestrator import SimulationOrchestrator
 from fedsim.simulation.spyker_config import FullConfiguration
 from fedsim.specs.client_spec import ClientSpec
@@ -32,6 +33,7 @@ class SpykerSimulation:
 
         self.context = None
         self.orchestrator = None
+        self._cpu_pool = None
         self.spyker_actors_map: Dict[str, Any] = {}
         self._server_actor_options: dict[str, float] = {}
         self.run_id = "unknown_run"
@@ -251,8 +253,9 @@ class SpykerSimulation:
                 raise ValueError("spyker_requires_fully_connected_servers")
         ensure_ray_initialized()
 
+        self._cpu_pool = get_cpu_execution_pool()
         self._server_actor_options = self._resolve_server_actor_options()
-        self.orchestrator = SimulationOrchestrator.options(num_gpus=0.0).remote()
+        self.orchestrator = SimulationOrchestrator.remote(cpu_pool=self._cpu_pool)
 
         self.context = SimulationContext(
             orchestrator_actor=self.orchestrator,
@@ -290,7 +293,7 @@ class SpykerSimulation:
                 dataset=self.dataset_id,
             )
 
-            eval_events = ray.get(self.evaluator_actor.start.remote())
+            eval_events = ray.get(self._cpu_pool.call.remote(self.evaluator_actor, "start", (), {}))
             if eval_events:
                 all_initial_events.extend(eval_events)
 

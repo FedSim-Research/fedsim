@@ -47,6 +47,25 @@ default. Set `FEDSIM_DATA_DIR` to an absolute path to choose another location.
 subdirectories. With an external Ray cluster, use shared storage and consistent
 paths on every node. Dataset files and checkpoints are not distributed by the API.
 
+## CPU capacity
+
+Simulation startup requires at least one free logical Ray CPU. Both engines
+share a pool sized to the whole CPUs available at its creation; for example,
+2.5 free CPUs allow two concurrent training or periodic evaluation callbacks.
+Coordination actors do not reserve these CPUs. A reused pool keeps its original
+capacity and CPU reservations for its lifetime. Shutting down its owning Ray
+job releases the pool. Standalone Python callers should call `ray.shutdown()`
+when finished.
+
+If fewer than one CPU is free, startup fails with
+`fedsim_requires_available_cpu`. If competing allocations prevent workers from
+starting within 30 seconds, startup fails with `fedsim_cpu_workers_unavailable`.
+This timeout tears down the shared pool, so other controllers using that pool
+also fail; it is not an isolated timeout for one engine.
+Check the Ray cluster's resource allocations before retrying. Logical CPU
+reservations are scheduling limits; they do not impose memory or process
+quotas. Large client populations can still exhaust workstation RAM.
+
 ## NVIDIA GPUs
 
 The GPU image uses PyTorch 2.15 with CUDA 13.2. It requires a compatible NVIDIA

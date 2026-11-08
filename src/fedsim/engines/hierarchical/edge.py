@@ -15,7 +15,7 @@ MODEL_SYNC = "MODEL_SYNC"
 SERVER_MESSAGE = "SERVER_MESSAGE"
 
 
-@ray.remote
+@ray.remote(num_cpus=0, num_gpus=0)
 class EdgeServer(BaseAsyncServer):
     def __init__(
         self,
@@ -54,9 +54,8 @@ class EdgeServer(BaseAsyncServer):
 
     def register_clients(self, client_configs: Dict[str, Dict[str, Any]]):
         """Instantiates PyTorch DataLoaders safely inside the Ray worker."""
-        gpu_fraction = 0
         for c_id, config in client_configs.items():
-            actor = VirtualClientActor.options(num_cpus=1e-4, num_gpus=gpu_fraction).remote(
+            actor = VirtualClientActor.remote(
                 client_id=c_id, client_config=config, context=self.context
             )
             self.assigned_client_instances[c_id] = actor

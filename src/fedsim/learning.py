@@ -74,7 +74,7 @@ generic_transforms = Compose(
 )
 
 
-@ray.remote
+@ray.remote(num_cpus=0, num_gpus=0)
 class DatasetProvider:
     def __init__(self, dataset_id: str, num_partitions: int, seed: int):
         partitioner = IidPartitioner(num_partitions=num_partitions)

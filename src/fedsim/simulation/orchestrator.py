@@ -8,9 +8,10 @@ import ray
 from fedsim.simulation.event import Event
 
 
-@ray.remote
+@ray.remote(num_cpus=0, num_gpus=0)
 class SimulationOrchestrator:
-    def __init__(self):
+    def __init__(self, cpu_pool=None):
+        self._cpu_pool = cpu_pool
         self._event_heap: List[Event] = []
         self.global_virtual_time: float = 0.0
         self._sequence_counter: int = 0
@@ -60,10 +61,15 @@ class SimulationOrchestrator:
                     self._log_queue.put((self.global_virtual_time, payload))
 
                     # Dispatch to the Ray cluster asynchronously
-                    if refs is not None:
-                        future = getattr(actor_ref, method_name).remote(payload, direct_refs=refs)
+                    kwargs = {} if refs is None else {"direct_refs": refs}
+                    if payload.get("event_type") in {"START_FIT", "EVALUATE"}:
+                        if self._cpu_pool is None:
+                            raise RuntimeError("CPU execution pool required for compute events")
+                        future = self._cpu_pool.call.remote(
+                            actor_ref, method_name, (payload,), kwargs
+                        )
                     else:
-                        future = getattr(actor_ref, method_name).remote(payload)
+                        future = getattr(actor_ref, method_name).remote(payload, **kwargs)
 
                     in_flight[future] = event
 

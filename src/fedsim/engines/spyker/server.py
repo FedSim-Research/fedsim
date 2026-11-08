@@ -14,7 +14,7 @@ from fedsim.specs.network_metrics import Network
 from fedsim.strategies.server_strategies import get_async_server_strategy
 
 
-@ray.remote
+@ray.remote(num_cpus=0, num_gpus=0)
 class SpykerServer(BaseAsyncServer):
     def __init__(self, server_id: str, config: FullConfiguration, context: SimulationContext):
         set_global_context(context)
@@ -98,10 +98,8 @@ class SpykerServer(BaseAsyncServer):
 
     def register_clients(self, client_configs: Dict[str, Any]):
         """Spawns Client Actors dynamically to process tasks concurrently."""
-        gpu_fraction = 0
-
         for c_id, config in client_configs.items():
-            actor = VirtualClientActor.options(num_cpus=1e-4, num_gpus=gpu_fraction).remote(
+            actor = VirtualClientActor.remote(
                 client_id=c_id, client_config=config, context=self.context
             )
             self.assigned_client_instances[c_id] = actor

@@ -46,6 +46,32 @@ render models. `FlowRenderer` preserves render-model identity by node or edge ID
 while reconciling data changes, so edits and history updates do not reset an
 in-progress drag.
 
+## CPU execution
+
+Coordination, dataset, evaluator, and client actors explicitly request zero
+logical CPUs. Keeping these actors alive therefore cannot consume the CPU
+reservations needed to start training. Each client retains its model, data
+loaders, and random generator between callbacks.
+
+Both engines submit `START_FIT` and periodic `EVALUATE` callbacks through one
+named CPU execution pool per Ray namespace. The pool creates one worker per
+whole CPU available when it is first built. Each worker reserves one logical
+CPU for its lifetime and waits for one compute callback to finish before
+accepting another. Initial periodic evaluation also uses the pool. Concurrent
+engine controllers share the same capacity, including in Both mode. Client
+and periodic evaluator actors set PyTorch's intra-op thread count to one.
+
+This bounds active training and periodic evaluation callbacks, not total
+process count, memory, or operating-system CPU usage. Client initialization,
+server aggregation, data preparation, and the controller's final evaluation
+run outside this admission pool. Idle clients still retain their own processes
+and training state. CPU reservations last for the pool's lifetime; shutting
+down its owning Ray job releases the pool.
+
+Changing execution concurrency can change callback completion order and thus
+event tie-breaking. Virtual delay formulas are unchanged; bitwise equivalence
+with previous runs is not guaranteed.
+
 ## Training settings and virtual time
 
 Both engines pass the selected dataset ID to their training clients. The batch

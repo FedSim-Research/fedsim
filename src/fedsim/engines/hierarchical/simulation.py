@@ -9,6 +9,7 @@ from fedsim.engines.hierarchical.edge import EdgeServer
 from fedsim.learning import Net
 from fedsim.runtime import ensure_ray_initialized
 from fedsim.simulation.context import SimulationContext, set_global_context
+from fedsim.simulation.cpu_execution import get_cpu_execution_pool
 from fedsim.simulation.orchestrator import SimulationOrchestrator
 from fedsim.specs.client_spec import ClientSpec
 from fedsim.specs.network_metrics import Network
@@ -43,6 +44,7 @@ class HierarchicalSimulation:
 
         self.context = None
         self.orchestrator = None
+        self._cpu_pool = None
         self.super_actor = None
         self.edge_actors_map = {}
         self._server_actor_options: dict[str, float] = {}
@@ -224,21 +226,21 @@ class HierarchicalSimulation:
 
     def build(self):
         """Constructs the simulation environment, orchestrator, and actors."""
+        if not self.super_id:
+            raise ValueError("Super server must be defined before building.")
+        if not self.edge_ids:
+            raise ValueError("At least one edge server must be defined.")
         ensure_ray_initialized()
 
+        self._cpu_pool = get_cpu_execution_pool()
         self._server_actor_options = self._resolve_server_actor_options()
-        self.orchestrator = SimulationOrchestrator.options(num_gpus=0.0).remote()
+        self.orchestrator = SimulationOrchestrator.remote(cpu_pool=self._cpu_pool)
         self.context = SimulationContext(
             orchestrator_actor=self.orchestrator,
             client_registry=self.client_registry,
             server_registry=self.server_registry,
         )
         set_global_context(self.context)
-
-        if not self.super_id:
-            raise ValueError("Super server must be defined before building.")
-        if not self.edge_ids:
-            raise ValueError("At least one edge server must be defined.")
 
         self._spawn_actors()
         self._configure_network()
@@ -256,7 +258,7 @@ class HierarchicalSimulation:
             from fedsim.telemetry.evaluator import PeriodicEvaluator
 
             print(f"Spawning Periodic Evaluator (Interval: {self.eval_interval}s)...")
-            self.evaluator_actor = PeriodicEvaluator.options(num_gpus=0.0).remote(
+            self.evaluator_actor = PeriodicEvaluator.remote(
                 run_id=str(self.run_id),
                 graph_id=self.graph_id,
                 architecture="hierarchical",
@@ -267,7 +269,7 @@ class HierarchicalSimulation:
             )
 
             # Fetch the first event (T=0 evaluation + scheduling the next)
-            eval_events = ray.get(self.evaluator_actor.start.remote())
+            eval_events = ray.get(self._cpu_pool.call.remote(self.evaluator_actor, "start", (), {}))
             if eval_events:
                 all_initial_events.extend(eval_events)
         # ---------------------------------

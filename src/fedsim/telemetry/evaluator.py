@@ -11,7 +11,7 @@ from fedsim.services.evaluation_point_store import persist_periodic_evaluation
 from fedsim.telemetry.logging import setup_telemetry_logger
 
 
-@ray.remote
+@ray.remote(num_cpus=0, num_gpus=0)
 class PeriodicEvaluator:
     def __init__(
         self,
@@ -30,6 +30,7 @@ class PeriodicEvaluator:
         self.orchestrator = orchestrator_ref
         self.interval = evaluation_interval
         self.dataset_id = dataset
+        torch.set_num_threads(1)
 
         self.logger = setup_telemetry_logger(self.run_id)
 

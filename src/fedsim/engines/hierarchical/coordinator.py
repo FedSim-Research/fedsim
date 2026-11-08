@@ -11,7 +11,7 @@ from fedsim.strategies.server_strategies import get_sync_server_strategy
 SERVER_MESSAGE = "SERVER_MESSAGE"
 
 
-@ray.remote
+@ray.remote(num_cpus=0, num_gpus=0)
 class SuperServer(BaseAsyncServer):
     def __init__(
         self,

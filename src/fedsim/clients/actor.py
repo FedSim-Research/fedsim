@@ -1,5 +1,6 @@
 import numpy as np
 import ray
+import torch
 
 from fedsim.clients.training import TrainingClient
 from fedsim.simulation.compute_model import estimate_training_time
@@ -7,11 +8,12 @@ from fedsim.simulation.context import SimulationContext, get_global_context, set
 from fedsim.simulation.network_model import estimate_transmission_time
 
 
-@ray.remote
+@ray.remote(num_cpus=0, num_gpus=0)
 class VirtualClientActor:
     def __init__(self, client_id: str, client_config: dict, context: SimulationContext):
         self.client_id = client_id
         set_global_context(context)
+        torch.set_num_threads(1)
 
         # Instantiate inner client locally to this actor's process
         # (Prevents serializing un-pickleable PyTorch DataLoaders)
