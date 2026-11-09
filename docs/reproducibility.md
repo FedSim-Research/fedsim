@@ -70,6 +70,10 @@ initialization. Use `Net(seed=...)` explicitly.
 Exact weight equality is checked within the same platform and PyTorch build;
 the same seed does not guarantee bitwise equality across operating systems.
 
+Network transfer timing now counts payload bytes against decimal Mbps. Earlier
+MiB-to-Mbps mixing underestimated the serialization component. This correction
+changes virtual event times; retain the source revision with timing results.
+
 This isolates model initialization and the current engines' simulated noise,
 not the complete experiment. Client data-loader shuffle generators remain
 explicitly seeded, but dataset partitioning and train/test splits retain their

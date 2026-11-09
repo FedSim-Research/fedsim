@@ -104,13 +104,12 @@ class SuperServer(BaseAsyncServer):
             edge_spec = self.context.get_server_spec(edge_server_id)
 
             total_bytes = sum(w.nbytes for w in self.global_model_weights)
-            model_size_mb = total_bytes / (1024 * 1024)
             latency = estimate_transmission_time(
                 sender_spec=super_spec,
                 receiver_spec=edge_spec,
                 network_metrics=edge_spec.network_metrics,
                 metrics_id=self.server_id,
-                payload_size_mb=model_size_mb,
+                payload_size_bytes=total_bytes,
                 rng=self.random_streams.stream("network", edge_server_id),
             )
 

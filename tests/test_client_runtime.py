@@ -39,7 +39,8 @@ def test_client_upload_uses_client_upload_and_server_download(monkeypatch, local
     )
     # 1 MiB download at min(100, 20) Mbps + upload at min(2, 4) Mbps,
     # one second of training and 20 ms latency in each direction.
-    expected = 8 / 20 + 8 / 2 + 1 + 0.04
+    payload_mbits = weights[0].nbytes * 8 / 1_000_000
+    expected = payload_mbits / 20 + payload_mbits / 2 + 1 + 0.04
     delay, target, _, event, _ = updates[0]
     assert delay == pytest.approx(expected)
     assert target == "server-handle"

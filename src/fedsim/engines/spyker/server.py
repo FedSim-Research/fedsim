@@ -13,6 +13,8 @@ from fedsim.simulation.spyker_config import FullConfiguration
 from fedsim.specs.network_metrics import Network
 from fedsim.strategies.server_strategies import get_async_server_strategy
 
+TOKEN_PAYLOAD_BYTES = 1000
+
 
 @ray.remote(num_cpus=0, num_gpus=0)
 class SpykerServer(BaseAsyncServer):
@@ -211,13 +213,9 @@ class SpykerServer(BaseAsyncServer):
         decayed_lr = base_lr - (self.spyker_config.decay_beta * (client_updates - avg_updates))
         return max(self.spyker_config.min_learning_rate, decayed_lr)
 
-    def _get_model_size_mb(self) -> float:
-        """Calculates the size of the current global model in Megabytes."""
-        if not self.global_model_weights:
-            return 0.001  # Fallback for empty init
-
-        total_bytes = sum(w.nbytes for w in self.global_model_weights)
-        return total_bytes / (1024.0 * 1024.0)
+    def _get_model_size_bytes(self) -> int:
+        """Count tensor payload bytes, excluding transport and message metadata."""
+        return sum(w.nbytes for w in self.global_model_weights)
 
     def _check_synchronization(self):
         """Spyker Algorithm 2: Server Sync Decision."""
@@ -411,17 +409,17 @@ class SpykerServer(BaseAsyncServer):
         receiver_spec = self.context.get_server_spec(target_id)
 
         if msg_type == "MODEL_BROADCAST":
-            payload_size_mb = self._get_model_size_mb()
+            payload_size_bytes = self._get_model_size_bytes()
         else:
-            # Estimate for Tokens as 1KB
-            payload_size_mb = 0.001
+            # Control messages use an estimated 1 kB payload (decimal bytes).
+            payload_size_bytes = TOKEN_PAYLOAD_BYTES
 
         delay = estimate_transmission_time(
             sender_spec=sender_spec,
             receiver_spec=receiver_spec,
             network_metrics=sender_spec.network_metrics,
             metrics_id=target_id,
-            payload_size_mb=payload_size_mb,
+            payload_size_bytes=payload_size_bytes,
             rng=self.random_streams.stream("network", target_id),
         )
 

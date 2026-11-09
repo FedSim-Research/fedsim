@@ -60,14 +60,14 @@ class VirtualClientActor:
         ref_model_age = config.get("model_age", 0)
 
         param_arrays = direct_refs
-        model_size_mb = sum([a.nbytes for a in param_arrays]) / (1024 * 1024)
+        model_size_bytes = sum(a.nbytes for a in param_arrays)
 
         t_download = estimate_transmission_time(
             sender_spec=server_spec,
             receiver_spec=client_spec,
             network_metrics=server_spec.network_metrics,
             metrics_id=self.client_id,
-            payload_size_mb=model_size_mb,
+            payload_size_bytes=model_size_bytes,
             rng=self.random_streams.stream("download", server_id),
         )
 
@@ -82,14 +82,14 @@ class VirtualClientActor:
         )
 
         res_arrays = fit_res["parameters"]
-        res_size_mb = sum([a.nbytes for a in res_arrays]) / (1024 * 1024)
+        res_size_bytes = sum(a.nbytes for a in res_arrays)
 
         t_upload = estimate_transmission_time(
             sender_spec=client_spec,
             receiver_spec=server_spec,
             network_metrics=server_spec.network_metrics,
             metrics_id=self.client_id,
-            payload_size_mb=res_size_mb,
+            payload_size_bytes=res_size_bytes,
             rng=self.random_streams.stream("upload", server_id),
         )
 

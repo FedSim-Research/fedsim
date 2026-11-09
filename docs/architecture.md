@@ -148,6 +148,13 @@ training time, especially when sigma is large relative to that time.
 Model transfer time uses the sender's upload and the receiver's download
 bandwidth. Client uploads therefore use the client as sender and its server as
 receiver. Both directions currently use the same link latency and loss model.
+Payload sizes are counted in bytes; bandwidth is decimal Mbps (one million
+bits per second). The serialization term is `8 * payload_bytes / (Mbps * 1_000_000)`,
+using the effective bottleneck throughput after the existing loss adjustment.
+Model payloads count NumPy tensor bytes and exclude message metadata, framing,
+and Ray serialization overhead. Spyker control messages use an estimated
+1,000-byte payload. An empty model has zero tensor bytes; link latency still
+applies. This corrects the former mixing of MiB sizes with decimal Mbps.
 
 The aggregation-time helper uses the same zero-mean noise convention. Its
 delay is currently not scheduled by either engine. These corrections change

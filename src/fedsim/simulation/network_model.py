@@ -10,10 +10,11 @@ def estimate_transmission_time(
     receiver_spec: ClientSpec | ServerSpec,
     network_metrics: dict[str, Network],
     metrics_id: str,
-    payload_size_mb: float,
+    payload_size_bytes: int,
     *,
     rng: random.Random | None = None,
 ) -> float:
+    """Estimate virtual transfer seconds from payload bytes and decimal Mbps."""
     rng = random if rng is None else rng
     # We treat packet loss as a reduction in effective throughput (TCP throughput model approximation)
     # Assuming packet_loss_avg is a percentage (0.0 to 1.0).
@@ -32,8 +33,8 @@ def estimate_transmission_time(
         * throughput_factor
     )
 
-    payload_size_mbits = 8 * payload_size_mb
-    transmission_delay_sec = payload_size_mbits / bottleneck_mbps
+    payload_size_bits = 8 * payload_size_bytes
+    transmission_delay_sec = payload_size_bits / (bottleneck_mbps * 1_000_000)
 
     latency_ms = rng.gauss(
         network_metrics[metrics_id].latency_avg,

@@ -137,14 +137,13 @@ class EdgeServer(BaseAsyncServer):
         super_server_spec = self.context.get_server_spec(self.super_server_id)
 
         total_bytes = sum(w.nbytes for w in aggregated_weights)
-        payload_size_mb = total_bytes / (1024 * 1024)
 
         delay = estimate_transmission_time(
             sender_spec=edge_server_spec,
             receiver_spec=super_server_spec,
             network_metrics=edge_server_spec.network_metrics,
             metrics_id=self.super_server_id,
-            payload_size_mb=payload_size_mb,
+            payload_size_bytes=total_bytes,
             rng=self.random_streams.stream("network", self.super_server_id),
         )
 
