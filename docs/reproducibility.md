@@ -74,13 +74,33 @@ Network transfer timing now counts payload bytes against decimal Mbps. Earlier
 MiB-to-Mbps mixing underestimated the serialization component. This correction
 changes virtual event times; retain the source revision with timing results.
 
-This isolates model initialization and the current engines' simulated noise,
-not the complete experiment. Client data-loader shuffle generators remain
-explicitly seeded, but dataset partitioning and train/test splits retain their
-existing behavior. Shared seeds do not establish matched data assignments.
-Callback completion order can still change event tie-breaking and asynchronous
-aggregation. Exact replay, dataset revisions, and future stochastic model or
-augmentation operations need separate controls and validation.
+These controls isolate model initialization and the current engines' simulated
+noise, not the complete experiment. Callback completion order can still change
+event tie-breaking and asynchronous aggregation. Exact replay and future
+stochastic model or augmentation operations need separate controls and validation.
+
+## Data assignments
+
+The `fedsim-iid-v1` definition uses the normalized dataset ID, total partition
+count, and common run seed (42 when omitted). Flower Datasets now receives this
+seed explicitly for source-data shuffling. Each IID partition receives a
+deterministic 80/20 train/test split using
+`derive_seed(run_seed, "data", "split", str(partition_index))`. Training-loader
+shuffle seeds remain separate and do not change train/test membership.
+
+Both engines share a job-owned provider when these definitions match. Splits
+are lazy and cached per partition. Matching dataset contents, partition counts,
+and run seeds produces the same assignment by partition index, independently
+of client request order. Captured graph list order determines how indices map
+to individual clients; matching seeds alone do not ensure comparable topology
+assignments or equal training work.
+
+These controls change data assignments relative to older code, which used
+Flower's default global shuffle seed and client-specific split seeds. Record
+the source revision and the actual dataset revision/content with new results.
+Dataset revisions and row assignments are not automatically archived. Direct
+`load_data` callers must use `partition_seed` to control data membership; `seed`
+now controls only training-loader shuffle.
 
 ## Experiment campaign records
 

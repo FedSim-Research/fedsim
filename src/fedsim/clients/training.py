@@ -15,10 +15,15 @@ class TrainingClient:
         num_partitions: int,
         dataset_id: str | None = None,
         seed: int | None = None,
+        *,
+        partition_seed: int | None = None,
+        dataset_provider=None,
     ):
         self.partition_id = partition_id
         self.num_partitions = num_partitions
         self.seed = seed
+        self.partition_seed = partition_seed
+        self.dataset_provider = dataset_provider
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.dataset_id = dataset_id
         self.net = Net(seed=seed).to(self.device)
@@ -30,6 +35,8 @@ class TrainingClient:
                 self.num_partitions,
                 seed=self.seed,
                 dataset_id=self.dataset_id,
+                partition_seed=self.partition_seed,
+                dataset_provider=self.dataset_provider,
             )
 
     def get_parameters(self) -> List[np.ndarray]:

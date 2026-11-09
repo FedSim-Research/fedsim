@@ -4,6 +4,8 @@
 # FedSim modifies model architecture, data loading, label handling, and training strategies.
 # Source attribution: THIRD_PARTY_NOTICES.md.
 
+import hashlib
+import json
 import math
 
 import ray
@@ -16,7 +18,8 @@ from flwr_datasets.partitioner import IidPartitioner
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Lambda, Normalize, Resize, ToTensor
 
-from fedsim.settings import data_dir, dataset_cache_dir
+from fedsim.settings import dataset_cache_dir
+from fedsim.simulation.randomness import derive_seed
 from fedsim.strategies.client_strategies import get_client_strategy
 
 DEFAULT_DATASET_ID = "uoft-cs/cifar10"
@@ -109,19 +112,53 @@ generic_transforms = Compose(
 @ray.remote(num_cpus=0, num_gpus=0)
 class DatasetProvider:
     def __init__(self, dataset_id: str, num_partitions: int, seed: int):
+        self.num_partitions = num_partitions
+        self.seed = seed
         partitioner = IidPartitioner(num_partitions=num_partitions)
         self.fds = FederatedDataset(
             dataset=dataset_id,
             partitioners={"train": partitioner},
+            shuffle=True,
+            seed=seed,
+            cache_dir=str(dataset_cache_dir()),
         )
         self.partitions = {}
 
-        for i in range(num_partitions):
-            part = self.fds.load_partition(i)
-            self.partitions[i] = part.train_test_split(test_size=0.2, seed=seed)
-
     def get_partition(self, partition_id: int):
+        if not 0 <= partition_id < self.num_partitions:
+            raise ValueError("dataset_partition_id_out_of_range")
+        if partition_id not in self.partitions:
+            part = self.fds.load_partition(partition_id)
+            split_seed = derive_seed(self.seed, "data", "split", str(partition_id))
+            self.partitions[partition_id] = part.train_test_split(test_size=0.2, seed=split_seed)
         return self.partitions[partition_id]
+
+
+def dataset_provider_name(
+    dataset_id: str, num_partitions: int, partition_seed: int, job_id: str
+) -> str:
+    """Identify a job-local IID assignment independently of client shuffle seeds."""
+    definition = json.dumps(
+        ["fedsim-iid-v1", dataset_id, num_partitions, partition_seed],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return f"fedsim-dataset-{job_id}-" + hashlib.sha256(definition.encode("utf-8")).hexdigest()
+
+
+def get_dataset_provider(
+    dataset_id: str | None, num_partitions: int, partition_seed: int | None = None
+):
+    """Create/reuse a job-owned provider; engines call this from the driver."""
+    if num_partitions < 1:
+        raise ValueError("dataset_requires_positive_partition_count")
+    normalized_dataset_id = (dataset_id or "").strip() or DEFAULT_DATASET_ID
+    data_seed = 42 if partition_seed is None else int(partition_seed)
+    job_id = str(ray.get_runtime_context().get_job_id())
+    name = dataset_provider_name(normalized_dataset_id, num_partitions, data_seed, job_id)
+    return DatasetProvider.options(name=name, get_if_exists=True, lifetime="non_detached").remote(
+        normalized_dataset_id, num_partitions, data_seed
+    )
 
 
 def preload_dataset(dataset_id: str | None = None):
@@ -138,37 +175,30 @@ def preload_dataset(dataset_id: str | None = None):
 
 def apply_transforms(batch):
     img_key = "img" if "img" in batch else "image"
-    batch["img"] = [generic_transforms(img) for img in batch[img_key]]
+    # Remove the source alias so the loader does not also collate raw PIL images.
+    images = batch.pop(img_key)
+    batch["img"] = [generic_transforms(img) for img in images]
     return batch
 
 
 def load_data(
-    partition_id: int, num_partitions: int, seed: int | None = None, dataset_id: str | None = None
+    partition_id: int,
+    num_partitions: int,
+    seed: int | None = None,
+    dataset_id: str | None = None,
+    *,
+    partition_seed: int | None = None,
+    dataset_provider=None,
 ):
+    """Load one shared partition; seed controls only the training-loader shuffle."""
     if partition_id < 0 or partition_id >= num_partitions:
         raise ValueError(
             f"partition_id={partition_id} out of range for num_partitions={num_partitions}"
         )
 
-    normalized_dataset_id = (dataset_id or "").strip() or DEFAULT_DATASET_ID
-    split_seed = 42 if seed is None else int(seed)
-
-    safe_id = normalized_dataset_id.replace("/", "_")
-    actor_name = f"dataset_provider_{safe_id}_{num_partitions}_{split_seed}"
-
-    try:
-        provider = ray.get_actor(actor_name)
-    except ValueError:
-        lock_dir = data_dir() / "locks"
-        lock_dir.mkdir(parents=True, exist_ok=True)
-        with FileLock(str(lock_dir / "dataset-provider.lock")):
-            try:
-                provider = ray.get_actor(actor_name)
-            except ValueError:
-                provider = DatasetProvider.options(name=actor_name, lifetime="detached").remote(
-                    normalized_dataset_id, num_partitions, split_seed
-                )
-
+    provider = dataset_provider
+    if provider is None:
+        provider = get_dataset_provider(dataset_id, num_partitions, partition_seed)
     partition_train_test = ray.get(provider.get_partition.remote(partition_id))
 
     partition_train_test = partition_train_test.with_transform(apply_transforms)

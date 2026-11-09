@@ -67,6 +67,31 @@ the existing CSV metadata field preserves them. The JSON export reads the
 archive independently of the in-memory queue. Historical records without a
 captured definition remain readable and have no invented snapshot.
 
+## Dataset assignments
+
+Each engine creates its dataset provider from the driver and passes the handle
+through the simulation context to its clients. Providers are named by Ray job
+and the `fedsim-iid-v1` definition: normalized dataset ID, partition count, and
+run seed (42 when omitted). Atomic `get_if_exists` creation lets matching Both
+controllers share one provider in the same Ray namespace and job. Providers
+use ordinary, non-detached lifetimes; they do not outlive their owning Ray job
+or share ownership across unrelated jobs.
+
+Flower Datasets explicitly shuffles the source data with the common run seed
+before IID partitioning. Each partition has a deterministic 80/20 train/test
+split, with its seed derived from the run seed and partition index. Splits are
+created on demand and cached once per partition. Client shuffle seeds remain
+run seed plus client index and affect batch order independently of membership.
+Changing the client shuffle seed cannot create another full partition set.
+
+Matching dataset contents, partition counts, and run seeds therefore give the
+same assignment by partition index in both engines. Mapping those indices to
+topology nodes follows captured client registration order. Dataset revisions
+are not automatically pinned or archived; experiments must still record the
+actual dataset revision and index-to-client mapping. Direct `load_data` callers
+can provide `partition_seed` separately from the loader shuffle `seed`; omitted
+partition seeds use 42.
+
 ## Runtime lifecycle
 
 Managed controllers register their use of Ray before dataset preload and keep

@@ -119,7 +119,14 @@ def test_selected_dataset_and_batch_size_reach_training(monkeypatch, local_actor
         seed=17,
     )
     client_id, client_config = simulation.client_map["server"][0]
-    context = SimulationContext(None, simulation.client_registry, simulation.server_registry)
+    provider = object()
+    context = SimulationContext(
+        None,
+        simulation.client_registry,
+        simulation.server_registry,
+        seed=simulation.seed,
+        dataset_provider=provider,
+    )
     samples = [{"img": torch.zeros(3, 32, 32), "label": index % 2} for index in range(8)]
     loader = DataLoader(samples, batch_size=32, shuffle=False)
     load_data = Mock(return_value=(loader, loader))
@@ -174,6 +181,8 @@ def test_selected_dataset_and_batch_size_reach_training(monkeypatch, local_actor
         client_config["total_partitions"],
         seed=client_config["seed"],
         dataset_id="ylecun/mnist",
+        partition_seed=17,
+        dataset_provider=provider,
     )
     assert updates[0][3]["data"]["num_examples"] == 8
     assert not ray.is_initialized()

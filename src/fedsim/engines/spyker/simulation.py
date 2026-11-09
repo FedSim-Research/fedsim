@@ -5,7 +5,7 @@ import ray
 import torch
 
 from fedsim.engines.spyker.server import SpykerServer
-from fedsim.learning import Net
+from fedsim.learning import Net, get_dataset_provider
 from fedsim.runtime import ensure_ray_initialized
 from fedsim.simulation.context import SimulationContext, set_global_context
 from fedsim.simulation.cpu_execution import get_cpu_execution_pool
@@ -266,6 +266,9 @@ class SpykerSimulation:
             client_registry=self.client_registry,
             server_registry=self.server_registry,
             seed=self.seed,
+            dataset_provider=get_dataset_provider(
+                self.dataset_id, len(self.client_registry), self.seed
+            ),
         )
 
         set_global_context(self.context)

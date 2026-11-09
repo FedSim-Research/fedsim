@@ -24,6 +24,8 @@ class VirtualClientActor:
             num_partitions=client_config["total_partitions"],
             dataset_id=client_config.get("dataset_id"),
             seed=client_config.get("seed"),
+            partition_seed=context.seed,
+            dataset_provider=context.dataset_provider,
         )
         self.current_virtual_time = 0.0
         self.orchestrator_ref = None

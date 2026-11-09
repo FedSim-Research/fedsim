@@ -1,6 +1,7 @@
 import math
 
 import numpy as np
+import pytest
 import torch
 from datasets import Dataset
 from flwr_datasets.partitioner import IidPartitioner
@@ -29,11 +30,16 @@ def test_flower_iid_partitions_cover_local_dataset_without_overlap():
     assert sum(len(partition) for partition in partitions) == len(set.union(*partitions))
 
 
-def test_huggingface_image_batches_train_with_current_pytorch():
-    dataset = image_dataset(size=4).with_transform(apply_transforms)
+@pytest.mark.parametrize("image_column", ["img", "image"])
+def test_huggingface_image_batches_train_with_current_pytorch(image_column):
+    dataset = image_dataset(size=4)
+    if image_column != "img":
+        dataset = dataset.rename_column("img", image_column)
+    dataset = dataset.with_transform(apply_transforms)
     loader = DataLoader(dataset, batch_size=4, shuffle=False)
     batch = next(iter(loader))
     assert batch["img"].shape == (4, 3, 32, 32)
+    assert "image" not in batch
     assert batch["label"].dtype == torch.int64
     model = Net()
     before = model.fc2.weight.detach().numpy().copy()

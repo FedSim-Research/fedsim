@@ -19,11 +19,13 @@ class SimulationContext:
         client_registry: Dict[str, ClientSpec],
         server_registry: Dict[str, ServerSpec],
         seed: int | None = None,
+        dataset_provider=None,
     ):
         self.orchestrator = orchestrator_actor
         self.client_registry = client_registry
         self.server_registry = server_registry
         self.seed = seed
+        self.dataset_provider = dataset_provider
 
         self.server_actor_handles = None
 
