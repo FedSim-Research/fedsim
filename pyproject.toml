@@ -38,7 +38,7 @@ packages = ["src/fedsim"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "src/fedsim", "tests", "docs", "pyproject.toml", "uv.lock", ".python-version",
+    "src/fedsim", "tests", "docs", "experiments", "pyproject.toml", "uv.lock", ".python-version",
     "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md",
 ]
 

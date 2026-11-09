@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "name": "network-sensitivity",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "scenarios": {
+    "balanced": [
+      2,
+      2,
+      2
+    ],
+    "imbalanced": [
+      4,
+      1,
+      1
+    ]
+  },
+  "run_time_limit": 60,
+  "eval_interval": 20,
+  "epochs": 1,
+  "lr": 0.01,
+  "batch_size": 32,
+  "model_complexity": 1,
+  "client_compute_factor": 500,
+  "phase": "measurement",
+  "network": {
+    "client_upload_mbps": [
+      100,
+      10,
+      2
+    ],
+    "client_download_mbps": [
+      100,
+      20,
+      5
+    ],
+    "server_upload_mbps": [
+      100,
+      25,
+      10
+    ],
+    "server_download_mbps": [
+      100,
+      25,
+      10
+    ],
+    "client_latency_ms": [
+      10,
+      40,
+      100
+    ],
+    "server_latency_ms": 100
+  }
+}

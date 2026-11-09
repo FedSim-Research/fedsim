@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel
 
 from fedsim.services import graph_service, simulation_run_store
+from fedsim.services.evaluation_point_store import export_evaluation_points
 from fedsim.services.run_definition import RunDefinition, read_archived_definition
 from fedsim.services.simulation_run_queue import run_queue
 from fedsim.services.simulation_seed_sets import (
@@ -277,3 +278,19 @@ def export_run_definition(run_id: str):
     if definition is None:
         raise HTTPException(status_code=404, detail="Run definition not available")
     return definition
+
+
+@router.get("/runs/{run_id}/export/evaluations")
+def export_run_evaluations(run_id: str) -> list[dict]:
+    run = run_queue.get_run_api(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    # Only IDs recorded in this job's results belong to it; never match prefixes.
+    identities = [run_id]
+    series = [run]
+    series.extend((run.get("results_by_architecture") or {}).values())
+    for result in series:
+        for repetition in result.get("runs") or []:
+            if repetition.get("run_id"):
+                identities.append(repetition["run_id"])
+    return export_evaluation_points(list(dict.fromkeys(identities)))

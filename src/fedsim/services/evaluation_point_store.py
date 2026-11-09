@@ -294,3 +294,20 @@ def get_evaluation_rows(
 
     output.sort(key=lambda item: (item["timestamp_real"], item["virtual_time"], item["run_id"]))
     return output
+
+
+def export_evaluation_points(run_ids: list[str]) -> list[dict[str, Any]]:
+    """Export exact recorded run IDs without dashboard time filters or rounding."""
+    for run_id in dict.fromkeys(run_ids):
+        ensure_run_points(run_id)
+    with SessionLocal() as session:
+        records = (
+            session.execute(
+                select(EvaluationPoint)
+                .where(EvaluationPoint.run_id.in_(run_ids))
+                .order_by(EvaluationPoint.run_id, EvaluationPoint.virtual_time, EvaluationPoint.id)
+            )
+            .scalars()
+            .all()
+        )
+        return [_row_to_point(row) for row in records]

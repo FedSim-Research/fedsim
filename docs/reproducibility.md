@@ -143,3 +143,6 @@ Freeze the software environment for each experiment campaign. Record:
 Use matched client counts and training budgets when comparing architectures,
 repeat runs with multiple seeds, and report variability. Keep results from
 different environments distinguishable and preserve the original outputs.
+
+The [local comparison campaign](experiments.md) supplies paired configurations,
+sequential execution and an archive format for new measurements.
