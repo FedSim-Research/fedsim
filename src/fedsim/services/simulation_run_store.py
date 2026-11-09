@@ -482,6 +482,8 @@ def _build_final_summary(job: Any) -> dict[str, Any] | None:
         "duration_seconds": job.duration_seconds,
         "error": job.error,
         "output_filename": result.get("output_filename"),
+        "server_checkpoints": result.get("server_checkpoints"),
+        "primary_server_id": result.get("primary_server_id"),
         "accuracy_loss_snapshot_url": result.get("accuracy_loss_snapshot_url"),
         "accuracy_loss_snapshot_urls_by_architecture": result.get(
             "accuracy_loss_snapshot_urls_by_architecture"
@@ -610,6 +612,8 @@ def _to_api_dict(record: SimulationRun) -> dict[str, Any]:
         "current_sim_time": progress_info["current_sim_time"],
         "run_time_limit": progress_info["run_time_limit"],
         "output_filename": result.get("output_filename"),
+        "server_checkpoints": result.get("server_checkpoints"),
+        "primary_server_id": result.get("primary_server_id"),
         "dataset": dataset,
         "datasets_by_architecture": datasets_by_architecture,
         "accuracy_loss_snapshot_url": result.get("accuracy_loss_snapshot_url"),

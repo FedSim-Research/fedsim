@@ -94,7 +94,7 @@ class SimulationController:
     def _run_simulation(
         self,
         builder: Callable[[], Any],
-        evaluator: Callable[[], Callable[[str], dict[str, float]]],
+        evaluator: Callable[[], Callable[..., dict[str, Any]]],
     ) -> dict[str, Any]:
         seed = self.simulation_settings.get("seed")
         simulation = builder()
@@ -106,15 +106,22 @@ class SimulationController:
 
         output_filename = self.simulation_settings.get("output_filename")
         evaluation = None
+        server_checkpoints = None
         if output_filename:
             output_filename = str(checkpoint_path(output_filename))
-            simulation.save_model(output_filename)
+            saved = simulation.save_model(output_filename)
+            if isinstance(saved, dict):
+                server_checkpoints = saved
             if self.simulation_settings.get("evaluate_model"):
                 evaluate_model = evaluator()
                 evaluation = evaluate_model(
-                    output_filename, self.simulation_settings.get("dataset", "uoft-cs/cifar10")
+                    server_checkpoints if server_checkpoints is not None else output_filename,
+                    self.simulation_settings.get("dataset", "uoft-cs/cifar10"),
                 )
         result = {"output_filename": output_filename, "seed": seed}
+        if server_checkpoints is not None:
+            result["server_checkpoints"] = server_checkpoints
+            result["primary_server_id"] = next(iter(server_checkpoints))
         if evaluation is not None:
             result["evaluation"] = evaluation
         logger.info(

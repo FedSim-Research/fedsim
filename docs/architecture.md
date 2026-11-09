@@ -186,6 +186,44 @@ delay is currently not scheduled by either engine. These corrections change
 effective settings and virtual timings; historical results must retain their
 original code and configuration rather than being relabeled as new results.
 
+## Model evaluation
+
+HierFL evaluates the coordinator model. Spyker evaluates every registered
+server on the same loaded test dataset and reports each server's accuracy and
+loss. Its summary is an equal-weight mean of server metrics, identified as
+`server_macro_mean`; model parameters and predictions are not averaged.
+Loss is summed over examples and divided by the number actually evaluated,
+so a partial last batch does not receive disproportionate weight.
+
+Periodic evaluation requests snapshots from all target actors before running
+the test loop. Each actor returns weights, progress metrics and its current
+virtual time in one method call. This keeps each actor's snapshot internally
+consistent; it is not an atomic cross-server barrier. Equal-time event order
+can still affect which updates a snapshot includes.
+
+One periodic database row retains the summary at each evaluation time. Its
+existing `server_stats` JSON includes server-ID-keyed metrics, model ages,
+snapshot times and raw progress. The summary's round is the minimum peer
+model age, explicitly labeled as such, not a global synchronization round.
+JSONL and Loki synchronization retain the server details; Loki reconstruction
+also accepts historical text logs. No database schema migration is required.
+
+Final Spyker saving writes one checkpoint per server. The requested filename
+remains the first registered server's model; the other files use safe ordinal
+suffixes such as `.server-2`. `primary_server_id` and `server_checkpoints` map
+files to server IDs. When final evaluation is enabled, all files are evaluated
+on one test loader. API responses and CSV result JSON preserve the mapping and
+individual metrics for every repetition. The requested primary checkpoint is
+not a model representing the summary mean.
+
+The dashboard distinguishes recorded-model results from server means and
+shows final per-server values by seed and repetition, including duplicate
+seeds. Multi-seed summaries average the evaluated repetition summaries; Both
+mode displays architecture results separately. Grafana trends filter by
+architecture and extract only the fields needed for each summary metric.
+Historical records without server details remain readable and gain no invented
+server identities or aggregation semantics.
+
 ## Spyker peer synchronization
 
 Multi-server Spyker graphs require a direct link between every pair of servers.

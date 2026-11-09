@@ -4,8 +4,7 @@ from typing import Any, Dict
 import ray
 import torch
 
-# Import the PyTorch logic from your app
-from fedsim.evaluation import load_evaluation_data
+from fedsim.evaluation import load_evaluation_data, summarize_server_evaluations
 from fedsim.learning import Net, test
 from fedsim.services.evaluation_point_store import persist_periodic_evaluation
 from fedsim.telemetry.logging import setup_telemetry_logger
@@ -22,11 +21,15 @@ class PeriodicEvaluator:
         orchestrator_ref: ray.ObjectRef,
         evaluation_interval: float,
         dataset: str = "uoft-cs/cifar10",
+        target_servers: dict[str, Any] | None = None,
     ):
+        if target_servers is not None and not target_servers:
+            raise ValueError("evaluation_requires_servers")
         self.run_id = run_id
         self.graph_id = graph_id
         self.architecture = architecture
         self.target_server = target_server_ref
+        self.target_servers = target_servers
         self.orchestrator = orchestrator_ref
         self.interval = evaluation_interval
         self.dataset_id = dataset
@@ -55,22 +58,46 @@ class PeriodicEvaluator:
     def evaluate(self, payload: Dict[str, Any]):
         current_virtual_time = payload.get("trigger_time", 0.0)
 
-        # Fetch current global weights & metrics
-        weights_np = ray.get(self.target_server.get_global_model.remote())
-        try:
-            server_metrics = ray.get(self.target_server.get_metrics.remote())
-        except AttributeError:
-            server_metrics = {}
+        targets = (
+            self.target_servers if self.target_servers is not None else {"": self.target_server}
+        )
+        # Queue all snapshot requests before evaluating. Each actor supplies its
+        # weights and progress in one call; this is not a cross-server barrier.
+        snapshots = ray.get([actor.get_evaluation_snapshot.remote() for actor in targets.values()])
+        per_server = {}
+        for server_id, snapshot in zip(targets, snapshots, strict=True):
+            keys = self.model.state_dict().keys()
+            state = OrderedDict(
+                {
+                    key: torch.tensor(value)
+                    for key, value in zip(keys, snapshot["parameters"], strict=True)
+                }
+            )
+            self.model.load_state_dict(state, strict=True)
+            avg_loss, accuracy = test(self.model, self.test_loader, self.device)
+            metrics = snapshot["metrics"]
+            per_server[server_id] = {
+                "accuracy": float(accuracy),
+                "avg_loss": float(avg_loss),
+                "round": metrics.get("model_age", metrics.get("current_round", 0)),
+                "snapshot_virtual_time": snapshot["virtual_time"],
+                "server_stats": metrics,
+            }
 
-        # Load weights & Evaluate
-        keys = self.model.state_dict().keys()
-        state_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(keys, weights_np)})
-        self.model.load_state_dict(state_dict, strict=True)
-        avg_loss, accuracy = test(self.model, self.test_loader, self.device)
-
-        # STRICT SCHEMA DEFINITION
-        # Extract current round standardizing between Spyker (model_age) and Hierarchical
-        round_val = server_metrics.get("model_age", server_metrics.get("current_round", 0))
+        if self.target_servers is None:
+            single = per_server[""]
+            accuracy, avg_loss = single["accuracy"], single["avg_loss"]
+            round_val, server_metrics = single["round"], single["server_stats"]
+        else:
+            summary = summarize_server_evaluations(per_server)
+            accuracy, avg_loss = summary["accuracy"], summary["avg_loss"]
+            round_val = min(item["round"] for item in per_server.values())
+            server_metrics = {
+                "aggregation": summary["aggregation"],
+                "server_count": summary["server_count"],
+                "per_server": per_server,
+                "round_aggregation": "minimum_model_age",
+            }
 
         extra_data = {
             "log_type": "periodic_evaluation",

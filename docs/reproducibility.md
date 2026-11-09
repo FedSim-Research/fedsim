@@ -102,6 +102,34 @@ Dataset revisions and row assignments are not automatically archived. Direct
 `load_data` callers must use `partition_seed` to control data membership; `seed`
 now controls only training-loader shuffle.
 
+## Evaluation scope
+
+New Spyker evaluations report every server and an equal-weight mean of its
+metrics (`server_macro_mean`). Final evaluations include `per_server` values;
+periodic points retain them inside `server_stats`, together with model ages
+and snapshot times. Each set of server models uses one common test loader.
+Per-server actor snapshots do not establish deterministic global event order
+or an atomic global snapshot.
+
+Evaluation work grows with the number of servers: each checkpoint is tested
+sequentially in one admitted evaluation task. Choose the periodic interval
+for the available CPU budget and record it with the campaign settings;
+evaluation can otherwise dominate wall-clock time.
+
+Each server checkpoint remains a separate model. `server_checkpoints` and
+`primary_server_id` identify its file; the requested output file remains the
+first server's checkpoint for compatibility. Use the complete per-repetition
+result JSON in the CSV export, rather than interpreting that one file as a
+model whose predictions produce the server-mean metric.
+
+The evaluation helper now computes loss per evaluated example, including a
+partial last batch. Earlier code averaged batch means equally. This can change
+reported loss even for the same checkpoint. Server means likewise differ in
+meaning from the previous first-server-only path. Keep historical metrics as
+recorded and retain code revision and evaluation scope with new measurements.
+Historical records without scope metadata retain their recorded metrics;
+no per-server results or aggregation scope are reconstructed from them.
+
 ## Experiment campaign records
 
 Freeze the software environment for each experiment campaign. Record:

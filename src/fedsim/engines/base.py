@@ -66,6 +66,15 @@ class BaseAsyncServer(ABC):
     def get_global_model(self) -> List[np.ndarray]:
         return self.global_model_weights
 
+    def get_evaluation_snapshot(self) -> Dict[str, Any]:
+        """Read weights and progress together in one serialized actor method."""
+        metrics = self.get_metrics() if hasattr(self, "get_metrics") else {}
+        return {
+            "parameters": self.get_global_model(),
+            "metrics": metrics,
+            "virtual_time": self.current_virtual_time,
+        }
+
     def _get_and_clear_events(self):
         events = self._generated_events.copy()
         self._generated_events.clear()

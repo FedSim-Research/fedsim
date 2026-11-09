@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import ray
@@ -288,7 +289,6 @@ class SpykerSimulation:
         if self.eval_interval > 0:
             from fedsim.telemetry.evaluator import PeriodicEvaluator
 
-            # Use Server 0 as the representative model to evaluate
             target_srv = self.spyker_actors_map[self.server_ids[0]]
 
             self.evaluator_actor = PeriodicEvaluator.remote(
@@ -299,6 +299,7 @@ class SpykerSimulation:
                 orchestrator_ref=self.orchestrator,
                 evaluation_interval=self.eval_interval,
                 dataset=self.dataset_id,
+                target_servers=self.spyker_actors_map,
             )
 
             eval_events = ray.get(self._cpu_pool.call.remote(self.evaluator_actor, "start", (), {}))
@@ -328,20 +329,27 @@ class SpykerSimulation:
         print("Simulation execution finished")
 
     def save_model(self, filename: str):
-        target_server = self.server_ids[0]
-        actor = self.spyker_actors_map[target_server]
-
-        print(f"Extracting final model from Server {target_server}...")
-        final_weights_np = ray.get(actor.get_global_model.remote())
-
-        dummy_model = Net()
-        keys = dummy_model.state_dict().keys()
-
-        state_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(keys, final_weights_np)})
-
-        torch.save(state_dict, filename)
-        print(f"Model successfully saved to {filename}")
-
-    # ===========================
-
-    # ==============================================================
+        """Save every server; the requested filename retains the first server."""
+        if not self.server_ids:
+            raise ValueError("spyker_requires_servers_to_save")
+        path = Path(filename)
+        keys = Net().state_dict().keys()
+        weights = ray.get(
+            [
+                self.spyker_actors_map[server_id].get_global_model.remote()
+                for server_id in self.server_ids
+            ]
+        )
+        checkpoints = {}
+        for index, (server_id, arrays) in enumerate(zip(self.server_ids, weights, strict=True)):
+            target = (
+                path
+                if index == 0
+                else path.with_name(f"{path.stem}.server-{index + 1}{path.suffix}")
+            )
+            state = OrderedDict(
+                {key: torch.tensor(value) for key, value in zip(keys, arrays, strict=True)}
+            )
+            torch.save(state, target)
+            checkpoints[server_id] = str(target)
+        return checkpoints

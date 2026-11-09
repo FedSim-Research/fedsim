@@ -63,6 +63,7 @@
               @if (isCombinedRun(run)) {
                 @for (entry of getCombinedRunMetrics(run); track entry.architecture) {
                   <div class="metric-block metric-block--combined">
+                    <span class="metric-label">{{ entry.label }}</span>
                     <span class="metric-label">{{ architectureLabel(entry.architecture) }} Accuracy</span>
                     <strong class="metric-value">{{ formatPercent(entry.metrics.accuracy) }}</strong>
                     <span class="metric-label">{{ architectureLabel(entry.architecture) }} Loss</span>
@@ -71,6 +72,7 @@
                 }
               } @else {
                 @let metrics = getRunMetrics(run);
+                <p class="telemetry-note">{{ getEvaluationLabel(run) }}</p>
                 <div class="metric-block">
                   <span class="metric-label">Accuracy</span>
                   <strong class="metric-value">{{ formatPercent(metrics.accuracy) }}</strong>
@@ -81,6 +83,20 @@
                 </div>
               }
             </div>
+            @let serverResults = getSpykerServerResults(run);
+            @if (serverResults.length) {
+              <div class="server-results">
+                <table>
+                  <caption>Spyker server results. Each model uses the same test dataset; the summary gives every server equal weight.</caption>
+                  <thead><tr><th>Seed</th><th>Repetition</th><th>Server</th><th>Accuracy</th><th>Loss</th></tr></thead>
+                  <tbody>
+                    @for (entry of serverResults; track entry.repetition + ':' + entry.serverId) {
+                      <tr><td>{{ entry.seed ?? '-' }}</td><td>{{ entry.repetition }}</td><td>{{ entry.serverId }}</td><td>{{ formatPercent(entry.accuracy) }}</td><td>{{ formatLoss(entry.loss) }}</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
             @if (isCombinedRun(run)) {
               <div class="mini-telemetry-grid">
                 @for (embed of modelQualityTrendEmbedsForBoth(); track embed.architecture) {

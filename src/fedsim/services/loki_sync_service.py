@@ -1,5 +1,6 @@
 """Service to sync evaluation points from database to Loki."""
 
+import json
 import logging
 import re
 from datetime import datetime, timezone
@@ -18,6 +19,19 @@ LOKI_PUSH_URL = "http://loki:3100/loki/api/v1/push"
 LOKI_QUERY_URL = "http://loki:3100/loki/api/v1/query_range"
 LOKI_EVALUATION_JOB_LABEL = "fedsim-evaluation"
 _SUPPORTED_EVALUATOR_ARCHITECTURES = {"hierarchical", "spyker"}
+
+
+def _log_line_matches_run(line: str, run_id: str) -> bool:
+    """Treat Loki's substring filter as a prefilter, never as run identity."""
+    try:
+        record = json.loads(line)
+    except (ValueError, TypeError):
+        record = None
+    if isinstance(record, dict):
+        record = record.get("extra_data", record)
+        return isinstance(record, dict) and record.get("run_id") == run_id
+    match = re.search(r"(?<!\S)run_id=(\S+)", line)
+    return match is not None and match.group(1) == run_id
 
 
 def _candidate_ray_log_dirs() -> list[Path]:
@@ -40,7 +54,9 @@ def _read_run_logs_from_ray_files(run_id: str) -> str | None:
                     continue
                 if run_id not in content:
                     continue
-                lines = [line for line in content.splitlines() if run_id in line]
+                lines = [
+                    line for line in content.splitlines() if _log_line_matches_run(line, run_id)
+                ]
                 if lines:
                     return "\n".join(lines)
     return None
@@ -53,11 +69,19 @@ def _normalize_architecture_label(value: str) -> str:
 
 
 def _format_evaluation_log_line(row: EvaluationPoint) -> str:
-    """Format evaluation point as a human-readable log line."""
-    architecture = _normalize_architecture_label(row.architecture)
-    return (
-        f"[{architecture} Eval] run_id={row.run_id} "
-        f"T={row.virtual_time:>6.1f}s | Acc: {row.accuracy * 100:>5.2f}% | Loss: {row.loss:.4f}"
+    """Preserve evaluation scope and server details when synchronizing to Loki."""
+    return json.dumps(
+        {
+            "log_type": "periodic_evaluation",
+            "run_id": row.run_id,
+            "graph_id": row.graph_id,
+            "architecture": _normalize_architecture_label(row.architecture),
+            "virtual_time": row.virtual_time,
+            "round": row.round,
+            "accuracy": row.accuracy,
+            "loss": row.loss,
+            "server_stats": json.loads(row.server_stats_json) if row.server_stats_json else {},
+        }
     )
 
 
@@ -176,7 +200,7 @@ def reconstruct_from_loki(run_id: str) -> int:
         start_ns = now_ns - (86400 * 1_000_000_000)  # 24 hours ago
 
         # Use line filter for run_id to avoid label cardinality issues
-        query = f'{{job="{LOKI_EVALUATION_JOB_LABEL}"}} |= "run_id={run_id}"'
+        query = f'{{job="{LOKI_EVALUATION_JOB_LABEL}"}} |= {json.dumps(run_id)}'
 
         response = requests.get(
             LOKI_QUERY_URL,
@@ -219,15 +243,40 @@ def reconstruct_from_loki(run_id: str) -> int:
 
                 values = stream.get("values", [])
                 for timestamp_ns_str, log_line in values:
+                    if not _log_line_matches_run(log_line, run_id):
+                        continue
+                    try:
+                        structured = json.loads(log_line)
+                    except (ValueError, TypeError):
+                        structured = None
+                    if isinstance(structured, dict):
+                        structured = structured.get("extra_data", structured)
+                    if not isinstance(structured, dict):
+                        structured = None
                     match = log_pattern.search(log_line)
-                    if not match:
+                    if structured is None and not match:
                         continue
 
                     try:
                         timestamp_ns = int(timestamp_ns_str)
-                        virtual_time = float(match.group("time"))
-                        accuracy = float(match.group("acc")) / 100.0  # Convert from percentage
-                        loss = float(match.group("loss"))
+                        if structured is not None:
+                            if structured.get("log_type") != "periodic_evaluation":
+                                continue
+                            if structured.get("run_id") != run_id:
+                                continue
+                            virtual_time = float(structured["virtual_time"])
+                            accuracy = float(structured["accuracy"])
+                            loss = float(structured["loss"])
+                            round_value = int(structured.get("round", 0))
+                            point_architecture = _normalize_architecture_label(
+                                str(structured.get("architecture", architecture))
+                            )
+                        else:
+                            virtual_time = float(match.group("time"))
+                            accuracy = float(match.group("acc")) / 100.0
+                            loss = float(match.group("loss"))
+                            round_value = 0
+                            point_architecture = _normalize_architecture_label(match.group("arch"))
 
                         timestamp_real = datetime.fromtimestamp(
                             timestamp_ns / 1_000_000_000, tz=timezone.utc
@@ -237,7 +286,7 @@ def reconstruct_from_loki(run_id: str) -> int:
                         exists = session.execute(
                             select(EvaluationPoint.id).where(
                                 EvaluationPoint.run_id == run_id,
-                                EvaluationPoint.architecture == architecture,
+                                EvaluationPoint.architecture == point_architecture,
                                 EvaluationPoint.virtual_time == virtual_time,
                             )
                         ).first()
@@ -247,16 +296,20 @@ def reconstruct_from_loki(run_id: str) -> int:
 
                         record = EvaluationPoint(
                             run_id=run_id,
-                            architecture=architecture,
+                            architecture=point_architecture,
                             timestamp_real=timestamp_real,
                             virtual_time=virtual_time,
-                            round=0,  # Unknown round from log format
+                            round=round_value,
                             accuracy=accuracy,
                             loss=loss,
+                            graph_id=structured.get("graph_id") if structured else None,
+                            server_stats_json=json.dumps(structured.get("server_stats", {}))
+                            if structured
+                            else None,
                         )
                         session.add(record)
                         inserted += 1
-                    except (ValueError, AttributeError) as e:
+                    except (ValueError, TypeError, KeyError, AttributeError) as e:
                         logger.debug("Failed to parse log line for run %s: %s", run_id, str(e))
                         continue
 
@@ -306,7 +359,7 @@ def fetch_run_logs(run_id: str) -> str | None:
     try:
         now_ns = int(datetime.now(timezone.utc).timestamp() * 1_000_000_000)
         start_ns = now_ns - (86400 * 1_000_000_000)
-        query = f'{{job="{LOKI_EVALUATION_JOB_LABEL}"}} |= "run_id={run_id}"'
+        query = f'{{job="{LOKI_EVALUATION_JOB_LABEL}"}} |= {json.dumps(run_id)}'
 
         response = requests.get(
             LOKI_QUERY_URL,
@@ -341,6 +394,8 @@ def fetch_run_logs(run_id: str) -> str | None:
                     continue
                 line = value_pair[1]
                 if not isinstance(line, str):
+                    continue
+                if not _log_line_matches_run(line, run_id):
                     continue
                 entries.append((timestamp_ns, line))
 

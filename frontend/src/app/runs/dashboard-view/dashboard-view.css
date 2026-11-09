@@ -431,3 +431,29 @@
     padding-left: 16px;
   }
 }
+
+.server-results {
+  width: 100%;
+  min-width: 0;
+  max-height: 300px;
+  overflow: auto;
+}
+
+.server-results table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.server-results caption {
+  text-align: left;
+  color: rgba(255, 255, 255, 0.7);
+  padding-bottom: 8px;
+}
+
+.server-results th,
+.server-results td {
+  text-align: left;
+  padding: 7px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}

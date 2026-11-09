@@ -75,6 +75,12 @@ def _build_series_result(seed_set: list[int], runs: list[dict[str, Any]]) -> dic
         "repetitions": len(seed_set),
         "completed_repetitions": len(runs),
         "output_filename": runs[0].get("output_filename") if len(seed_set) == 1 and runs else None,
+        "server_checkpoints": runs[0].get("server_checkpoints")
+        if len(seed_set) == 1 and runs
+        else None,
+        "primary_server_id": runs[0].get("primary_server_id")
+        if len(seed_set) == 1 and runs
+        else None,
         "evaluation": runs[0].get("evaluation") if len(seed_set) == 1 and runs else None,
         "evaluation_summary": evaluation_summary,
         "runs": runs,
@@ -125,6 +131,8 @@ class RunJob:
             )["current_sim_time"],
             "run_time_limit": run_time_limit,
             "output_filename": result.get("output_filename"),
+            "server_checkpoints": result.get("server_checkpoints"),
+            "primary_server_id": result.get("primary_server_id"),
             "dataset": self._dataset_for_architecture(),
             "datasets_by_architecture": self._datasets_by_architecture(),
             "accuracy_loss_snapshot_url": result.get("accuracy_loss_snapshot_url"),

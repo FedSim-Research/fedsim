@@ -53,9 +53,15 @@ class SimulationStartRequest(BaseModel):
     spyker_config: SpykerAlgorithmConfig | None = None
 
 
-class SimulationEvaluationResult(BaseModel):
+class ServerEvaluationResult(BaseModel):
     accuracy: float
     avg_loss: float
+
+
+class SimulationEvaluationResult(ServerEvaluationResult):
+    aggregation: str | None = None
+    server_count: int | None = None
+    per_server: dict[str, ServerEvaluationResult] | None = None
 
 
 class SimulationRunResponse(BaseModel):
@@ -74,6 +80,8 @@ class SimulationRunResponse(BaseModel):
     current_sim_time: float | None = None
     run_time_limit: float | None = None
     output_filename: str | None = None
+    server_checkpoints: dict[str, str] | None = None
+    primary_server_id: str | None = None
     dataset: str | None = None
     datasets_by_architecture: dict[str, str | None] | None = None
     accuracy_loss_snapshot_url: str | None = None

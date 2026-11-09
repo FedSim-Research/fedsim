@@ -251,6 +251,7 @@ def test(net, testloader, device):
     net.eval()
     criterion = torch.nn.CrossEntropyLoss()
     correct, loss = 0, 0.0
+    num_examples = 0
     with torch.no_grad():
         for batch in testloader:
             images = batch["img"].to(device)
@@ -258,9 +259,12 @@ def test(net, testloader, device):
             labels = batch[label_key].to(device)
 
             outputs = net(images)
-            loss += criterion(outputs, labels).item()
+            loss += criterion(outputs, labels).item() * len(labels)
             correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+            num_examples += len(labels)
 
-    accuracy = correct / len(testloader.dataset)
-    loss = loss / len(testloader)
+    if not num_examples:
+        raise ValueError("evaluation_requires_examples")
+    accuracy = correct / num_examples
+    loss = loss / num_examples
     return loss, accuracy

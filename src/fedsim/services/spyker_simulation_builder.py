@@ -13,10 +13,10 @@ DEFAULT_RUN_TIME_LIMIT = 5000.0
 @lru_cache(maxsize=1)
 def _import_spyker():
     from fedsim.engines.spyker.simulation import SpykerSimulation
-    from fedsim.evaluation import evaluate_model
+    from fedsim.evaluation import evaluate_models
     from fedsim.specs.network_metrics import Network
 
-    return SpykerSimulation, Network, evaluate_model
+    return SpykerSimulation, Network, evaluate_models
 
 
 def _node_config(node: Node) -> dict[str, Any]:

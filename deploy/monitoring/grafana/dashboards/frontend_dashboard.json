@@ -97,7 +97,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "last_over_time({job=\"fedsim-evaluation\"} | json | run_id=~\"${run_id:raw}\" | unwrap accuracy [1h])",
+          "expr": "last_over_time({job=\"fedsim-evaluation\"} | json run_id=\"run_id\", architecture=\"architecture\", accuracy=\"accuracy\" | run_id=~\"${run_id:raw}\" | architecture=~\"${architecture:raw}\" | unwrap accuracy | __error__=\"\" [1h]) by (run_id, architecture)",
           "legendFormat": "Accuracy",
           "datasource": {
             "type": "loki",
@@ -107,7 +107,7 @@
         },
         {
           "refId": "B",
-          "expr": "last_over_time({job=\"fedsim-evaluation\"} | json | run_id=~\"${run_id:raw}\" | unwrap loss [1h])",
+          "expr": "last_over_time({job=\"fedsim-evaluation\"} | json run_id=\"run_id\", architecture=\"architecture\", loss=\"loss\" | run_id=~\"${run_id:raw}\" | architecture=~\"${architecture:raw}\" | unwrap loss | __error__=\"\" [1h]) by (run_id, architecture)",
           "legendFormat": "Loss",
           "datasource": {
             "type": "loki",
@@ -132,7 +132,8 @@
           "placement": "bottom",
           "calcs": []
         }
-      }
+      },
+      "description": "New Spyker runs report an equal-weight mean of server metrics. Older runs may show one server only. Individual server results are retained in run results and logs."
     }
   ],
   "refresh": "10s",
@@ -147,6 +148,16 @@
         "name": "run_id",
         "type": "textbox",
         "label": "Run ID Regex",
+        "query": ".*",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        }
+      },
+      {
+        "name": "architecture",
+        "type": "textbox",
+        "label": "Architecture Regex",
         "query": ".*",
         "current": {
           "text": ".*",

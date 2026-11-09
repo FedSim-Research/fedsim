@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, computed, inject } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { SimulationRunResponse } from '../../api/graph-api.service';
+import { SimulationRunResponse, SimulationRunResult } from '../../api/graph-api.service';
 import { FrameworkJobsService } from '../framework-jobs.service';
 import { DashboardRunsService } from '../dashboard-runs.service';
 
@@ -13,6 +13,7 @@ type ComparableMetrics = {
 type ArchitectureMetrics = {
   architecture: 'hierarchical' | 'spyker';
   metrics: ComparableMetrics;
+  label: string;
 };
 
 type ArchitectureEmbed = {
@@ -129,7 +130,7 @@ export class DashboardViewComponent {
     return (['hierarchical', 'spyker'] as const)
       .map((arch) => ({
         architecture: arch,
-        url: run.accuracy_loss_snapshot_urls_by_architecture?.[arch] ?? '',
+        url: this.architectureValue(run.accuracy_loss_snapshot_urls_by_architecture, arch) ?? '',
       }))
       .filter((item) => item.url);
   });
@@ -161,11 +162,18 @@ export class DashboardViewComponent {
     return progress === null ? '-' : `${progress.toFixed(1)}%`;
   }
 
-  public getRunMetrics(run: SimulationRunResponse): ComparableMetrics {
+  public getRunMetrics(run: SimulationRunResult): ComparableMetrics {
     if (run.evaluation) {
       return {
         accuracy: run.evaluation.accuracy ?? null,
         loss: run.evaluation.avg_loss ?? null,
+      };
+    }
+
+    if (run.evaluation_summary) {
+      return {
+        accuracy: run.evaluation_summary.mean_accuracy,
+        loss: run.evaluation_summary.mean_avg_loss,
       };
     }
 
@@ -198,13 +206,53 @@ export class DashboardViewComponent {
       return [];
     }
 
-    return (['hierarchical', 'spyker'] as const).map((architecture) => ({
-      architecture,
-      metrics: {
-        accuracy: byArchitecture[architecture]?.evaluation?.accuracy ?? null,
-        loss: byArchitecture[architecture]?.evaluation?.avg_loss ?? null,
-      },
-    }));
+    return (['hierarchical', 'spyker'] as const).map((architecture) => {
+      const result = this.architectureValue(byArchitecture, architecture) ?? {};
+      return {
+        architecture,
+        metrics: this.getRunMetrics(result),
+        label: this.getEvaluationLabel(result),
+      };
+    });
+  }
+
+  private architectureValue<T>(entries: Record<string, T> | null | undefined,
+    architecture: 'hierarchical' | 'spyker'): T | undefined {
+    return architecture === 'hierarchical'
+      ? entries?.['hierfl'] ?? entries?.['hierarchical']
+      : entries?.['spyker'];
+  }
+
+  public getEvaluationLabel(run: SimulationRunResult): string {
+    const serverMean = run.evaluation?.aggregation === 'server_macro_mean' ||
+      run.runs?.some((entry) => entry.evaluation?.aggregation === 'server_macro_mean');
+    const repetitions = (run.evaluation_summary?.evaluated_repetitions ?? 0) > 1;
+    if (serverMean) {
+      return repetitions ? 'Mean across servers and repetitions' : 'Mean across servers';
+    }
+    return repetitions ? 'Mean across evaluated repetitions' : 'Recorded model';
+  }
+
+  public getSpykerServerResults(run: SimulationRunResponse) {
+    const result = this.isCombinedRun(run)
+      ? run.results_by_architecture?.['spyker']
+      : this.normalizeArchitecture(run.architecture) === 'spyker' ? run : null;
+    if (!result) {
+      return [];
+    }
+    const repetitions = result.runs?.length ? result.runs : [{
+      seed: result.seed ?? null, repetition_index: 1, evaluation: result.evaluation,
+    }];
+    return repetitions.flatMap((entry) => {
+      const evaluation = entry.evaluation;
+      if (evaluation?.aggregation !== 'server_macro_mean' || !evaluation.per_server) {
+        return [];
+      }
+      return Object.entries(evaluation.per_server).map(([serverId, metrics]) => ({
+        seed: entry.seed, repetition: entry.repetition_index, serverId,
+        accuracy: metrics.accuracy, loss: metrics.avg_loss,
+      }));
+    });
   }
 
   public architectureLabel(architecture: 'hierarchical' | 'spyker' | 'both'): string {
@@ -244,7 +292,7 @@ export class DashboardViewComponent {
   public getCombinedGraphIds(run: SimulationRunResponse): { hierarchical: number | null; spyker: number | null } {
     const metadata = run.run_metadata as Record<string, unknown> | null | undefined;
     const combinedPayload = (metadata?.['combined_payload'] as Record<string, unknown> | undefined) ?? {};
-    const hierarchical = combinedPayload['hierarchical'] as Record<string, unknown> | undefined;
+    const hierarchical = this.architectureValue(combinedPayload, 'hierarchical') as Record<string, unknown> | undefined;
     const spyker = combinedPayload['spyker'] as Record<string, unknown> | undefined;
     const hierarchicalGraphId = typeof hierarchical?.['graph_id'] === 'number' ? (hierarchical['graph_id'] as number) : null;
     const spykerGraphId = typeof spyker?.['graph_id'] === 'number' ? (spyker['graph_id'] as number) : null;

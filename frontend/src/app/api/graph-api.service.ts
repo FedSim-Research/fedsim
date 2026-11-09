@@ -141,6 +141,14 @@ export interface SimulationStartBothRequest {
   spyker: SimulationStartRequest;
 }
 
+export interface SimulationEvaluation {
+  accuracy: number;
+  avg_loss: number;
+  aggregation?: string | null;
+  server_count?: number | null;
+  per_server?: Record<string, { accuracy: number; avg_loss: number }> | null;
+}
+
 export interface SimulationRunResult {
   architecture?: 'spyker' | 'hierfl' | string;
   graph_id?: number | null;
@@ -153,10 +161,9 @@ export interface SimulationRunResult {
   finished_at?: string | null;
   duration_seconds?: number | null;
   output_filename?: string | null;
-  evaluation?: {
-    accuracy: number;
-    avg_loss: number;
-  } | null;
+  server_checkpoints?: Record<string, string> | null;
+  primary_server_id?: string | null;
+  evaluation?: SimulationEvaluation | null;
   evaluation_summary?: {
     evaluated_repetitions: number;
     mean_accuracy: number;
@@ -169,10 +176,9 @@ export interface SimulationRunResult {
     repetition_index: number;
     duration_seconds?: number | null;
     output_filename?: string | null;
-    evaluation?: {
-      accuracy: number;
-      avg_loss: number;
-    } | null;
+    server_checkpoints?: Record<string, string> | null;
+    primary_server_id?: string | null;
+    evaluation?: SimulationEvaluation | null;
   }> | null;
   results_by_architecture?: Record<
     string,
@@ -182,10 +188,9 @@ export interface SimulationRunResult {
       repetitions?: number | null;
       completed_repetitions?: number | null;
       output_filename?: string | null;
-      evaluation?: {
-        accuracy: number;
-        avg_loss: number;
-      } | null;
+      server_checkpoints?: Record<string, string> | null;
+      primary_server_id?: string | null;
+      evaluation?: SimulationEvaluation | null;
       evaluation_summary?: {
         evaluated_repetitions: number;
         mean_accuracy: number;
@@ -198,10 +203,9 @@ export interface SimulationRunResult {
         repetition_index: number;
         duration_seconds?: number | null;
         output_filename?: string | null;
-        evaluation?: {
-          accuracy: number;
-          avg_loss: number;
-        } | null;
+        server_checkpoints?: Record<string, string> | null;
+        primary_server_id?: string | null;
+        evaluation?: SimulationEvaluation | null;
       }> | null;
     }
   > | null;
@@ -220,6 +224,8 @@ export interface SimulationRunResponse {
   current_sim_time?: number | null;
   run_time_limit?: number | null;
   output_filename?: string | null;
+  server_checkpoints?: Record<string, string> | null;
+  primary_server_id?: string | null;
   dataset?: string | null;
   datasets_by_architecture?: Record<string, string | null> | null;
   accuracy_loss_snapshot_url?: string | null;
@@ -228,10 +234,7 @@ export interface SimulationRunResponse {
   repetitions?: number | null;
   completed_repetitions?: number | null;
   error?: string | null;
-  evaluation?: {
-    accuracy: number;
-    avg_loss: number;
-  } | null;
+  evaluation?: SimulationEvaluation | null;
   evaluation_summary?: {
     evaluated_repetitions: number;
     mean_accuracy: number;
@@ -244,10 +247,9 @@ export interface SimulationRunResponse {
     repetition_index: number;
     duration_seconds?: number | null;
     output_filename?: string | null;
-    evaluation?: {
-      accuracy: number;
-      avg_loss: number;
-    } | null;
+    server_checkpoints?: Record<string, string> | null;
+    primary_server_id?: string | null;
+    evaluation?: SimulationEvaluation | null;
   }> | null;
   results_by_architecture?: Record<string, SimulationRunResult> | null;
   run_metadata?: Record<string, unknown> | null;
