@@ -111,6 +111,26 @@ with previous runs is not guaranteed.
 
 ## Training settings and virtual time
 
+Both engines initialize their shared model from the run seed with a private
+CPU PyTorch generator. Model construction uses meta tensors before allocating
+and initializing weights, so it does not consume or reseed the process-global
+generator. The layer shapes and default Conv2d/Linear initialization are
+unchanged. Controllers and training clients no longer seed global Python,
+NumPy, or PyTorch state.
+Before allocating weights, model construction verifies that its explicit
+initializer covers every registered parameter and that no buffers would be
+left uninitialized. Extensions with additional state fail until their
+initialization is defined.
+
+Server actors receive the run seed through their simulation context. Their
+network streams are scoped by server ID and destination ID. Client actors use
+their existing per-client seed (run seed plus partition index), with separate
+streams for training duration, downloads, and uploads per server. Streams
+advance independently and remain owned by the actor between callbacks. The
+`fedsim-rng-v1` scheme derives 64-bit seeds from canonical JSON using SHA-256,
+independently of Python's randomized hash. Unseeded runs use private generators
+initialized from system entropy.
+
 Both engines pass the selected dataset ID to their training clients. The batch
 size, epochs, and learning rate reach each training task; changing the batch
 size preserves the data loader's seeded random generator.

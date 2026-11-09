@@ -1,9 +1,5 @@
 import logging
-import random
 from typing import Any, Callable
-
-import numpy as np
-import torch
 
 from fedsim.runtime import managed_ray_runtime
 from fedsim.services.hierfl_simulation_builder import (
@@ -101,7 +97,6 @@ class SimulationController:
         evaluator: Callable[[], Callable[[str], dict[str, float]]],
     ) -> dict[str, Any]:
         seed = self.simulation_settings.get("seed")
-        self._apply_seed(seed)
         simulation = builder()
         logger.debug("simulation_build_start architecture=%s", self.architecture)
         simulation.build()
@@ -129,12 +124,3 @@ class SimulationController:
             evaluation is not None,
         )
         return result
-
-    def _apply_seed(self, seed: int | None) -> None:
-        if seed is None:
-            logger.debug("simulation_seed_not_set architecture=%s", self.architecture)
-            return
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        logger.info("simulation_seed_applied architecture=%s seed=%s", self.architecture, seed)

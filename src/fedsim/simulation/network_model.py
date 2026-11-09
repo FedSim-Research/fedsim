@@ -11,10 +11,13 @@ def estimate_transmission_time(
     network_metrics: dict[str, Network],
     metrics_id: str,
     payload_size_mb: float,
+    *,
+    rng: random.Random | None = None,
 ) -> float:
+    rng = random if rng is None else rng
     # We treat packet loss as a reduction in effective throughput (TCP throughput model approximation)
     # Assuming packet_loss_avg is a percentage (0.0 to 1.0).
-    packet_loss = random.gauss(
+    packet_loss = rng.gauss(
         network_metrics[metrics_id].packet_loss_avg,
         network_metrics[metrics_id].packet_loss_stddev,
     )
@@ -32,7 +35,7 @@ def estimate_transmission_time(
     payload_size_mbits = 8 * payload_size_mb
     transmission_delay_sec = payload_size_mbits / bottleneck_mbps
 
-    latency_ms = random.gauss(
+    latency_ms = rng.gauss(
         network_metrics[metrics_id].latency_avg,
         network_metrics[metrics_id].latency_stddev,
     )

@@ -68,6 +68,7 @@ def test_builders_expand_client_groups_without_starting_ray(architecture):
     assert set(simulation.client_registry) == {"clients-1", "clients-2"}
     assert len(simulation.server_registry) == (2 if architecture == "hierfl" else 1)
     assert simulation.run_id == "synthetic-run"
+    assert simulation.seed == 42
     assert str(simulation.graph_id) == "123"
     assert len(simulation.client_map["server"]) == 2
     assert not ray.is_initialized()

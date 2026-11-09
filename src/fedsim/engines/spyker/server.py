@@ -422,6 +422,7 @@ class SpykerServer(BaseAsyncServer):
             network_metrics=sender_spec.network_metrics,
             metrics_id=target_id,
             payload_size_mb=payload_size_mb,
+            rng=self.random_streams.stream("network", target_id),
         )
 
         final_delay = delay + added_delay

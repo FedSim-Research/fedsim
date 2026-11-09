@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 import numpy as np
 
 from fedsim.simulation.context import get_global_context
+from fedsim.simulation.randomness import RandomStreams
 
 
 class BaseAsyncServer(ABC):
@@ -14,6 +15,7 @@ class BaseAsyncServer(ABC):
         self.global_model_weights: List[np.ndarray] = []
         self._generated_events = []
         self.context = get_global_context()
+        self.random_streams = RandomStreams(self.context.seed, "server", server_id)
 
     def set_orchestrator(self, orchestrator_ref):
         self.orchestrator_ref = orchestrator_ref

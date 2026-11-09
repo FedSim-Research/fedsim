@@ -4,6 +4,8 @@
 # FedSim modifies model architecture, data loading, label handling, and training strategies.
 # Source attribution: THIRD_PARTY_NOTICES.md.
 
+import math
+
 import ray
 import torch
 import torch.nn as nn
@@ -22,27 +24,57 @@ DEFAULT_DATASET_ID = "uoft-cs/cifar10"
 
 class Net(nn.Module):
     """
-    Generalized 3-Conv, 2-FC Model (Spyker Paper spec).
+    Generalized 3-Conv, 2-FC model with a private CPU initialization generator.
     """
 
-    def __init__(self, num_classes=10):
+    def __init__(self, num_classes=10, *, seed: int | None = None):
         super(Net, self).__init__()
 
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
+        # Meta construction avoids consuming PyTorch's process-global generator.
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1, device="meta")
 
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1, device="meta")
 
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1, device="meta")
 
         self.pool = nn.MaxPool2d(2, 2)
 
         # Adaptive pool ensures that if a dataset is  slightly off-size, it is forced to 4x4 before the Linear layers.
         self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
 
-        self.fc1 = nn.Linear(128 * 4 * 4, 256)
+        self.fc1 = nn.Linear(128 * 4 * 4, 256, device="meta")
 
         # Fully Connected Layer 2 (Output layer)
-        self.fc2 = nn.Linear(256, num_classes)
+        self.fc2 = nn.Linear(256, num_classes, device="meta")
+
+        layers = (self.conv1, self.conv2, self.conv3, self.fc1, self.fc2)
+        initialized_parameters = {
+            id(parameter)
+            for layer in layers
+            for parameter in (layer.weight, layer.bias)
+            if parameter is not None
+        }
+        # to_empty discards all state. Refuse extensions without an initializer,
+        # including buffers such as BatchNorm running statistics.
+        if (
+            initialized_parameters != {id(parameter) for parameter in self.parameters()}
+            or next(self.buffers(), None) is not None
+        ):
+            raise RuntimeError("net_initialization_requires_complete_parameter_and_buffer_coverage")
+
+        self.to_empty(device="cpu")
+        generator = torch.Generator(device="cpu")
+        if seed is None:
+            generator.seed()
+        else:
+            generator.manual_seed(int(seed))
+        # Match Conv2d/Linear's default initialization, using only our generator.
+        for layer in layers:
+            nn.init.kaiming_uniform_(layer.weight, a=math.sqrt(5), generator=generator)
+            fan_in = layer.weight[0].numel()
+            bound = 1 / math.sqrt(fan_in)
+            if layer.bias is not None:
+                nn.init.uniform_(layer.bias, -bound, bound, generator=generator)
 
     def forward(self, x):
         # Support Grayscale to RGB conversion for MNIST/Fashion-MNIST

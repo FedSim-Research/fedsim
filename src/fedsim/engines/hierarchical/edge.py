@@ -145,6 +145,7 @@ class EdgeServer(BaseAsyncServer):
             network_metrics=edge_server_spec.network_metrics,
             metrics_id=self.super_server_id,
             payload_size_mb=payload_size_mb,
+            rng=self.random_streams.stream("network", self.super_server_id),
         )
 
         self._schedule_event(

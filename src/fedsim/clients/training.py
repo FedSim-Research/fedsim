@@ -1,4 +1,3 @@
-import random
 from collections import OrderedDict
 from typing import List
 
@@ -21,13 +20,8 @@ class TrainingClient:
         self.num_partitions = num_partitions
         self.seed = seed
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        if seed is not None:
-            random.seed(seed)
-            np.random.seed(seed)
-            torch.manual_seed(seed)
-
         self.dataset_id = dataset_id
-        self.net = Net().to(self.device)
+        self.net = Net(seed=seed).to(self.device)
 
     def _ensure_data_loaded(self):
         if not hasattr(self, "trainloader"):

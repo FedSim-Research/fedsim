@@ -6,12 +6,14 @@ from fedsim.clients.training import TrainingClient
 from fedsim.simulation.compute_model import estimate_training_time
 from fedsim.simulation.context import SimulationContext, get_global_context, set_global_context
 from fedsim.simulation.network_model import estimate_transmission_time
+from fedsim.simulation.randomness import RandomStreams
 
 
 @ray.remote(num_cpus=0, num_gpus=0)
 class VirtualClientActor:
     def __init__(self, client_id: str, client_config: dict, context: SimulationContext):
         self.client_id = client_id
+        self.random_streams = RandomStreams(client_config.get("seed"), "client")
         set_global_context(context)
         torch.set_num_threads(1)
 
@@ -66,6 +68,7 @@ class VirtualClientActor:
             network_metrics=server_spec.network_metrics,
             metrics_id=self.client_id,
             payload_size_mb=model_size_mb,
+            rng=self.random_streams.stream("download", server_id),
         )
 
         fit_res = self.inner_client.fit(parameters=param_arrays, config=config)
@@ -75,6 +78,7 @@ class VirtualClientActor:
             dataset_size=fit_res["num_examples"],
             epochs=epochs,
             model_complexity=model_complexity,
+            rng=self.random_streams.stream("training"),
         )
 
         res_arrays = fit_res["parameters"]
@@ -86,6 +90,7 @@ class VirtualClientActor:
             network_metrics=server_spec.network_metrics,
             metrics_id=self.client_id,
             payload_size_mb=res_size_mb,
+            rng=self.random_streams.stream("upload", server_id),
         )
 
         total_virtual_duration = t_download + t_train + t_upload

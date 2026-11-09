@@ -18,9 +18,15 @@ from fedsim.specs.server_spec import ServerSpec
 
 
 class SpykerSimulation:
-    def __init__(self, dataset_id: str = "uoft-cs/cifar10", gpu_budget: float | None = None):
+    def __init__(
+        self,
+        dataset_id: str = "uoft-cs/cifar10",
+        gpu_budget: float | None = None,
+        seed: int | None = None,
+    ):
         self.dataset_id = dataset_id
         self.gpu_budget = gpu_budget
+        self.seed = seed
         self.server_ids = []
         self.client_ids = []
 
@@ -182,9 +188,7 @@ class SpykerSimulation:
                 "First spyker server must have at least one client to initialize global model."
             )
 
-        from fedsim.learning import Net
-
-        dummy_model = Net()
+        dummy_model = Net(seed=self.seed)
         initial_weights_np = [val.cpu().numpy() for _, val in dummy_model.state_dict().items()]
 
         print(f"Spawning {len(self.server_ids)} Spyker Servers...")
@@ -261,6 +265,7 @@ class SpykerSimulation:
             orchestrator_actor=self.orchestrator,
             client_registry=self.client_registry,
             server_registry=self.server_registry,
+            seed=self.seed,
         )
 
         set_global_context(self.context)

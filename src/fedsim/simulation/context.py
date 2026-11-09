@@ -18,10 +18,12 @@ class SimulationContext:
         orchestrator_actor: ray.ObjectRef | Any,
         client_registry: Dict[str, ClientSpec],
         server_registry: Dict[str, ServerSpec],
+        seed: int | None = None,
     ):
         self.orchestrator = orchestrator_actor
         self.client_registry = client_registry
         self.server_registry = server_registry
+        self.seed = seed
 
         self.server_actor_handles = None
 

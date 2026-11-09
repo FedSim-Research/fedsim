@@ -111,6 +111,7 @@ class SuperServer(BaseAsyncServer):
                 network_metrics=edge_spec.network_metrics,
                 metrics_id=self.server_id,
                 payload_size_mb=model_size_mb,
+                rng=self.random_streams.stream("network", edge_server_id),
             )
 
             self._schedule_event(

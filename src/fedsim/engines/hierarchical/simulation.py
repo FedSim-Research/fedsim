@@ -27,10 +27,12 @@ class HierarchicalSimulation:
         dataset_id: str = "uoft-cs/cifar10",
         run_time_limit: float = RUNTIME_LIMIT,
         gpu_budget: float | None = None,
+        seed: int | None = None,
     ):
         self.dataset_id = dataset_id
         self.run_time_limit = run_time_limit
         self.gpu_budget = gpu_budget
+        self.seed = seed
         self.super_id = None
         self.edge_ids = []
         self.client_ids = []
@@ -177,9 +179,7 @@ class HierarchicalSimulation:
                 "First edge server must have at least one client to initialize global model."
             )
 
-        from fedsim.learning import Net
-
-        dummy_model = Net()
+        dummy_model = Net(seed=self.seed)
         initial_weights = [val.cpu().numpy() for _, val in dummy_model.state_dict().items()]
 
         print(f"Spawning Super Server ({self.super_id})...")
@@ -239,6 +239,7 @@ class HierarchicalSimulation:
             orchestrator_actor=self.orchestrator,
             client_registry=self.client_registry,
             server_registry=self.server_registry,
+            seed=self.seed,
         )
         set_global_context(self.context)
 
