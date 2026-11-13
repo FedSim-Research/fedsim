@@ -117,7 +117,7 @@
                   <div class="snapshot-section">
                     <span class="snapshot-label">Model Quality Snapshots</span>
                     @for (item of modelQualitySnapshotsByArchitecture(); track item.architecture) {
-                      <a [href]="item.url" target="_blank" class="snapshot-link">
+                      <a [href]="item.url" target="_blank" rel="noopener noreferrer" class="snapshot-link">
                         {{ architectureLabel(item.architecture) }} Dashboard
                       </a>
                     }
@@ -138,7 +138,7 @@
                 <div class="snapshot-links">
                   <div class="snapshot-section">
                     <span class="snapshot-label">Model Quality Snapshot</span>
-                    <a [href]="modelQualitySnapshot()!.url" target="_blank" class="snapshot-link">
+                    <a [href]="modelQualitySnapshot()!.url" target="_blank" rel="noopener noreferrer" class="snapshot-link">
                       View Dashboard
                     </a>
                   </div>
