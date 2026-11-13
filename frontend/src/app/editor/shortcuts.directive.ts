@@ -1,7 +1,6 @@
 import { Directive, HostListener, inject, ElementRef, input, effect, untracked } from '@angular/core';
-import { HierflGraphService } from './topologies/hierfl-graph.service';
-import { SpykerGraphService } from './topologies/spyker-graph.service';
-import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
+import { ArchitectureGraph } from './graph-workspace.service';
+import { StaticEdge as Edge } from 'ngx-vflow';
 import { MessageService } from 'primeng/api';
 import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'selecto';
 import { v4 as uuidv4 } from 'uuid';
@@ -26,11 +25,9 @@ interface CopiedNode {
   exportAs: 'appShortcuts',
 })
 export class Shortcuts{
-  protected graphServiceSpyker = inject(SpykerGraphService);
-  protected graphServiceHierfl = inject(HierflGraphService);
   protected messageService = inject(MessageService);
   protected elRef = inject(ElementRef) as ElementRef<HTMLElement>;
-  public activeService = input.required<SpykerGraphService | HierflGraphService>();
+  public activeService = input.required<ArchitectureGraph>();
   private clipboard: CopiedNode[] = [];
   public selectedNodeIds: Set<string> = new Set();
   public selectedEdgeIds: Set<string> = new Set();
@@ -40,9 +37,14 @@ export class Shortcuts{
 
   constructor() {
     // A selection only makes sense inside the graph it was made in.
+    let previous: ArchitectureGraph | null = null;
     effect(() => {
-      this.activeService();
-      untracked(() => this.clearSelectionState());
+      const current = this.activeService();
+      untracked(() => {
+        previous?.setSelection(new Set(), new Set());
+        this.clearSelectionState();
+        previous = current;
+      });
     });
   }
 
@@ -180,23 +182,17 @@ export class Shortcuts{
     this.applySelection(selected);
   }
 
-  private applySelection(selected: Set<string>) {
+  private applySelection(selected: Set<string>): void {
     this.selectedNodeIds = new Set(selected);
-    const spykerNodes = this.graphServiceSpyker.nodes().map((n) => {
-      const data = ((n as any).data as any) || {};
-      const selectedFlag = selected.has(n.id);
-      return { ...n, data: { ...data, selected: selectedFlag } } as Node;
-    });
-    this.graphServiceSpyker.nodes.set(spykerNodes);
-
-    const hierNodes = this.graphServiceHierfl.nodes().map((n) => {
-      const data = ((n as any).data as any) || {};
-      const selectedFlag = selected.has(n.id);
-      return { ...n, data: { ...data, selected: selectedFlag } } as Node;
-    });
-    this.graphServiceHierfl.nodes.set(hierNodes);
-    this.applyEdgeSelection(this.collectSelectedEdges(selected));
+    this.selectedEdgeIds = new Set(
+      this.activeService()
+        .edges()
+        .filter((edge) => selected.has(edge.source) && selected.has(edge.target))
+        .map((edge) => edge.id),
+    );
+    this.activeService().setSelection(this.selectedNodeIds, this.selectedEdgeIds);
   }
+
 
   private applySelectionFromElements(elements: Array<HTMLElement | SVGElement>) {
     const nodeIds = this.extractNodeIds(elements);
@@ -232,40 +228,12 @@ export class Shortcuts{
     this.lastSelectElements = [];
   }
 
-  private collectSelectedEdges(selectedNodes: Set<string>): Set<string> {
-    const ids = new Set<string>();
-
-    const addEdges = (edges: any[]) => {
-      edges.forEach((e) => {
-        if (selectedNodes.has(e.source) && selectedNodes.has(e.target)) {
-          ids.add(e.id);
-        }
-      });
-    };
-
-    addEdges(this.graphServiceSpyker.edges());
-    addEdges(this.graphServiceHierfl.edges());
-
-    return ids;
+  private clearNodeSelection(): void {
+    this.selectedNodeIds = new Set();
+    this.selectedEdgeIds = new Set();
+    this.activeService().setSelection(this.selectedNodeIds, this.selectedEdgeIds);
   }
 
-  private clearNodeSelection() {
-    this.selectedNodeIds.clear();
-    const spykerCleared = this.graphServiceSpyker.nodes().map((n) => {
-      const data = ((n as any).data as any) || {};
-      if (data.selected) return { ...n, data: { ...data, selected: false } } as Node;
-      return n;
-    });
-    this.graphServiceSpyker.nodes.set(spykerCleared);
-
-    const hierCleared = this.graphServiceHierfl.nodes().map((n) => {
-      const data = ((n as any).data as any) || {};
-      if (data.selected) return { ...n, data: { ...data, selected: false } } as Node;
-      return n;
-    });
-    this.graphServiceHierfl.nodes.set(hierCleared);
-    this.applyEdgeSelection(new Set());
-  }
 
   public clearSelectionState(): void {
     this.clearNodeSelection();
@@ -324,21 +292,9 @@ export class Shortcuts{
 
   private applyEdgeSelection(selectedEdges: Set<string>): void {
     this.selectedEdgeIds = new Set(selectedEdges);
-
-    const spykerEdges = this.graphServiceSpyker.edges().map((e) => {
-      const data = ((e as any).data as any) || {};
-      const selectedFlag = selectedEdges.has(e.id);
-      return { ...e, data: { ...data, selected: selectedFlag } } as any;
-    });
-    this.graphServiceSpyker.edges.set(spykerEdges);
-
-    const hierEdges = this.graphServiceHierfl.edges().map((e) => {
-      const data = ((e as any).data as any) || {};
-      const selectedFlag = selectedEdges.has(e.id);
-      return { ...e, data: { ...data, selected: selectedFlag } } as any;
-    });
-    this.graphServiceHierfl.edges.set(hierEdges);
+    this.activeService().setSelection(this.selectedNodeIds, this.selectedEdgeIds);
   }
+
 
   public async importGraph(): Promise<void> {
     return new Promise((resolve, reject) => {
