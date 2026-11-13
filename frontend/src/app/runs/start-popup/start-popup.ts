@@ -479,11 +479,21 @@ export class StartPopup implements OnInit {
     return normalized;
   }
 
+  /** Takes over stored values only for known settings of the same type. */
   private mergePersistedSettings<T extends Record<string, unknown>>(
     currentSettings: T,
     persistedSettings: Record<string, unknown>,
   ): T {
-    return { ...currentSettings, ...persistedSettings } as T;
+    const merged: Record<string, unknown> = { ...currentSettings };
+    for (const [key, current] of Object.entries(currentSettings)) {
+      const stored = persistedSettings[key];
+      const sameType = typeof stored === typeof current
+        && (typeof stored !== 'number' || Number.isFinite(stored));
+      if (sameType) {
+        merged[key] = stored;
+      }
+    }
+    return merged as T;
   }
 
   private extractSeedSetText(
