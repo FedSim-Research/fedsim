@@ -131,7 +131,7 @@ export class ClientNode extends CustomNodeComponent {
     });
     const nextConfig = {
       count: this.toNumber(draft.count, Number(current.count ?? 50)),
-      type: String(draft.type ?? '').trim(),
+      type: String(draft.type ?? '').trim().toLowerCase(),
       computeFactor: this.toNumber(draft.computeFactor, Number(current.computeFactor ?? 0.8)),
       performanceSigma: this.toNumber(draft.performanceSigma, Number(current.performanceSigma ?? 0)),
       uploadMbps: this.toNumber(draft.uploadMbps, Number(current.uploadMbps ?? 2)),
