@@ -34,6 +34,16 @@ describe('globalErrorInterceptor', () => {
     expect(add).toHaveBeenCalledWith(expect.objectContaining({ detail: 'Backend not reachable.' }));
   });
 
+  it('lists validation issues instead of [object Object]', async () => {
+    const request = firstValueFrom(http.get('/runs')).catch(() => undefined);
+    backend.expectOne('/runs').flush(
+      { detail: [{ loc: ['body', 'lr'], msg: 'Input should be greater than 0' }] },
+      { status: 422, statusText: 'Unprocessable Entity' },
+    );
+    await request;
+    expect(add).toHaveBeenCalledWith(expect.objectContaining({ detail: 'Input should be greater than 0' }));
+  });
+
   it('stays quiet for requests marked as silent', async () => {
     await failRequest(new HttpContext().set(SILENT_ERRORS, true));
     expect(add).not.toHaveBeenCalled();

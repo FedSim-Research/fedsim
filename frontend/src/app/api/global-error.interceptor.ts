@@ -19,7 +19,7 @@ export const globalErrorInterceptor: HttpInterceptorFn = (req, next) => {
       } else if (error.status >= 500) {
         detail = 'Server error. Please try again.';
       } else if (error.error?.detail) {
-        detail = String(error.error.detail);
+        detail = formatDetail(error.error.detail);
       }
       messageService.add({
         severity: 'error',
@@ -30,3 +30,13 @@ export const globalErrorInterceptor: HttpInterceptorFn = (req, next) => {
     })
   );
 };
+
+/** FastAPI sends plain strings for HTTP errors and a list of issues for validation errors. */
+function formatDetail(detail: unknown): string {
+  if (Array.isArray(detail)) {
+    return detail
+      .map((issue) => (typeof issue?.msg === 'string' ? issue.msg : JSON.stringify(issue)))
+      .join('\n');
+  }
+  return String(detail);
+}
