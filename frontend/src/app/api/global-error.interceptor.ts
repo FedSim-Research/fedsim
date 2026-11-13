@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { HttpContextToken, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
-import { MessageService } from 'primeng/api';
 import { catchError, throwError } from 'rxjs';
+import { ErrorNotifier } from './error-notifier.service';
 
 /** Marks requests whose failures the caller reports itself, e.g. background polling. */
 export const SILENT_ERRORS = new HttpContextToken<boolean>(() => false);
@@ -10,7 +10,7 @@ export const globalErrorInterceptor: HttpInterceptorFn = (req, next) => {
   if (req.context.get(SILENT_ERRORS)) {
     return next(req);
   }
-  const messageService = inject(MessageService);
+  const notifier = inject(ErrorNotifier);
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
       let detail = 'Unexpected error.';
@@ -21,11 +21,7 @@ export const globalErrorInterceptor: HttpInterceptorFn = (req, next) => {
       } else if (error.error?.detail) {
         detail = formatDetail(error.error.detail);
       }
-      messageService.add({
-        severity: 'error',
-        summary: 'Request failed',
-        detail,
-      });
+      notifier.error('Request failed', detail);
       return throwError(() => error);
     })
   );

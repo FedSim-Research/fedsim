@@ -44,6 +44,11 @@ describe('globalErrorInterceptor', () => {
     expect(add).toHaveBeenCalledWith(expect.objectContaining({ detail: 'Input should be greater than 0' }));
   });
 
+  it('collapses identical errors raised at the same time', async () => {
+    await Promise.all([failRequest(), failRequest()]);
+    expect(add).toHaveBeenCalledTimes(1);
+  });
+
   it('stays quiet for requests marked as silent', async () => {
     await failRequest(new HttpContext().set(SILENT_ERRORS, true));
     expect(add).not.toHaveBeenCalled();
