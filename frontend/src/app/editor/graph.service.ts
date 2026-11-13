@@ -4,7 +4,8 @@ import { GraphHistoryService, State } from './graph-history.service';
 import { GraphApiService } from '../api/graph-api.service';
 import { EdgeMetrics, EDGE_METRIC_DEFAULTS, normalizeEdgeMetrics } from '../api/edge-metrics';
 import { toVflowGraph } from './graph-serialization';
-import { Architecture } from '../domain/topology';
+import { Architecture, NodeKind } from '../domain/topology';
+import { nodeLimitViolation } from '../domain/node-limits';
 
 /** Edits within this window are written to the backend as one request. */
 const SAVE_DEBOUNCE_MS = 300;
@@ -28,7 +29,7 @@ export abstract class GraphService<T extends GraphHistoryService> {
   private saveQueue: Promise<void> = Promise.resolve();
   private hasUnsavedChanges = false;
 
-  protected constructor(protected graphHistory: T, private architecture: Architecture){}
+  protected constructor(protected graphHistory: T, public readonly architecture: Architecture) {}
 
   public getGraphId(): number | null {
     return this.graphId;
@@ -85,21 +86,30 @@ export abstract class GraphService<T extends GraphHistoryService> {
     return true;
   }
 
-  public addNode(newNode: Node): void {
-    this.addEntities([newNode], []);
+  /** Adds a node. Returns why it was rejected, or null when it was added. */
+  public addNode(newNode: Node): string | null {
+    return this.addEntities([newNode], []);
   }
 
   public addEdge(newEdge: Edge): void {
     this.addEntities([], [newEdge]);
   }
 
-  /** Adds nodes and edges as one undoable step. */
-  public addEntities(newNodes: Node[], newEdges: Edge[]): void {
+  /**
+   * Adds nodes and edges as one undoable step.
+   * Returns why nothing was added (e.g. a node limit), or null on success.
+   */
+  public addEntities(newNodes: Node[], newEdges: Edge[]): string | null {
+    const violation = nodeLimitViolation(this.architecture, kindsOf(this.nodes()), kindsOf(newNodes));
+    if (violation) {
+      return violation;
+    }
     const normalizedEdges = newEdges.map((edge) => this.normalizeEdge(edge));
     this.nodes.update((nodes) => [...nodes, ...newNodes]);
     this.edges.update((edges) => [...edges, ...normalizedEdges]);
     this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
     this.scheduleSave();
+    return null;
   }
 
   public removeNodeById(nodeId: string): void {
@@ -284,4 +294,8 @@ export abstract class GraphService<T extends GraphHistoryService> {
   private storageKey(): string {
     return `fedsim.graphId.${this.architecture}`;
   }
+}
+
+function kindsOf(nodes: Node[]): NodeKind[] {
+  return nodes.map((node) => (node as NodeWithData).data?.['type'] as NodeKind);
 }

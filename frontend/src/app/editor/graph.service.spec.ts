@@ -3,24 +3,25 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { StaticNode } from 'ngx-vflow';
 import { ClientNode } from './nodes/client-node/client-node';
-import { ServerNode } from './nodes/server-node/server-node';
 import { SuperServerNode } from './nodes/super-server-node/super-server-node';
+import { createGraphNode } from './nodes/node-factory';
+import { NodeKind } from '../domain/topology';
 import { HierflGraphService } from './topologies/hierfl-graph.service';
 import { GraphApiService } from '../api/graph-api.service';
 
 describe('GraphService', () => {
   let service: HierflGraphService;
 
-  function node(id: string, type: StaticNode['type']): StaticNode {
-    return { id, point: { x: 0, y: 0 }, type, data: { config: {} } } as StaticNode;
+  function node(id: string, kind: NodeKind): StaticNode {
+    return createGraphNode({ id, kind, architecture: 'hierfl', point: { x: 0, y: 0 }, config: {} });
   }
 
   beforeEach(() => {
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     service = TestBed.inject(HierflGraphService);
-    service.addNode(node('server', ServerNode));
-    service.addNode(node('client-a', ClientNode));
-    service.addNode(node('client-b', ClientNode));
+    service.addNode(node('server', 'ServerNode'));
+    service.addNode(node('client-a', 'ClientNode'));
+    service.addNode(node('client-b', 'ClientNode'));
     service.addEdge({ id: 'e1', source: 'server', target: 'client-a' });
     service.addEdge({ id: 'e2', source: 'server', target: 'client-b' });
   });
@@ -39,12 +40,12 @@ describe('GraphService', () => {
   });
 
   it('allows a new super server once the previous one was removed', () => {
-    service.addNode(node('super-1', SuperServerNode));
-    service.addNode(node('super-2', SuperServerNode));
+    service.addNode(node('super-1', 'SuperServerNode'));
+    expect(service.addNode(node('super-2', 'SuperServerNode'))).toContain('Only one Super Server');
     expect(service.nodes().filter((n) => n.type === SuperServerNode)).toHaveLength(1);
 
     service.removeNodeById('super-1');
-    service.addNode(node('super-2', SuperServerNode));
+    service.addNode(node('super-2', 'SuperServerNode'));
     expect(service.nodes().map((n) => n.id)).toContain('super-2');
   });
 });

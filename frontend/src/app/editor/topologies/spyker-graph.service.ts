@@ -14,9 +14,9 @@ export class SpykerGraphService extends GraphService<SpykerGraphHistoryService> 
   }
 
   /** Spyker servers form a full mesh, so a new server is linked to every existing one. */
-  public override addNode(newNode: Node): void {
+  public override addNode(newNode: Node): string | null {
     const meshEdges = newNode.type === ServerNode ? this.meshEdgesFor(newNode.id) : [];
-    this.addEntities([newNode], meshEdges);
+    return this.addEntities([newNode], meshEdges);
   }
 
   private meshEdgesFor(serverId: string): Edge[] {
