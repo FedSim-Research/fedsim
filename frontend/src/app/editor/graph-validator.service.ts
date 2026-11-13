@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
 import { Architecture } from '../domain/topology';
+import { canLink } from '../domain/link-rules';
 
 type FlowNodeData = { type?: string; config?: Record<string, unknown> };
 type FlowEdgeMetrics = {
@@ -177,7 +178,7 @@ export class GraphValidatorService {
         errors.push(`${architecture}: edge references missing node`);
         continue;
       }
-      if (!this.isValidEdgePair(architecture, sourceType, targetType)) {
+      if (!canLink(architecture, sourceType, targetType)) {
         errors.push(`${architecture}: invalid edge ${sourceType} -> ${targetType}`);
       }
       if (!adjacency.has(edge.source)) adjacency.set(edge.source, new Set<string>());
@@ -280,22 +281,5 @@ export class GraphValidatorService {
     const data = ((edge as unknown as { data?: Record<string, unknown> }).data ?? {});
     const metrics = data['metrics'] as FlowEdgeMetrics | undefined;
     return metrics ?? (data as FlowEdgeMetrics);
-  }
-
-  private isValidEdgePair(architecture: Architecture, sourceType: string, targetType: string): boolean {
-    const pair = `${sourceType}->${targetType}`;
-    if (architecture === 'hierfl') {
-      return (
-        pair === 'SuperServerNode->ServerNode' ||
-        pair === 'ServerNode->SuperServerNode' ||
-        pair === 'ServerNode->ClientNode' ||
-        pair === 'ClientNode->ServerNode'
-      );
-    }
-    return (
-      pair === 'ServerNode->ServerNode' ||
-      pair === 'ServerNode->ClientNode' ||
-      pair === 'ClientNode->ServerNode'
-    );
   }
 }
