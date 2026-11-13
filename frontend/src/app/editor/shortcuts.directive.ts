@@ -7,7 +7,6 @@ import { ServerNode } from './nodes/server-node/server-node';
 import { SuperServerNode } from './nodes/super-server-node/super-server-node';
 import { MessageService } from 'primeng/api';
 import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'selecto';
-import { GraphPersistenceService } from './graph-persistence.service';
 import { v4 as uuidv4 } from 'uuid';
 import { GraphFileError, parseGraphFile } from './graph-file';
 
@@ -20,7 +19,6 @@ import { GraphFileError, parseGraphFile } from './graph-file';
 export class Shortcuts{
   protected graphServiceSpyker = inject(SpykerGraphService);
   protected graphServiceHierfl = inject(HierflGraphService);
-  protected graphPersistence = inject(GraphPersistenceService);
   protected messageService = inject(MessageService);
   protected elRef = inject(ElementRef) as ElementRef<HTMLElement>;
   public activeService = input.required<SpykerGraphService | HierflGraphService>();
@@ -60,12 +58,12 @@ export class Shortcuts{
       const key = event.key.toLowerCase();
       if (key === 'z') {
         event.preventDefault();
-        void this.applyHistoryAction('undo');
+        this.applyHistoryAction('undo');
         return;
       }
       if (key === 'y') {
         event.preventDefault();
-        void this.applyHistoryAction('redo');
+        this.applyHistoryAction('redo');
         return;
       }
       if (key === 'c') {
@@ -343,30 +341,11 @@ export class Shortcuts{
     };
   }
 
-  private async applyHistoryAction(action: 'undo' | 'redo'): Promise<void> {
+  private applyHistoryAction(action: 'undo' | 'redo'): void {
     const service = this.activeService();
-    if (!service) return;
-    const history = service.getGraphHistory();
-    const before = history.getState();
-    if (action === 'undo') {
-      history.undo();
-    } else {
-      history.redo();
-    }
-    const snapshot = history.getState();
-    if (before === snapshot) return;
-    service.applyHistoryState(snapshot);
-    this.clearSelectionState();
-    const architecture = service instanceof HierflGraphService ? 'hierfl' : 'spyker';
-    try {
-      await this.graphPersistence.syncGraphState(service, architecture, false);
-    } catch (error) {
-      this.messageService.add({
-        severity: 'error',
-        summary: 'Sync failed',
-        detail: 'Undo/redo could not be saved to the backend.',
-      });
-      console.warn('Undo/redo sync failed', error);
+    const changed = action === 'undo' ? service.undo() : service.redo();
+    if (changed) {
+      this.clearSelectionState();
     }
   }
 

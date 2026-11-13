@@ -93,3 +93,23 @@ describe('GraphService saving', () => {
     expect(replaceGraphState.mock.calls[1][1].nodes[0].data.config).toEqual({ count: 2 });
   });
 });
+
+describe('GraphService undo', () => {
+  it('saves the restored state through the regular save queue', async () => {
+    vi.useFakeTimers();
+    const replaceGraphState = vi.fn().mockResolvedValue({});
+    TestBed.configureTestingModule({ providers: [{ provide: GraphApiService, useValue: { replaceGraphState } }] });
+    const service = TestBed.inject(HierflGraphService);
+    service.setGraphId(5);
+    service.addNode({ id: 'a', point: { x: 0, y: 0 }, type: ClientNode, data: { type: 'ClientNode', config: {} } } as StaticNode);
+    await vi.runAllTimersAsync();
+
+    expect(service.undo()).toBe(true);
+    expect(service.undo()).toBe(false);
+    await vi.runAllTimersAsync();
+
+    expect(replaceGraphState).toHaveBeenCalledTimes(2);
+    expect(replaceGraphState.mock.calls[1][1].nodes).toEqual([]);
+    vi.useRealTimers();
+  });
+});

@@ -191,33 +191,15 @@ export class App implements OnInit{
     this.sidebarOpen.set(isOpen);
   }
 
-  public async undo(){
-    const history = this.activeGraph().getGraphHistory();
-    const before = history.getState();
-    history.undo();
-    const after = history.getState();
-    if (before === after) return;
-    this.activeGraph().applyHistoryState(after);
-    this.shortcuts?.clearSelectionState();
-    try {
-      await this.graphPersistence.syncGraphState(this.activeGraph(), this.activeMode(), false);
-    } catch {
-      this.showErrorToast('Undo could not be saved to the backend.');
+  public undo(): void {
+    if (this.activeGraph().undo()) {
+      this.shortcuts?.clearSelectionState();
     }
   }
 
-  public async redo(){
-    const history = this.activeGraph().getGraphHistory();
-    const before = history.getState();
-    history.redo();
-    const after = history.getState();
-    if (before === after) return;
-    this.activeGraph().applyHistoryState(after);
-    this.shortcuts?.clearSelectionState();
-    try {
-      await this.graphPersistence.syncGraphState(this.activeGraph(), this.activeMode(), false);
-    } catch {
-      this.showErrorToast('Redo could not be saved to the backend.');
+  public redo(): void {
+    if (this.activeGraph().redo()) {
+      this.shortcuts?.clearSelectionState();
     }
   }
 

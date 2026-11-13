@@ -63,6 +63,28 @@ export abstract class GraphService<T extends GraphHistoryService> {
     this.applyState(state.nodes, state.edges);
   }
 
+  /** Steps back in history. Returns false when there was nothing to undo. */
+  public undo(): boolean {
+    return this.moveInHistory(() => this.graphHistory.undo());
+  }
+
+  /** Re-applies an undone step. Returns false when there was nothing to redo. */
+  public redo(): boolean {
+    return this.moveInHistory(() => this.graphHistory.redo());
+  }
+
+  private moveInHistory(step: () => void): boolean {
+    const before = this.graphHistory.getState();
+    step();
+    const after = this.graphHistory.getState();
+    if (after === before) {
+      return false;
+    }
+    this.applyState(after.nodes, after.edges);
+    this.scheduleSave();
+    return true;
+  }
+
   public addNode(newNode: Node): void {
     this.addEntities([newNode], []);
   }
