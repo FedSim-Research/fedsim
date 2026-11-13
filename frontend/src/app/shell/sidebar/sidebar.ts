@@ -1,4 +1,4 @@
-import { Component, HostListener, Output, inject, EventEmitter, ViewChild, ElementRef, Input, OnChanges, OnInit, OnDestroy, SimpleChanges } from '@angular/core';
+import { Component, HostListener, Output, inject, EventEmitter, ViewChild, ElementRef, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StartPopup } from '../../runs/start-popup/start-popup';
@@ -11,6 +11,8 @@ import { MessageService } from 'primeng/api';
 import { Shortcuts } from '../../editor/shortcuts.directive';
 import { GraphApiService } from '../../api/graph-api.service';
 import { PresetLibrary } from './preset-library';
+import { NodeEvents, NodeForward } from '../../editor/nodes/node-events.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SimulationRequest } from '../../runs/simulation-request';
 import { Architecture, NodeKind } from '../../domain/topology';
 
@@ -97,7 +99,7 @@ const DEFAULT_CLIENT_CONFIG: ClientConfig = {
   styleUrls: ['./sidebar.css'],
   imports: [FormsModule, CommonModule, StartPopup, ResetButton, ViewGraphsDialog, HelpDialog, SidebarDashboardPanelComponent, ToastModule],
 })
-export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
+export class SidebarComponent implements OnInit, OnChanges {
   public isOpen = true;
   public isDarkMode = true;
   public showSimulationpopup = false;
@@ -158,27 +160,26 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
     }),
   };
 
-  private readonly nodeForwardListener = (event: Event): void => {
-    const customEvent = event as CustomEvent<{ kind: 'superserver' | 'server' | 'client'; config: Record<string, unknown> }>;
-    const detail = customEvent.detail;
-    if (!detail) {
-      return;
-    }
+  constructor() {
+    inject(NodeEvents)
+      .forwarded$.pipe(takeUntilDestroyed())
+      .subscribe((forward) => this.takeOverNodeSettings(forward));
+  }
 
-    if (detail.kind === 'superserver') {
-      this.configDraft.superserver = this.toSuperServerConfig(detail.config);
-    } else if (detail.kind === 'server') {
-      this.configDraft.server = this.toServerConfig(detail.config);
-    } else if (detail.kind === 'client') {
-      this.configDraft.client = this.toClientConfig(detail.config);
+  private takeOverNodeSettings({ kind, config }: NodeForward): void {
+    if (kind === 'superserver') {
+      this.configDraft.superserver = this.toSuperServerConfig(config);
+    } else if (kind === 'server') {
+      this.configDraft.server = this.toServerConfig(config);
+    } else {
+      this.configDraft.client = this.toClientConfig(config);
     }
-
     this.openSidebar();
-  };
+  }
+
 
   public async ngOnInit(): Promise<void> {
     this.sidebarOpenChange.emit(this.isOpen);
-    window.addEventListener('node-forward', this.nodeForwardListener as EventListener);
     await this.ensureGraphForMode(this.currentArchitecture());
     await this.loadPresetsForCurrentArchitecture();
   }
@@ -197,10 +198,6 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
 
   public get isSpyker(): boolean {
     return this.activeMode === 'spyker';
-  }
-
-  public ngOnDestroy(): void {
-    window.removeEventListener('node-forward', this.nodeForwardListener as EventListener);
   }
 
   private showErrorToast(message: string) {

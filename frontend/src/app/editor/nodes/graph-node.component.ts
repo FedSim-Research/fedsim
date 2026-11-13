@@ -5,11 +5,10 @@ import { Architecture } from '../../domain/topology';
 import { GraphWorkspace } from '../graph-workspace.service';
 import { NodeDeleteUiService } from '../node-delete-ui.service';
 import { NodeEditUiService } from '../node-edit-ui.service';
+import { ForwardKind, NodeEvents } from './node-events.service';
 
 /** Flat, editable node settings; their defaults also define the edit form. */
 export type NodeSettings = Record<string, string | number>;
-
-export type ForwardKind = 'client' | 'server' | 'superserver';
 
 interface NodeData {
   config?: Record<string, unknown>;
@@ -29,6 +28,7 @@ export abstract class GraphNodeComponent<S extends NodeSettings> extends CustomN
   private readonly deleteUi = inject(NodeDeleteUiService);
   private readonly editUi = inject(NodeEditUiService);
   private readonly messages = inject(MessageService);
+  private readonly events = inject(NodeEvents);
 
   public readonly isEditing = computed(() => this.editUi.activeId() === this.node().id);
   public readonly showDelete = computed(() => this.deleteUi.activeId() === this.node().id || this.isEditing());
@@ -44,7 +44,7 @@ export abstract class GraphNodeComponent<S extends NodeSettings> extends CustomN
     event.stopPropagation();
     if (this.isEditing()) return;
     if (event.ctrlKey || event.metaKey) {
-      window.dispatchEvent(new CustomEvent('node-ctrl-click', { detail: { id: this.node().id } }));
+      this.events.toggleSelection(this.node().id);
       return;
     }
     this.deleteUi.showFor(this.node().id);
@@ -57,9 +57,7 @@ export abstract class GraphNodeComponent<S extends NodeSettings> extends CustomN
 
   public onForwardNode(event: MouseEvent): void {
     event.stopPropagation();
-    window.dispatchEvent(new CustomEvent('node-forward', {
-      detail: { kind: this.forwardKind, config: this.settings() },
-    }));
+    this.events.forward({ kind: this.forwardKind, config: this.settings() });
   }
 
   public onStartEdit(event: MouseEvent): void {

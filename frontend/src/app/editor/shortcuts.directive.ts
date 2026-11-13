@@ -6,6 +6,8 @@ import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'sel
 import { v4 as uuidv4 } from 'uuid';
 import { GRAPH_FILE_LIMITS, GraphFileError, parseGraphFile } from './graph-file';
 import { createGraphNode } from './nodes/node-factory';
+import { NodeEvents } from './nodes/node-events.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NodeKind } from '../domain/topology';
 import { nodeLimitViolation } from '../domain/node-limits';
 
@@ -36,6 +38,9 @@ export class Shortcuts{
   private lastSelectElements: Array<HTMLElement | SVGElement> = [];
 
   constructor() {
+    inject(NodeEvents)
+      .selectionToggled$.pipe(takeUntilDestroyed())
+      .subscribe((id) => this.toggleNodeSelection(id));
     // A selection only makes sense inside the graph it was made in.
     let previous: ArchitectureGraph | null = null;
     effect(() => {
@@ -160,16 +165,13 @@ export class Shortcuts{
     this.resetBoxSelectionState();
   }
 
-  @HostListener('window:node-ctrl-click', ['$event'])
-  public onNodeCtrlClick(event: Event): void {
-    const custom = event as CustomEvent<any>;
-    const id = custom?.detail?.id as string | undefined;
-    if (!id) return;
+  private toggleNodeSelection(id: string): void {
     const selected = new Set(this.selectedNodeIds);
     if (selected.has(id)) selected.delete(id);
     else selected.add(id);
     this.applySelection(selected);
   }
+
 
   private applySelection(selected: Set<string>): void {
     this.selectedNodeIds = new Set(selected);
