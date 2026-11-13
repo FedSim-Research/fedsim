@@ -1,4 +1,4 @@
-import { Component, HostListener, Inject, Output, EventEmitter, ViewChild, ElementRef, Input, OnInit, OnDestroy } from '@angular/core';
+import { Component, HostListener, Inject, Output, EventEmitter, ViewChild, ElementRef, Input, OnChanges, OnInit, OnDestroy, SimpleChanges } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StartPopup } from '../../runs/start-popup/start-popup';
@@ -89,7 +89,7 @@ const DEFAULT_CLIENT_CONFIG: ClientConfig = {
   styleUrls: ['./sidebar.css'],
   imports: [FormsModule, CommonModule, StartPopup, ResetButton, ViewGraphsDialog, HelpDialog, SidebarDashboardPanelComponent, ToastModule],
 })
-export class SidebarComponent implements OnInit, OnDestroy {
+export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
   public isOpen = true;
   public isDarkMode = true;
   public showSimulationpopup = false;
@@ -109,6 +109,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
   @Input() hierflGraphId: number | null = null;
   @Input() spykerGraphId: number | null = null;
   @Input() activeView: WorkspaceView = 'editor';
+  /** Owned by the app shell; the sidebar only requests changes via `modeChange`. */
+  @Input() activeMode: 'spyker' | 'hierfl' = 'hierfl';
   @Output() resetGraph = new EventEmitter<void>();
   @Output() modeChange = new EventEmitter<'spyker' | 'hierfl'>();
   @Output() viewChange = new EventEmitter<WorkspaceView>();
@@ -135,11 +137,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
     };
   }>();
 
-  public selectedArchitectures = {
-    spyker: false,
-    hierfl: true,
-  };
-  public architectureMode: 'spyker' | 'hierfl' = 'hierfl';
   public architectureMenuOpen = false;
 
   public configDraft: {
@@ -200,11 +197,26 @@ export class SidebarComponent implements OnInit, OnDestroy {
   ) {}
 
   public async ngOnInit(): Promise<void> {
-    this.architectureMode = this.currentArchitecture();
     this.sidebarOpenChange.emit(this.isOpen);
     window.addEventListener('node-forward', this.nodeForwardListener as EventListener);
     await this.ensureGraphForMode(this.currentArchitecture());
     await this.loadPresetsForCurrentArchitecture();
+  }
+
+  public async ngOnChanges(changes: SimpleChanges): Promise<void> {
+    const modeChange = changes['activeMode'];
+    if (!modeChange || modeChange.firstChange) {
+      return;
+    }
+    if (this.isSpyker) {
+      this.closeSuperServerDisclosure();
+    }
+    await this.ensureGraphForMode(this.activeMode);
+    await this.loadPresetsForCurrentArchitecture();
+  }
+
+  public get isSpyker(): boolean {
+    return this.activeMode === 'spyker';
   }
 
   public ngOnDestroy(): void {
@@ -251,39 +263,11 @@ export class SidebarComponent implements OnInit, OnDestroy {
     this.undoRequested.emit();
   }
 
-  public async toggleArchitecture(): Promise<void> {
-    this.selectedArchitectures.spyker = !this.selectedArchitectures.spyker;
-    this.selectedArchitectures.hierfl = !this.selectedArchitectures.spyker;
-    this.architectureMode = this.currentArchitecture();
-    this.modeChange.emit(this.selectedArchitectures.spyker ? 'spyker' : 'hierfl');
-    if (this.selectedArchitectures.spyker) {
-      this.closeSuperServerDisclosure();
-    }
-    await this.ensureGraphForMode(this.currentArchitecture());
-    await this.loadPresetsForCurrentArchitecture();
-  }
-
-  public async setArchitecture(isSpyker: boolean): Promise<void> {
-    this.selectedArchitectures.spyker = isSpyker;
-    this.selectedArchitectures.hierfl = !isSpyker;
-    this.architectureMode = this.currentArchitecture();
-    this.modeChange.emit(isSpyker ? 'spyker' : 'hierfl');
-    if (isSpyker) {
-      this.closeSuperServerDisclosure();
-    }
-    await this.ensureGraphForMode(this.currentArchitecture());
-    await this.loadPresetsForCurrentArchitecture();
-  }
-
   public setView(view: WorkspaceView): void {
     if (this.activeView === view) {
       return;
     }
     this.viewChange.emit(view);
-  }
-
-  public async onArchitectureModeChange(mode: 'spyker' | 'hierfl'): Promise<void> {
-    await this.setArchitecture(mode === 'spyker');
   }
 
   public toggleArchitectureMenu(event?: Event): void {
@@ -296,17 +280,15 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
 
   public architectureLabel(): string {
-    return this.architectureMode === 'spyker' ? 'Spyker' : 'Hierarchical';
+    return this.isSpyker ? 'Spyker' : 'Hierarchical';
   }
 
-  public async selectArchitectureMode(mode: 'spyker' | 'hierfl', event?: Event): Promise<void> {
+  public selectArchitectureMode(mode: 'spyker' | 'hierfl', event?: Event): void {
     event?.stopPropagation();
     this.architectureMenuOpen = false;
-    if (mode === this.architectureMode) {
-      return;
+    if (mode !== this.activeMode) {
+      this.modeChange.emit(mode);
     }
-    this.architectureMode = mode;
-    await this.onArchitectureModeChange(mode);
   }
 
   @HostListener('document:click', ['$event'])
@@ -330,7 +312,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
 
   private currentArchitecture(): 'spyker' | 'hierfl' {
-    return this.selectedArchitectures.spyker ? 'spyker' : 'hierfl';
+    return this.activeMode;
   }
 
   private toSuperServerConfig(config: Record<string, unknown>): SuperServerConfig {
@@ -405,7 +387,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   public onDragStart(event: DragEvent, kind: 'SuperServerNode' | 'ServerNode' | 'ClientNode'): void {
     if (kind === 'SuperServerNode') {
-      if (this.selectedArchitectures.spyker) {
+      if (this.isSpyker) {
         event.preventDefault();
         event.stopPropagation();
         this.showErrorToast('No super server is allowed to exist in the Spyker Environment');
@@ -964,7 +946,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
       this.showErrorToast('Preset not found.');
       return;
     }
-    if (this.selectedArchitectures.spyker) {
+    if (this.isSpyker) {
       this.showErrorToast('No super server is allowed to exist in the Spyker Environment');
       return;
     }
@@ -1003,7 +985,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
     this.showSuccessToast(`"${item.name}" is now selected. Drag a Client node to place it.`);
   }
   public onSuperServerSummaryClick(event: Event): void {
-    if (this.selectedArchitectures.spyker) {
+    if (this.isSpyker) {
       event.preventDefault();
       this.closeSuperServerDisclosure();
       this.showErrorToast('No super server is allowed to exist in the Spyker Environment');

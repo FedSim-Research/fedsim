@@ -94,14 +94,14 @@
                 <button
                   type="button"
                   class="architecture-select__option"
-                  [class.architecture-select__option--active]="architectureMode === 'hierfl'"
+                  [class.architecture-select__option--active]="activeMode === 'hierfl'"
                   (click)="selectArchitectureMode('hierfl', $event)">
                   Hierarchical
                 </button>
                 <button
                   type="button"
                   class="architecture-select__option"
-                  [class.architecture-select__option--active]="architectureMode === 'spyker'"
+                  [class.architecture-select__option--active]="activeMode === 'spyker'"
                   (click)="selectArchitectureMode('spyker', $event)">
                   Spyker
                 </button>
@@ -117,8 +117,8 @@
         <div class="rightpane__subtitle">Node Library</div>
       </div>
 
-      <div class="tooltip-wrapper" [title]="selectedArchitectures.spyker ? 'Not available in Spyker' : ''">
-        <details #supDetails class="disclosure" [class.disclosure--disabled]="selectedArchitectures.spyker">
+      <div class="tooltip-wrapper" [title]="isSpyker ? 'Not available in Spyker' : ''">
+        <details #supDetails class="disclosure" [class.disclosure--disabled]="isSpyker">
           <summary class="disclosure__summary" (click)="onSuperServerSummaryClick($event)">
             <span>Super Server</span>
           </summary>
@@ -288,8 +288,8 @@
 <app-view-graphs-dialog
   [isDarkMode]="isDarkMode"
   [shortcuts]="shortcuts"
-  [activeMode]="selectedArchitectures.spyker ? 'spyker' : 'hierfl'"
-  (modeRequested)="setArchitecture($event === 'spyker')"
+  [activeMode]="activeMode"
+  (modeRequested)="selectArchitectureMode($event)"
   (graphSelected)="onGraphSelected($event)"
   (close)="closeViewGraphsDialog()"></app-view-graphs-dialog>
 }
