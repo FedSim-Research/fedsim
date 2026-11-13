@@ -20,6 +20,7 @@ import { FrameworkJobsService } from './runs/framework-jobs.service';
 import { DashboardViewComponent } from './runs/dashboard-view/dashboard-view';
 import { v4 as uuidv4 } from 'uuid';
 import { Architecture } from './domain/topology';
+import { canLink } from './domain/link-rules';
 
 export type workspaceView = 'editor' | 'dashboard';
 
@@ -360,22 +361,7 @@ export class App implements OnInit{
     const isHier = this.activeMode() === 'hierfl';
     const isSpyker = !isHier;
 
-    const pair = `${sourceType}->${targetType}`;
-    const validPairs = isHier
-      ? new Set([
-          'SuperServerNode->ServerNode',
-          'ServerNode->SuperServerNode',
-          'ServerNode->ClientNode',
-          'ClientNode->ServerNode',
-        ])
-      : new Set([
-          'ServerNode->ServerNode',
-          'ServerNode->ClientNode',
-          'ClientNode->ServerNode',
-        ]);
-    const valid = validPairs.has(pair);
-
-    if (!valid) return false;
+    if (!canLink(this.activeMode(), sourceType, targetType)) return false;
 
 
     if (isSpyker && sourceType === 'ServerNode' && targetType === 'ServerNode') {
