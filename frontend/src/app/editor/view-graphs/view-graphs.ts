@@ -9,6 +9,8 @@ import { ListboxModule } from 'primeng/listbox';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { MessageService } from 'primeng/api';
 import { Shortcuts } from '../shortcuts.directive';
+import { graphFileFromDetail, graphFileName } from '../graph-file';
+import { downloadJson } from '../../shared/download';
 
 @Component({
   selector: 'app-view-graphs-dialog',
@@ -96,14 +98,17 @@ export class ViewGraphsDialog implements OnInit, OnChanges {
     this.close.emit();
   }
 
-  public onExport(): void {
-    if (this.shortcuts) {
-      const graph = this.selectedGraph;
-      this.shortcuts.exportGraph({
-        graphId: graph?.graph_id ?? null,
-        graphName: graph?.name ?? null,
-        architecture: graph?.architecture,
-      });
+  public async onExport(): Promise<void> {
+    const graph = this.selectedGraph;
+    if (!graph) {
+      this.messageService.add({ severity: 'warn', summary: 'Warning', detail: 'Please select a graph to export' });
+      return;
+    }
+    try {
+      const detail = await this.graphApiService.getGraph(graph.graph_id);
+      downloadJson(graphFileFromDetail(detail), graphFileName(graph.graph_id, graph.name, graph.architecture));
+    } catch {
+      this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to export graph' });
     }
   }
 

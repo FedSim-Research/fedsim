@@ -9,7 +9,7 @@ import { MessageService } from 'primeng/api';
 import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'selecto';
 import { GraphPersistenceService } from './graph-persistence.service';
 import { v4 as uuidv4 } from 'uuid';
-import { GraphFileError, parseGraphFile, toGraphFile } from './graph-file';
+import { GraphFileError, parseGraphFile } from './graph-file';
 
 
 @Directive({
@@ -399,32 +399,6 @@ export class Shortcuts{
       return { ...e, data: { ...data, selected: selectedFlag } } as any;
     });
     this.graphServiceHierfl.edges.set(hierEdges);
-  }
-
-  public exportGraph(options?: {
-    graphId?: number | null;
-    graphName?: string | null;
-    architecture?: 'spyker' | 'hierfl';
-  }) {
-    const activeArchitecture = this.activeService() instanceof HierflGraphService ? 'hierfl' : 'spyker';
-    const architecture = options?.architecture ?? activeArchitecture;
-    const data = toGraphFile(activeArchitecture, this.activeService().nodes(), this.activeService().edges());
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const storedId = this.activeService().loadGraphIdFromStorage();
-    const graphId = options?.graphId ?? storedId ?? 'graph';
-    const rawName = options?.graphName ?? 'graph';
-    const safeName = rawName
-      .toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-_]+/g, '')
-      .slice(0, 48) || 'graph';
-    const filename = `${graphId}_${safeName}_${architecture}.json`;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
   }
 
   public async importGraph(): Promise<void> {
