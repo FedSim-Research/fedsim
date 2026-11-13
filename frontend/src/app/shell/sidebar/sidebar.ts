@@ -6,7 +6,6 @@ import { ResetButton } from '../../editor/reset-button/reset-button';
 import { ViewGraphsDialog } from '../../editor/view-graphs/view-graphs';
 import { HelpDialog } from '../help-dialog/help-dialog';
 import { SidebarDashboardPanelComponent } from '../../runs/sidebar-dashboard-panel/sidebar-dashboard-panel';
-import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { Shortcuts } from '../../editor/shortcuts.directive';
 import { GraphApiService } from '../../api/graph-api.service';
@@ -97,7 +96,7 @@ const DEFAULT_CLIENT_CONFIG: ClientConfig = {
   standalone: true,
   templateUrl: './sidebar.html',
   styleUrls: ['./sidebar.css'],
-  imports: [FormsModule, CommonModule, StartPopup, ResetButton, ViewGraphsDialog, HelpDialog, SidebarDashboardPanelComponent, ToastModule],
+  imports: [FormsModule, CommonModule, StartPopup, ResetButton, ViewGraphsDialog, HelpDialog, SidebarDashboardPanelComponent],
 })
 export class SidebarComponent implements OnInit, OnChanges {
   public isOpen = true;

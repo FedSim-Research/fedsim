@@ -9,6 +9,7 @@ import { EdgeMetricsBoxComponent } from './editor/edges/edge-metrics-box/edge-me
 import { GraphWorkspace } from './editor/graph-workspace.service';
 import { GraphPersistenceService } from './editor/graph-persistence.service';
 import { MessageService } from 'primeng/api';
+import { ToastModule } from 'primeng/toast';
 import { FrameworkJobsPopupComponent } from './runs/framework-jobs-popup/framework-jobs-popup';
 import { DashboardViewComponent } from './runs/dashboard-view/dashboard-view';
 import { SimulationRunner } from './runs/simulation-runner.service';
@@ -36,6 +37,7 @@ export type workspaceView = 'editor' | 'dashboard';
     EdgeMetricsBoxComponent,
     FrameworkJobsPopupComponent,
     DashboardViewComponent,
+    ToastModule,
   ],
 })
 export class App implements OnInit{
