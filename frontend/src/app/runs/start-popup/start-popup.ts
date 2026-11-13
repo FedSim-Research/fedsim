@@ -5,8 +5,9 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { StepperModule } from 'primeng/stepper';
 import { GraphApiService } from '../../api/graph-api.service';
+import { Architecture } from '../../domain/topology';
 
-type StartMode = 'spyker' | 'hierfl' | 'both';
+type StartMode = Architecture | 'both';
 
 type CommonTrainingConfig = {
   epochs: number;
@@ -114,7 +115,7 @@ export class StartPopup implements OnInit {
 
   private lastPersistedSignature: string | null = null;
   private api = inject(GraphApiService);
-  private backendSyncTimers: Partial<Record<'hierfl' | 'spyker', ReturnType<typeof setTimeout>>> = {};
+  private backendSyncTimers: Partial<Record<Architecture, ReturnType<typeof setTimeout>>> = {};
 
   public onClose(): void {
     this.close.emit();
@@ -251,7 +252,7 @@ export class StartPopup implements OnInit {
     this.persistSettingsIfChanged();
   }
 
-  public updateSeedSet(architecture: 'hierfl' | 'spyker', value: string): void {
+  public updateSeedSet(architecture: Architecture, value: string): void {
     const target = architecture === 'hierfl' ? this.hierflSettings : this.spykerSettings;
     target.seedSetText = value;
     target.repetitions = this.countSeeds(value);
@@ -324,7 +325,7 @@ export class StartPopup implements OnInit {
   }
 
   private persistArchitectureParams(
-    architecture: 'hierfl' | 'spyker',
+    architecture: Architecture,
     graphId: number | null,
     settings: Record<string, unknown>,
     evaluateAfterRun: boolean,
@@ -345,7 +346,7 @@ export class StartPopup implements OnInit {
   }
 
   private readSavedParams(
-    architecture: 'hierfl' | 'spyker',
+    architecture: Architecture,
     graphId: number | null
   ): PersistedStartParams | null {
     if (graphId === null || !Number.isFinite(graphId)) {
@@ -366,12 +367,12 @@ export class StartPopup implements OnInit {
     return null;
   }
 
-  private storageKey(architecture: 'hierfl' | 'spyker', graphId: number): string {
+  private storageKey(architecture: Architecture, graphId: number): string {
     return `fedsim.start-params.${architecture}.${graphId}`;
   }
 
   private scheduleBackendSync(
-    architecture: 'hierfl' | 'spyker',
+    architecture: Architecture,
     graphId: number,
     payload: PersistedStartParams,
   ): void {
@@ -413,7 +414,7 @@ export class StartPopup implements OnInit {
     return candidate as PersistedStartParams;
   }
 
-  private applyPersistedParams(architecture: 'hierfl' | 'spyker', params: PersistedStartParams): void {
+  private applyPersistedParams(architecture: Architecture, params: PersistedStartParams): void {
     const currentSettings = architecture === 'hierfl' ? this.hierflSettings : this.spykerSettings;
     const normalizedSettings = this.normalizeSavedSettings(params.settings, currentSettings.seedSetText);
     const mergedSettings = this.mergePersistedSettings(currentSettings, normalizedSettings);
@@ -431,7 +432,7 @@ export class StartPopup implements OnInit {
   }
 
   private async reconcileWithBackend(
-    architecture: 'hierfl' | 'spyker',
+    architecture: Architecture,
     graphId: number | null,
     localParams: PersistedStartParams | null,
   ): Promise<void> {

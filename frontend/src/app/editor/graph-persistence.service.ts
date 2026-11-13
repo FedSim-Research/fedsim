@@ -15,7 +15,6 @@ const NODE_TYPE_MAP = {
   SuperServerNode: SuperServerNode,
 } as const;
 
-
 @Injectable({ providedIn: 'root' })
 export class GraphPersistenceService {
   private api = inject(GraphApiService);

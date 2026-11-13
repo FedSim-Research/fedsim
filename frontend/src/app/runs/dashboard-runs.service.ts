@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { GraphApiService, SimulationRunResponse } from '../api/graph-api.service';
+import { Architecture } from '../domain/topology';
 
 @Injectable({ providedIn: 'root' })
 export class DashboardRunsService {
@@ -16,7 +17,7 @@ export class DashboardRunsService {
   public selectedRunId = signal<string | null>(null);
   public compareRunIds = signal<string[]>([]);
 
-  public filterArchitecture = signal<'all' | 'spyker' | 'hierfl' | 'both'>('all');
+  public filterArchitecture = signal<'all' | Architecture | 'both'>('all');
   public filterStatus = signal<'all' | 'queued' | 'running' | 'completed' | 'failed'>('all');
   public searchText = signal('');
 

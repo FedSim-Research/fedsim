@@ -10,6 +10,7 @@ import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { Shortcuts } from '../../editor/shortcuts.directive';
 import { GraphApiService, PresetResponse } from '../../api/graph-api.service';
+import { Architecture } from '../../domain/topology';
 
 type SuperServerConfig = {
   name: string;
@@ -110,15 +111,15 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
   @Input() spykerGraphId: number | null = null;
   @Input() activeView: WorkspaceView = 'editor';
   /** Owned by the app shell; the sidebar only requests changes via `modeChange`. */
-  @Input() activeMode: 'spyker' | 'hierfl' = 'hierfl';
+  @Input() activeMode: Architecture = 'hierfl';
   @Output() resetGraph = new EventEmitter<void>();
-  @Output() modeChange = new EventEmitter<'spyker' | 'hierfl'>();
+  @Output() modeChange = new EventEmitter<Architecture>();
   @Output() viewChange = new EventEmitter<WorkspaceView>();
   @Output() sidebarOpenChange = new EventEmitter<boolean>();
-  @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
-  @Output() graphDeleted = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
+  @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: Architecture }>();
+  @Output() graphDeleted = new EventEmitter<{ graphId: number; architecture: Architecture }>();
   @Output() simulationRequested = new EventEmitter<{
-    mode: 'spyker' | 'hierfl' | 'both';
+    mode: Architecture | 'both';
     hierfl: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
       simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; dataset: string; seedSet: number[]; repetitions: number; outputFilename: string; evaluateModel: boolean };
@@ -284,7 +285,7 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
     return this.isSpyker ? 'Spyker' : 'Hierarchical';
   }
 
-  public selectArchitectureMode(mode: 'spyker' | 'hierfl', event?: Event): void {
+  public selectArchitectureMode(mode: Architecture, event?: Event): void {
     event?.stopPropagation();
     this.architectureMenuOpen = false;
     if (mode !== this.activeMode) {
@@ -300,7 +301,7 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
     }
   }
 
-  private async ensureGraphForMode(mode: 'spyker' | 'hierfl'): Promise<void> {
+  private async ensureGraphForMode(mode: Architecture): Promise<void> {
     try {
       const graphs = await this.graphApi.listGraphs();
       const hasGraph = graphs.some((graph) => graph.architecture === mode);
@@ -312,7 +313,7 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
     }
   }
 
-  private currentArchitecture(): 'spyker' | 'hierfl' {
+  private currentArchitecture(): Architecture {
     return this.activeMode;
   }
 
@@ -1012,13 +1013,13 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
     this.showHelpDialog = false;
   }
 
-  public onGraphSelected(event: { graphId: number; architecture: 'spyker' | 'hierfl' }): void {
+  public onGraphSelected(event: { graphId: number; architecture: Architecture }): void {
     this.graphSelected.emit(event);
     this.closeViewGraphsDialog();
   }
 
   public runSimulation(payload: {
-    mode: 'spyker' | 'hierfl' | 'both';
+    mode: Architecture | 'both';
     hierfl: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number };
       simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; dataset: string; seedSet: number[]; repetitions: number; outputFilename: string; evaluateModel: boolean };

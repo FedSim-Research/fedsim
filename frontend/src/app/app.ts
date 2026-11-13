@@ -19,8 +19,8 @@ import { FrameworkJobsPopupComponent } from './runs/framework-jobs-popup/framewo
 import { FrameworkJobsService } from './runs/framework-jobs.service';
 import { DashboardViewComponent } from './runs/dashboard-view/dashboard-view';
 import { v4 as uuidv4 } from 'uuid';
+import { Architecture } from './domain/topology';
 
-export type modes = 'spyker' | 'hierfl';
 export type workspaceView = 'editor' | 'dashboard';
 
 const RUN_STATUS_POLL_MS = 2000;
@@ -54,7 +54,7 @@ export class App implements OnInit{
   private graphValidator = inject(GraphValidatorService);
   private messageService = inject(MessageService);
   private frameworkJobs = inject(FrameworkJobsService);
-  public activeMode = signal<modes>('hierfl');
+  public activeMode = signal<Architecture>('hierfl');
   public activeView = signal<workspaceView>('editor');
   public sidebarOpen = signal(true);
   public simulationRunning = signal(false);
@@ -170,7 +170,7 @@ export class App implements OnInit{
     }
   }
 
- public changeMode(mode: 'spyker' | 'hierfl'): void {
+ public changeMode(mode: Architecture): void {
     if (this.activeMode() === mode) return;
     this.activeMode.set(mode);
     console.log("changed mode to:" + mode);
@@ -554,7 +554,7 @@ export class App implements OnInit{
   }
 
   public async handleSimulation(payload: {
-    mode: 'spyker' | 'hierfl' | 'both';
+    mode: Architecture | 'both';
     hierfl: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
       simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; dataset: string; seedSet: number[]; repetitions: number; outputFilename: string; evaluateModel: boolean };
@@ -573,7 +573,7 @@ export class App implements OnInit{
       };
     };
   }): Promise<void> {
-    const runFor = async (architecture: 'spyker' | 'hierfl'): Promise<void> => {
+    const runFor = async (architecture: Architecture): Promise<void> => {
       const service = architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierfl;
       const graphId = service.getGraphId() ?? service.loadGraphIdFromStorage();
       if (graphId === null) {
@@ -781,7 +781,7 @@ export class App implements OnInit{
     });
   }
 
-  private showValidationErrors(architecture: 'spyker' | 'hierfl', errors: string[]): void {
+  private showValidationErrors(architecture: Architecture, errors: string[]): void {
     const maxErrors = 5;
     const shown = errors.slice(0, maxErrors).map((err) => `- ${err}`).join('\n');
     const remaining = errors.length > maxErrors ? `\n...and ${errors.length - maxErrors} more` : '';
@@ -794,7 +794,7 @@ export class App implements OnInit{
   }
 
   private formatSimulationResult(
-    architecture: 'spyker' | 'hierfl',
+    architecture: Architecture,
     result: {
       repetitions?: number | null;
       output_filename?: string | null;
@@ -838,7 +838,7 @@ export class App implements OnInit{
 
   private async waitForRunCompletion(
     runId: string,
-    architecture: 'spyker' | 'hierfl',
+    architecture: Architecture,
     jobId: string
   ): Promise<void> {
     const run = await this.pollRunUntilFinished(runId, architecture, jobId);
@@ -910,14 +910,14 @@ export class App implements OnInit{
     return first.length === second.length && first.every((value, index) => value === second[index]);
   }
 
-  public handleGraphDeleted(event: { graphId: number; architecture: modes }): void {
+  public handleGraphDeleted(event: { graphId: number; architecture: Architecture }): void {
     const service = event.architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierfl;
     if (service.getGraphId() === event.graphId) {
       service.detachGraph();
     }
   }
 
-  public async handleGraphSelected(event: { graphId: number; architecture: modes }): Promise<void> {
+  public async handleGraphSelected(event: { graphId: number; architecture: Architecture }): Promise<void> {
     this.activeMode.set(event.architecture);
     const service = event.architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierfl;
     try {

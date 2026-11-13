@@ -3,7 +3,6 @@ import { normalizeEdgeMetrics } from '../api/edge-metrics';
 import { VflowGraph } from '../api/graph-api.service';
 import { Architecture } from '../domain/topology';
 
-
 interface NodePayloadData {
   type?: VflowGraph['nodes'][number]['data']['type'];
   config?: Record<string, unknown>;
