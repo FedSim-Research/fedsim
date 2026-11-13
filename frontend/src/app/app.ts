@@ -1,4 +1,4 @@
-import { Component, inject, ViewChild, computed, signal, OnInit } from '@angular/core';
+import { Component, DestroyRef, inject, ViewChild, computed, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Vflow, VflowComponent, StaticEdge as Edge, NodePositionChange, Connection, ConnectionSettings } from 'ngx-vflow';
 import { FlowRenderer } from './editor/flow-renderer';
@@ -77,6 +77,10 @@ export class App implements OnInit{
     () => this.activeGraph(),
     () => this.shortcuts?.selectedNodeIds ?? new Set<string>(),
   );
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.drag.destroy());
+  }
 
   public connectionSettings: ConnectionSettings = {
     mode: 'loose',
