@@ -12,7 +12,7 @@ import { EdgeMetricsBoxComponent } from './editor/edges/edge-metrics-box/edge-me
 import { SpykerGraphService } from './editor/topologies/spyker-graph.service';
 import { HierflGraphService } from './editor/topologies/hierfl-graph.service';
 import { GraphPersistenceService } from './editor/graph-persistence.service';
-import { GraphApiService } from './api/graph-api.service';
+import { GraphApiService, SimulationRunResponse } from './api/graph-api.service';
 import { GraphValidatorService } from './editor/graph-validator.service';
 import { MessageService } from 'primeng/api';
 import { FrameworkJobsPopupComponent } from './runs/framework-jobs-popup/framework-jobs-popup';
@@ -859,73 +859,55 @@ export class App implements OnInit{
     architecture: 'spyker' | 'hierfl',
     jobId: string
   ): Promise<void> {
-    let lastStatus: 'queued' | 'running' | 'completed' | 'failed' | null = null;
+    const run = await this.pollRunUntilFinished(runId, architecture, jobId);
+    if (run) {
+      this.showSuccessToast(this.formatSimulationResult(architecture, run));
+    }
+  }
+
+  private async waitForCombinedRunCompletion(runId: string, jobId: string): Promise<void> {
+    const run = await this.pollRunUntilFinished(runId, 'combined', jobId);
+    const results = run?.results_by_architecture ?? {};
+    for (const architecture of ['hierfl', 'spyker'] as const) {
+      const result = results[architecture];
+      if (result) {
+        this.showSuccessToast(this.formatSimulationResult(architecture, result));
+      }
+    }
+  }
+
+  /** Polls a run, mirroring its state into the job list. Resolves with the run once it completed. */
+  private async pollRunUntilFinished(
+    runId: string,
+    label: string,
+    jobId: string
+  ): Promise<SimulationRunResponse | null> {
+    let lastStatus: SimulationRunResponse['status'] | null = null;
     for (;;) {
       const run = await this.graphApi.getRunStatus(runId);
       if (run.status !== lastStatus) {
-        console.info(
-          `[simulation] run status changed: runId=${runId} architecture=${architecture} status=${run.status}`
-        );
+        console.info(`[simulation] run status changed: runId=${runId} run=${label} status=${run.status}`);
         lastStatus = run.status;
       }
-
       if (run.status === 'running') {
         this.frameworkJobs.markRunning(jobId);
       }
-
       if (run.status === 'completed') {
         this.frameworkJobs.markCompleted(jobId);
-        this.showSuccessToast(this.formatSimulationResult(architecture, run));
-        return;
+        return run;
       }
-
       if (run.status === 'failed') {
         this.frameworkJobs.markFailed(jobId);
         const detail = run.error ? ` (${run.error})` : '';
-        this.showErrorToast(`${architecture} simulation failed${detail}`);
-        return;
+        this.showErrorToast(`${label} simulation failed${detail}`);
+        return null;
       }
-
       await this.sleep(2000);
     }
   }
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  private async waitForCombinedRunCompletion(runId: string, jobId: string): Promise<void> {
-    let lastStatus: 'queued' | 'running' | 'completed' | 'failed' | null = null;
-    for (;;) {
-      const run = await this.graphApi.getRunStatus(runId);
-      if (run.status !== lastStatus) {
-        console.info(`[simulation] combined run status changed: runId=${runId} status=${run.status}`);
-        lastStatus = run.status;
-      }
-      if (run.status === 'running') {
-        this.frameworkJobs.markRunning(jobId);
-      }
-      if (run.status === 'completed') {
-        this.frameworkJobs.markCompleted(jobId);
-        const bothResults = run.results_by_architecture ?? {};
-        const hierResult = bothResults['hierfl'];
-        const spykerResult = bothResults['spyker'];
-        if (hierResult) {
-          this.showSuccessToast(this.formatSimulationResult('hierfl', hierResult));
-        }
-        if (spykerResult) {
-          this.showSuccessToast(this.formatSimulationResult('spyker', spykerResult));
-        }
-        return;
-      }
-      if (run.status === 'failed') {
-        this.frameworkJobs.markFailed(jobId);
-        const detail = run.error ? ` (${run.error})` : '';
-        this.showErrorToast(`combined simulation failed${detail}`);
-        return;
-      }
-      await this.sleep(2000);
-    }
   }
 
   private haveMatchingSeedSet(first: number[], second: number[]): boolean {
