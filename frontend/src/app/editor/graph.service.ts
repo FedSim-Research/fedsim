@@ -23,7 +23,6 @@ export abstract class GraphService<T extends GraphHistoryService> {
   public edges: WritableSignal<Edge[]> = signal([]);
   protected api = inject(GraphApiService);
   private graphId: number | null = null;
-  private pendingGraphReset: Promise<void> = Promise.resolve();
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private saveQueue: Promise<void> = Promise.resolve();
   private hasUnsavedChanges = false;
@@ -147,26 +146,22 @@ export abstract class GraphService<T extends GraphHistoryService> {
     this.scheduleSave();
   }
 
-  public async resetGraph(): Promise<void> {
-    const hadContent = this.nodes().length > 0 || this.edges().length > 0;
-    const emptyState = this.applyState([], []);
-    if (hadContent) {
-      this.graphHistory.saveState(emptyState);
-    } else {
-      this.graphHistory.resetHistory(emptyState);
+  /** Replaces the whole graph content as one undoable step, e.g. for imports. */
+  public replaceContents(nodes: Node[], edges: Edge[]): void {
+    this.applyState(nodes, edges);
+    this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
+    this.scheduleSave();
+  }
+
+  /** Removes all nodes and edges; the graph itself and its settings are kept. */
+  public resetGraph(): void {
+    if (this.nodes().length || this.edges().length) {
+      this.replaceContents([], []);
     }
-    this.pendingGraphReset = this.pendingGraphReset
-      .catch(() => undefined)
-      .then(() => this.resetGraphInBackend());
-    await this.pendingGraphReset;
   }
 
   public getGraphHistory(){
     return this.graphHistory
-  }
-
-  public async waitForGraphReady(): Promise<void> {
-    await this.pendingGraphReset.catch(() => undefined);
   }
 
   public updateNodePositions(posChanges: NodePositionChange[]){
@@ -223,7 +218,6 @@ export abstract class GraphService<T extends GraphHistoryService> {
   }
 
   private async saveNow(): Promise<void> {
-    await this.waitForGraphReady();
     if (!this.hasUnsavedChanges || this.graphId === null) {
       return;
     }
@@ -273,22 +267,6 @@ export abstract class GraphService<T extends GraphHistoryService> {
         },
       },
     };
-  }
-
-  private async resetGraphInBackend(): Promise<void> {
-    const graphIdToDelete = this.graphId;
-    this.setGraphId(null);
-    if (graphIdToDelete !== null) {
-      await this.api.deleteGraph(graphIdToDelete).catch(() => undefined);
-    }
-    const created = await this.api.createGraph({
-      name: `${this.architecture}-graph`,
-      architecture: this.architecture,
-      metadata: null,
-    }).catch(() => null);
-    if (created) {
-      this.setGraphId(created.graph_id);
-    }
   }
 
   private storageKey(): string {

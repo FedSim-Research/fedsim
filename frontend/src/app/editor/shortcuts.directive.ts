@@ -434,7 +434,6 @@ export class Shortcuts{
       data: { metrics: edge.metrics },
     }));
 
-    await service.resetGraph();
-    service.addEntities(nodes, edges);
+    service.replaceContents(nodes, edges);
   }
 }

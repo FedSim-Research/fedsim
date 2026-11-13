@@ -82,6 +82,17 @@ describe('GraphService saving', () => {
     expect(payload.nodes.map((n: { id: string }) => n.id)).toEqual(['b']);
   });
 
+  it('resets by clearing the graph instead of replacing it', async () => {
+    service.addNode(node('a'));
+    service.resetGraph();
+    await vi.runAllTimersAsync();
+
+    expect(service.getGraphId()).toBe(5);
+    expect(replaceGraphState).toHaveBeenLastCalledWith(5, { nodes: [], edges: [] });
+    expect(service.undo()).toBe(true);
+    expect(service.nodes().map((n) => n.id)).toEqual(['a']);
+  });
+
   it('retries a failed save with the next edit', async () => {
     replaceGraphState.mockRejectedValueOnce(new Error('offline'));
     service.addNode(node('a'));

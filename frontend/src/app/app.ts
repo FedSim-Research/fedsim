@@ -105,12 +105,8 @@ export class App implements OnInit{
     void this.graphPersistence.initializeGraph(this.graphServiceHierfl, 'hierfl', false);
   }
 
-  public async handleReset() {
-    if (this.activeMode()=='hierfl'){
-      await this.graphServiceHierfl.resetGraph();
-    } else if (this.activeMode()=='spyker') {
-      await this.graphServiceSpyker.resetGraph();
-    }
+  public handleReset(): void {
+    this.activeGraph().resetGraph();
   }
 
   public onDragOver(event: DragEvent) {
