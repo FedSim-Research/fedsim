@@ -2,18 +2,10 @@ import { Injectable, inject } from '@angular/core';
 import { StaticNode as Node, StaticEdge as Edge } from 'ngx-vflow';
 import { GraphApiService, GraphDetail } from '../api/graph-api.service';
 import { GraphService } from './graph.service';
-import { ClientNode } from './nodes/client-node/client-node';
-import { ServerNode } from './nodes/server-node/server-node';
-import { SuperServerNode } from './nodes/super-server-node/super-server-node';
 import { EDGE_METRIC_DEFAULTS } from '../api/edge-metrics';
 import { State } from './graph-history.service';
-import { Architecture } from '../domain/topology';
-
-const NODE_TYPE_MAP = {
-  ClientNode: ClientNode,
-  ServerNode: ServerNode,
-  SuperServerNode: SuperServerNode,
-} as const;
+import { Architecture, isNodeKind } from '../domain/topology';
+import { createGraphNode } from './nodes/node-factory';
 
 @Injectable({ providedIn: 'root' })
 export class GraphPersistenceService {
@@ -80,46 +72,31 @@ export class GraphPersistenceService {
 
   private toStateSnapshot(architecture: Architecture, graph: GraphDetail): State {
     const nodes: Node[] = [];
-    const externalByBackendId = new Map<string, string>();
 
     for (const node of graph.nodes) {
-      const nodeType = NODE_TYPE_MAP[node.type as keyof typeof NODE_TYPE_MAP];
-      if (!nodeType) {
+      if (!isNodeKind(node.type)) {
         continue;
       }
-      externalByBackendId.set(node.node_id, node.node_id);
-      nodes.push({
+      nodes.push(createGraphNode({
         id: node.node_id,
+        kind: node.type,
+        architecture,
         point: node.position,
-        type: nodeType,
-        data: {
-          type: node.type,
-          config: node.config,
-          environment: architecture,
-          fromJson: true,
-          selected: false,
-        },
-      });
+        config: node.config,
+      }));
     }
 
-    const edges: Edge[] = [];
-    for (const edge of graph.edges) {
-      const source = externalByBackendId.get(edge.source_node_id);
-      const target = externalByBackendId.get(edge.target_node_id);
-      if (!source || !target) {
-        continue;
-      }
-      edges.push({
-        id: `${edge.edge_id}`,
-        source,
-        target,
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    const edges: Edge[] = graph.edges
+      .filter((edge) => nodeIds.has(edge.source_node_id) && nodeIds.has(edge.target_node_id))
+      .map((edge) => ({
+        id: String(edge.edge_id),
+        source: edge.source_node_id,
+        target: edge.target_node_id,
         reconnectable: true,
         floating: false,
-        data: {
-          metrics: edge.config ?? EDGE_METRIC_DEFAULTS,
-        },
-      });
-    }
+        data: { metrics: edge.config ?? EDGE_METRIC_DEFAULTS },
+      }));
 
     return { nodes, edges };
   }
