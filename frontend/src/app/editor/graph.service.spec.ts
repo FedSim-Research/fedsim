@@ -27,16 +27,18 @@ describe('GraphService', () => {
   });
 
   it('selects nodes and edges without touching history', () => {
-    const before = service.getGraphHistory().getState();
     service.setSelection(new Set(['server']), new Set(['e1']));
 
     expect(service.nodes().map((n) => Boolean((n as { data?: { selected?: boolean } }).data?.selected))).toEqual([true, false, false]);
     expect(service.edges().map((e) => Boolean((e as { data?: { selected?: boolean } }).data?.selected))).toEqual([true, false]);
-    expect(service.getGraphHistory().getState()).toBe(before);
 
     const nodes = service.nodes();
     service.setSelection(new Set(['server']), new Set(['e1']));
     expect(service.nodes()).toBe(nodes);
+
+    // Undo skips the selection and takes back the last real edit.
+    service.undo();
+    expect(service.edges().map((e) => e.id)).toEqual(['e1']);
   });
 
   it('removes nodes with their attached edges as one undo step', () => {
@@ -45,9 +47,7 @@ describe('GraphService', () => {
     expect(service.nodes().map((n) => n.id)).toEqual(['server', 'client-b']);
     expect(service.edges()).toEqual([]);
 
-    const history = service.getGraphHistory();
-    history.undo();
-    service.applyHistoryState(history.getState());
+    service.undo();
     expect(service.nodes()).toHaveLength(3);
     expect(service.edges().map((e) => e.id)).toEqual(['e1', 'e2']);
   });

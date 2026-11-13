@@ -54,17 +54,9 @@ export abstract class GraphService {
     return Number.isFinite(parsed) ? parsed : null;
   }
 
-  public setGraphState(nodes: Node[], edges: Edge[], resetHistory: boolean): void {
-    const snapshot = this.applyState(nodes, edges);
-    if (resetHistory) {
-      this.graphHistory.resetHistory(snapshot);
-    } else {
-      this.graphHistory.saveState(snapshot);
-    }
-  }
-
-  public applyHistoryState(state: GraphState): void {
-    this.applyState(state.nodes, state.edges);
+  /** Shows a stored graph: replaces the content and starts a fresh history. Nothing is saved. */
+  public loadContents(nodes: Node[], edges: Edge[]): void {
+    this.graphHistory.resetHistory(this.applyState(nodes, edges));
   }
 
   /** Steps back in history. Returns false when there was nothing to undo. */
@@ -142,10 +134,6 @@ export abstract class GraphService {
     this.removeEntities([], [edge.id]);
   }
 
-  public removeEdgeById(edgeId: string): void {
-    this.removeEntities([], [edgeId]);
-  }
-
   /** Removes nodes (with their attached edges) and edges as one undoable step. */
   public removeEntities(nodeIds: Iterable<string>, edgeIds: Iterable<string>): void {
     const doomedNodes = new Set(nodeIds);
@@ -191,10 +179,6 @@ export abstract class GraphService {
     if (this.nodes().length || this.edges().length) {
       this.replaceContents([], []);
     }
-  }
-
-  public getGraphHistory(){
-    return this.graphHistory
   }
 
   /** Shows intermediate drag positions; neither recorded in history nor saved. */
@@ -249,7 +233,7 @@ export abstract class GraphService {
     }
     this.hasUnsavedChanges = false;
     this.setGraphId(null);
-    this.setGraphState([], [], true);
+    this.loadContents([], []);
   }
 
   /** Writes pending changes now. Saves run strictly one after another. */

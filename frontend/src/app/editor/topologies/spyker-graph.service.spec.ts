@@ -46,9 +46,7 @@ describe('SpykerGraphService', () => {
     service.addNode(server('a'));
     service.addNode(server('b'));
 
-    const history = service.getGraphHistory();
-    history.undo();
-    service.applyHistoryState(history.getState());
+    service.undo();
 
     expect(service.nodes().map((node) => node.id)).toEqual(['a']);
     expect(service.edges()).toEqual([]);

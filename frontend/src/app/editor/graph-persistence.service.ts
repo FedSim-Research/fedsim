@@ -26,7 +26,7 @@ export class GraphPersistenceService {
 
     if (!createIfMissing) {
       service.setGraphId(null);
-      service.setGraphState([], [], true);
+      service.loadContents([], []);
       return;
     }
 
@@ -36,7 +36,7 @@ export class GraphPersistenceService {
       metadata: null,
     });
     service.setGraphId(created.graph_id);
-    service.setGraphState([], [], true);
+    service.loadContents([], []);
   }
 
   /** Loads a stored graph into the given workspace and makes it the active graph. */
@@ -67,7 +67,7 @@ export class GraphPersistenceService {
 
   private applyGraph(service: GraphService, architecture: Architecture, graph: GraphDetail): void {
     const snapshot = this.toStateSnapshot(architecture, graph);
-    service.setGraphState(snapshot.nodes, snapshot.edges, true);
+    service.loadContents(snapshot.nodes, snapshot.edges);
   }
 
   private toStateSnapshot(architecture: Architecture, graph: GraphDetail): GraphState {
