@@ -26,6 +26,19 @@ describe('GraphService', () => {
     service.addEdge({ id: 'e2', source: 'server', target: 'client-b' });
   });
 
+  it('selects nodes and edges without touching history', () => {
+    const before = service.getGraphHistory().getState();
+    service.setSelection(new Set(['server']), new Set(['e1']));
+
+    expect(service.nodes().map((n) => Boolean((n as { data?: { selected?: boolean } }).data?.selected))).toEqual([true, false, false]);
+    expect(service.edges().map((e) => Boolean((e as { data?: { selected?: boolean } }).data?.selected))).toEqual([true, false]);
+    expect(service.getGraphHistory().getState()).toBe(before);
+
+    const nodes = service.nodes();
+    service.setSelection(new Set(['server']), new Set(['e1']));
+    expect(service.nodes()).toBe(nodes);
+  });
+
   it('removes nodes with their attached edges as one undo step', () => {
     service.removeEntities(['client-a'], ['e2']);
 

@@ -112,6 +112,15 @@ export abstract class GraphService<T extends GraphHistoryService> {
     return null;
   }
 
+  /**
+   * Marks exactly the given nodes and edges as selected. Selection is view state:
+   * it is neither recorded in history nor saved.
+   */
+  public setSelection(nodeIds: ReadonlySet<string>, edgeIds: ReadonlySet<string>): void {
+    this.nodes.set(withSelection(this.nodes(), nodeIds));
+    this.edges.set(withSelection(this.edges(), edgeIds));
+  }
+
   /** Topology hook: edges an architecture adds automatically for new nodes. */
   protected linksForNewNodes(_newNodes: Node[]): Edge[] {
     return [];
@@ -303,4 +312,19 @@ export abstract class GraphService<T extends GraphHistoryService> {
 
 function kindsOf(nodes: Node[]): NodeKind[] {
   return nodes.map((node) => (node as NodeWithData).data?.['type'] as NodeKind);
+}
+
+/** Returns `items` with updated selection flags, keeping unchanged items (and the array) as they are. */
+function withSelection<T extends { id: string }>(items: T[], selectedIds: ReadonlySet<string>): T[] {
+  let changed = false;
+  const next = items.map((item) => {
+    const data = (item as { data?: { selected?: boolean } }).data ?? {};
+    const selected = selectedIds.has(item.id);
+    if (Boolean(data.selected) === selected) {
+      return item;
+    }
+    changed = true;
+    return { ...item, data: { ...data, selected } };
+  });
+  return changed ? next : items;
 }
