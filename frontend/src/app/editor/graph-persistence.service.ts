@@ -5,7 +5,7 @@ import { GraphService } from './graph.service';
 import { ClientNode } from './nodes/client-node/client-node';
 import { ServerNode } from './nodes/server-node/server-node';
 import { SuperServerNode } from './nodes/super-server-node/super-server-node';
-import { EdgeMetrics, EDGE_METRIC_DEFAULTS } from '../api/edge-metrics';
+import { EDGE_METRIC_DEFAULTS, normalizeEdgeMetrics } from '../api/edge-metrics';
 import { State } from './graph-history.service';
 
 const NODE_TYPE_MAP = {
@@ -216,7 +216,7 @@ export class GraphPersistenceService {
 
     const edges = service.edges().map((edge) => {
       const payload = (edge as any).data ?? {};
-      const metrics = this.normalizeEdgeMetrics(payload.metrics);
+      const metrics = normalizeEdgeMetrics(payload.metrics);
       const reconnectable = edge.reconnectable === 'source' || edge.reconnectable === 'target'
         ? true
         : edge.reconnectable ?? true;
@@ -233,34 +233,5 @@ export class GraphPersistenceService {
     });
 
     return { nodes, edges };
-  }
-
-  private normalizeEdgeMetrics(metrics?: EdgeMetrics | null): EdgeMetrics {
-    const source = metrics ?? EDGE_METRIC_DEFAULTS;
-    return {
-      pingMs: this.clampMetric(source.pingMs, EDGE_METRIC_DEFAULTS.pingMs, 0, undefined, true),
-      jitterMs: this.clampMetric(source.jitterMs, EDGE_METRIC_DEFAULTS.jitterMs, 0, undefined, true),
-      packetloss: this.clampMetric(source.packetloss, EDGE_METRIC_DEFAULTS.packetloss, 0, 1),
-      packetlossStddev: this.clampMetric(source.packetlossStddev, EDGE_METRIC_DEFAULTS.packetlossStddev, 0, 1),
-    };
-  }
-
-  private clampMetric(
-    value: number,
-    fallback: number,
-    min = 0,
-    max?: number,
-    integer = false
-  ): number {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-      return fallback;
-    }
-    const adjusted = integer ? Math.round(numeric) : numeric;
-    const boundedMin = Math.max(min, adjusted);
-    if (max === undefined) {
-      return boundedMin;
-    }
-    return Math.min(max, boundedMin);
   }
 }

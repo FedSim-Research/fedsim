@@ -2,7 +2,7 @@ import { Injectable, WritableSignal, signal, inject } from '@angular/core';
 import { StaticNode as Node, StaticEdge as Edge, NodePositionChange } from 'ngx-vflow';
 import { GraphHistoryService, State } from './graph-history.service';
 import { GraphApiService } from '../api/graph-api.service';
-import { EdgeMetrics, EDGE_METRIC_DEFAULTS } from '../api/edge-metrics';
+import { EdgeMetrics, EDGE_METRIC_DEFAULTS, normalizeEdgeMetrics } from '../api/edge-metrics';
 
 type NodeWithData = Node & { data?: Record<string, any> };
 type EdgeDataPayload = {
@@ -107,7 +107,7 @@ export abstract class GraphService<T extends GraphHistoryService> {
   }
 
   public updateEdgeMetrics(edgeId: string, metrics: EdgeMetrics): void {
-    const normalized = this.normalizeEdgeMetrics(metrics);
+    const normalized = normalizeEdgeMetrics(metrics);
     let backendId: number | undefined;
     this.edges.update((edges) =>
       edges.map((edge) => {
@@ -210,7 +210,7 @@ export abstract class GraphService<T extends GraphHistoryService> {
 
   private withEdgeMetrics(edge: Edge): EdgeWithData {
     const payload = (edge as EdgeWithData).data ?? { metrics: EDGE_METRIC_DEFAULTS };
-    const normalizedMetrics = this.normalizeEdgeMetrics(payload.metrics);
+    const normalizedMetrics = normalizeEdgeMetrics(payload.metrics);
     return {
       ...edge,
       data: { ...payload, metrics: normalizedMetrics },
@@ -232,28 +232,6 @@ export abstract class GraphService<T extends GraphHistoryService> {
         },
       },
     };
-  }
-
-  private normalizeEdgeMetrics(metrics?: EdgeMetrics | null): EdgeMetrics {
-    const source = metrics ?? EDGE_METRIC_DEFAULTS;
-    return {
-      pingMs: this.clampMetric(source.pingMs, EDGE_METRIC_DEFAULTS.pingMs),
-      jitterMs: this.clampMetric(source.jitterMs, EDGE_METRIC_DEFAULTS.jitterMs),
-      packetloss: this.clampMetric(source.packetloss, EDGE_METRIC_DEFAULTS.packetloss, 0, 1),
-      packetlossStddev: this.clampMetric(source.packetlossStddev, EDGE_METRIC_DEFAULTS.packetlossStddev, 0, 1),
-    };
-  }
-
-  private clampMetric(value: number, fallback: number, min = 0, max?: number): number {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-      return fallback;
-    }
-    const boundedMin = Math.max(min, numeric);
-    if (max === undefined) {
-      return boundedMin;
-    }
-    return Math.min(max, boundedMin);
   }
 
   protected async persistCreateNode(newNode: Node): Promise<void> {
