@@ -2,8 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { MessageService } from 'primeng/api';
 import { GraphApiService } from '../api/graph-api.service';
 import { GraphValidatorService } from '../editor/graph-validator.service';
-import { HierflGraphService } from '../editor/topologies/hierfl-graph.service';
-import { SpykerGraphService } from '../editor/topologies/spyker-graph.service';
+import { GraphWorkspace } from '../editor/graph-workspace.service';
 import { formatSimulationResult, SimulationRunner } from './simulation-runner.service';
 import { SimulationRequest } from './simulation-request';
 
@@ -34,8 +33,7 @@ describe('SimulationRunner', () => {
         { provide: GraphApiService, useValue: api },
         { provide: MessageService, useValue: { add } },
         { provide: GraphValidatorService, useValue: { validateSimulationRequest: validate } },
-        { provide: HierflGraphService, useValue: hierfl },
-        { provide: SpykerGraphService, useValue: graph() },
+        { provide: GraphWorkspace, useValue: { graphFor: () => hierfl } },
       ],
     });
   });

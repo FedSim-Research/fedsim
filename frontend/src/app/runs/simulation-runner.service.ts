@@ -3,8 +3,7 @@ import { MessageService } from 'primeng/api';
 import { GraphApiService, SimulationRunResponse, SimulationRunResult } from '../api/graph-api.service';
 import { Architecture } from '../domain/topology';
 import { GraphValidatorService } from '../editor/graph-validator.service';
-import { HierflGraphService } from '../editor/topologies/hierfl-graph.service';
-import { SpykerGraphService } from '../editor/topologies/spyker-graph.service';
+import { GraphWorkspace } from '../editor/graph-workspace.service';
 import { FrameworkJobsService } from './framework-jobs.service';
 import { ArchitectureRunConfig, SimulationRequest, toStartRequest } from './simulation-request';
 
@@ -20,10 +19,7 @@ export class SimulationRunner {
   private readonly validator = inject(GraphValidatorService);
   private readonly jobs = inject(FrameworkJobsService);
   private readonly messages = inject(MessageService);
-  private readonly graphs = {
-    spyker: inject(SpykerGraphService),
-    hierfl: inject(HierflGraphService),
-  } as const;
+  private readonly workspace = inject(GraphWorkspace);
 
   public async run(request: SimulationRequest): Promise<void> {
     if (request.mode === 'both') {
@@ -86,7 +82,7 @@ export class SimulationRunner {
 
   /** Saves and validates the graph. Returns its id, or null after reporting why it cannot run. */
   private async prepare(architecture: Architecture, config: ArchitectureRunConfig): Promise<number | null> {
-    const graph = this.graphs[architecture];
+    const graph = this.workspace.graphFor(architecture);
     const graphId = graph.getGraphId() ?? graph.loadGraphIdFromStorage();
     if (graphId === null) {
       this.error(`No graph available for ${architecture}. Please check if the backend is running.`);
