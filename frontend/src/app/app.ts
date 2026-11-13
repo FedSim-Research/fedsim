@@ -20,7 +20,7 @@ import { FrameworkJobsService } from './runs/framework-jobs.service';
 import { DashboardViewComponent } from './runs/dashboard-view/dashboard-view';
 import { v4 as uuidv4 } from 'uuid';
 import { Architecture } from './domain/topology';
-import { canLink } from './domain/link-rules';
+import { canConnect, normalizeConnection, orientServerLinks } from './editor/connection-policy';
 
 export type workspaceView = 'editor' | 'dashboard';
 
@@ -98,7 +98,7 @@ export class App implements OnInit{
 
   public connectionSettings: ConnectionSettings = {
     mode: 'loose',
-    validator: (connection) => this.canConnect(connection),
+    validator: (connection) => canConnect(this.activeMode(), this.nodes(), this.edges(), connection),
   };
 
   public ngOnInit(): void {
@@ -206,9 +206,7 @@ export class App implements OnInit{
   }
 
   public handleConnect(connection: Connection): void {
-    const resolved = this.activeMode() === 'hierfl'
-      ? this.normalizeHierConnection(connection)
-      : this.normalizeSpykerConnection(connection);
+    const resolved = normalizeConnection(this.nodes(), connection);
     const newEdge: Edge = {
       id: uuidv4(),
       source: resolved.source,
@@ -254,7 +252,8 @@ export class App implements OnInit{
         if (this._lastPosChanges) {
           this.activeGraph().updateNodePositions(this._lastPosChanges);
           if (this.activeMode() === 'spyker') {
-            this.normalizeSpykerServerEdges();
+            const spyker = this.graphServiceSpyker;
+            spyker.edges.set(orientServerLinks(spyker.nodes(), spyker.edges()));
           }
           this.activeGraph().getGraphHistory().saveState({nodes: this.activeGraph().nodes(), edges: this.activeGraph().edges()});
           this._lastPosChanges = null;
@@ -347,196 +346,6 @@ export class App implements OnInit{
     });
 
     this.activeGraph().nodes.set([...updatedNodes]);
-  }
-
-  private canConnect(connection: Connection): boolean {
-    const sourceNode = this.nodes().find(n => n.id === connection.source);
-    const targetNode = this.nodes().find(n => n.id === connection.target);
-    if (!sourceNode || !targetNode) return false;
-
-    const sourceType = (sourceNode as any).data?.type as string | undefined;
-    const targetType = (targetNode as any).data?.type as string | undefined;
-    if (!sourceType || !targetType) return false;
-
-    const isHier = this.activeMode() === 'hierfl';
-    const isSpyker = !isHier;
-
-    if (!canLink(this.activeMode(), sourceType, targetType)) return false;
-
-
-    if (isSpyker && sourceType === 'ServerNode' && targetType === 'ServerNode') {
-      if (connection.sourceHandle === 'server-out-bottom' || connection.targetHandle === 'server-out-bottom') {
-        return false;
-      }
-      const alreadyConnected = this.edges().some(e =>
-        (e.source === connection.source && e.target === connection.target) ||
-        (e.source === connection.target && e.target === connection.source)
-      );
-
-      if (alreadyConnected) return false;
-
-      return true;
-    }
-
-    const resolved = isHier ? this.normalizeHierConnection(connection) : this.normalizeSpykerConnection(connection);
-
-    if (sourceType === 'ClientNode' || targetType === 'ClientNode') {
-      const clientId = sourceType === 'ClientNode' ? connection.source : connection.target;
-      if (this.edges().some(e => e.source === clientId || e.target === clientId)) {
-        return false;
-      }
-    }
-
-    const involvesSuperAndServer =
-      (sourceType === 'SuperServerNode' && targetType === 'ServerNode') ||
-      (sourceType === 'ServerNode' && targetType === 'SuperServerNode');
-    if (isHier && involvesSuperAndServer && this.edges().some(e => e.source === resolved.source && e.target === resolved.target)) {
-      return false;
-    }
-
-    return true;
-  }
-
-  private normalizeHierConnection(connection: Connection): Connection {
-    const sourceNode = this.nodes().find(n => n.id === connection.source);
-    const targetNode = this.nodes().find(n => n.id === connection.target);
-    if (!sourceNode || !targetNode) return connection;
-    const sourceType = (sourceNode as any).data?.type as string | undefined;
-    const targetType = (targetNode as any).data?.type as string | undefined;
-    if (!sourceType || !targetType) return connection;
-
-    if (sourceType === 'ServerNode' && targetType === 'SuperServerNode') {
-      return {
-        source: connection.target,
-        target: connection.source,
-        sourceHandle: 'superserver-out',
-        targetHandle: 'server-in-top',
-      };
-    }
-    if (sourceType === 'SuperServerNode' && targetType === 'ServerNode') {
-      return {
-        source: connection.source,
-        target: connection.target,
-        sourceHandle: 'superserver-out',
-        targetHandle: 'server-in-top',
-      };
-    }
-    if (sourceType === 'ClientNode' && targetType === 'ServerNode') {
-      return {
-        source: connection.target,
-        target: connection.source,
-        sourceHandle: 'server-out-bottom',
-        targetHandle: 'client-in',
-      };
-    }
-    if (sourceType === 'ServerNode' && targetType === 'ClientNode') {
-      return {
-        source: connection.source,
-        target: connection.target,
-        sourceHandle: 'server-out-bottom',
-        targetHandle: 'client-in',
-      };
-    }
-
-    return connection;
-  }
-
-  private normalizeSpykerConnection(connection: Connection): Connection {
-    const sourceNode = this.nodes().find(n => n.id === connection.source);
-    const targetNode = this.nodes().find(n => n.id === connection.target);
-    if (!sourceNode || !targetNode) return connection;
-    const sourceType = (sourceNode as any).data?.type as string | undefined;
-    const targetType = (targetNode as any).data?.type as string | undefined;
-    if (!sourceType || !targetType) return connection;
-
-    if (sourceType === 'ServerNode' && targetType === 'ServerNode') {
-      const sourcePoint = (sourceNode as any).point as { x: number; y: number } | undefined;
-      const targetPoint = (targetNode as any).point as { x: number; y: number } | undefined;
-      if (!sourcePoint || !targetPoint) {
-        return connection;
-      }
-
-      const sourceIsLeft = sourcePoint.x <= targetPoint.x;
-      const leftId = sourceIsLeft ? connection.source : connection.target;
-      const rightId = sourceIsLeft ? connection.target : connection.source;
-
-      return {
-        source: leftId,
-        target: rightId,
-        sourceHandle: 'server-out',
-        targetHandle: 'server-in',
-      };
-    }
-
-    if (sourceType === 'ServerNode' && targetType === 'ClientNode') {
-      return {
-        ...connection,
-        sourceHandle: 'server-out-bottom',
-        targetHandle: 'client-in',
-      };
-    }
-
-    if (sourceType === 'ClientNode' && targetType === 'ServerNode') {
-      return {
-        ...connection,
-        source: connection.target,
-        target: connection.source,
-        sourceHandle: 'server-out-bottom',
-        targetHandle: 'client-in',
-      };
-    }
-
-    return connection;
-  }
-
-  private normalizeSpykerServerEdges(): void {
-    const nodes = this.graphServiceSpyker.nodes();
-    const nodeMap = new Map(nodes.map((node) => [node.id, node]));
-    const edges = this.graphServiceSpyker.edges();
-    let changed = false;
-
-    const updated = edges.map((edge) => {
-      const sourceNode = nodeMap.get(edge.source);
-      const targetNode = nodeMap.get(edge.target);
-      const sourceType = (sourceNode as any)?.data?.type as string | undefined;
-      const targetType = (targetNode as any)?.data?.type as string | undefined;
-      if (!sourceNode || !targetNode || sourceType !== 'ServerNode' || targetType !== 'ServerNode') {
-        return edge;
-      }
-
-      const sourcePoint = (sourceNode as any).point as { x: number; y: number } | undefined;
-      const targetPoint = (targetNode as any).point as { x: number; y: number } | undefined;
-      if (!sourcePoint || !targetPoint) {
-        return edge;
-      }
-
-      const sourceIsLeft = sourcePoint.x <= targetPoint.x;
-      const leftId = sourceIsLeft ? sourceNode.id : targetNode.id;
-      const rightId = sourceIsLeft ? targetNode.id : sourceNode.id;
-
-      const next = {
-        ...edge,
-        source: leftId,
-        target: rightId,
-        sourceHandle: 'server-out',
-        targetHandle: 'server-in',
-      };
-
-      if (
-        next.source !== edge.source ||
-        next.target !== edge.target ||
-        next.sourceHandle !== edge.sourceHandle ||
-        next.targetHandle !== edge.targetHandle
-      ) {
-        changed = true;
-      }
-
-      return next;
-    });
-
-    if (changed) {
-      this.graphServiceSpyker.edges.set(updated);
-    }
   }
 
   public async handleSimulation(payload: {
