@@ -6,6 +6,7 @@ import { GraphApiService, SimulationRunResponse } from '../api/graph-api.service
 export class DashboardRunsService {
   private graphApi = inject(GraphApiService);
   private pollHandle: ReturnType<typeof setInterval> | null = null;
+  private pollConsumers = 0;
 
   public loading = signal(false);
   public error = signal<string | null>(null);
@@ -74,7 +75,9 @@ export class DashboardRunsService {
     });
   });
 
+  /** Each consumer that starts polling must call `stopPolling` once when it goes away. */
   public startPolling(): void {
+    this.pollConsumers += 1;
     if (this.pollHandle) {
       return;
     }
@@ -88,7 +91,8 @@ export class DashboardRunsService {
   }
 
   public stopPolling(): void {
-    if (this.pollHandle) {
+    this.pollConsumers = Math.max(0, this.pollConsumers - 1);
+    if (this.pollConsumers === 0 && this.pollHandle) {
       clearInterval(this.pollHandle);
       this.pollHandle = null;
     }
