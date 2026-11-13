@@ -1,4 +1,4 @@
-import { Component, HostListener, Inject, Output, EventEmitter, ViewChild, ElementRef, Input, OnChanges, OnInit, OnDestroy, SimpleChanges } from '@angular/core';
+import { Component, HostListener, Output, inject, EventEmitter, ViewChild, ElementRef, Input, OnChanges, OnInit, OnDestroy, SimpleChanges } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StartPopup } from '../../runs/start-popup/start-popup';
@@ -9,7 +9,8 @@ import { SidebarDashboardPanelComponent } from '../../runs/sidebar-dashboard-pan
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { Shortcuts } from '../../editor/shortcuts.directive';
-import { GraphApiService, PresetResponse } from '../../api/graph-api.service';
+import { GraphApiService } from '../../api/graph-api.service';
+import { PresetLibrary } from './preset-library';
 import { SimulationRequest } from '../../runs/simulation-request';
 import { Architecture, NodeKind } from '../../domain/topology';
 
@@ -39,21 +40,26 @@ type ClientConfig = {
   downloadMbps: number;
 };
 
-type BlueprintDraft<T> = {
-  presetName: string;
-  config: T;
+type PresetKind = 'superserver' | 'server' | 'client';
+
+type PresetConfigs = {
+  superserver: SuperServerConfig;
+  server: ServerConfig;
+  client: ClientConfig;
 };
 
-type BlueprintItem<T> = {
-  id: number;
-  name: string;
-  config: T;
-};
-
-type SavePresetTarget = {
-  kind: 'superserver' | 'server' | 'client';
+type PresetTarget = {
+  kind: PresetKind;
   index: number;
   name: string;
+};
+
+const PRESET_KINDS: readonly PresetKind[] = ['superserver', 'server', 'client'];
+
+const PRESET_LABELS: Record<PresetKind, { preset: string; node: string }> = {
+  superserver: { preset: 'super server', node: 'Super Server' },
+  server: { preset: 'server node', node: 'Server' },
+  client: { preset: 'client node', node: 'Client' },
 };
 
 type WorkspaceView = 'editor' | 'dashboard';
@@ -98,13 +104,10 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
   public showResetPopup = false;
   public showViewGraphsDialog = false;
   public showHelpDialog = false;
-  public showSuperServerBlueprintPopup = false;
-  public showServerBlueprintPopup = false;
-  public showClientBlueprintPopup = false;
   public showDeletePresetPopup = false;
   public showConfirmSavePresetPopup = false;
-  public deletePresetTarget: { kind: 'superserver' | 'server' | 'client'; index: number; name: string } | null = null;
-  public savePresetTarget: SavePresetTarget | null = null;
+  public deletePresetTarget: PresetTarget | null = null;
+  public savePresetTarget: PresetTarget | null = null;
   @ViewChild('supDetails') private supDetails?: ElementRef<HTMLDetailsElement>;
 
   @Input() shortcuts?: Shortcuts;
@@ -123,23 +126,37 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
 
   public architectureMenuOpen = false;
 
-  public configDraft: {
-    superserver: SuperServerConfig;
-    server: ServerConfig;
-    client: ClientConfig;
-  } = {
+  private readonly document = inject(DOCUMENT);
+  private readonly messageService = inject(MessageService);
+  private readonly graphApi = inject(GraphApiService);
+
+  /** Settings the next dragged node of each kind is created with. */
+  public configDraft: PresetConfigs = {
     superserver: { ...DEFAULT_SUPER_SERVER_CONFIG },
     server: { ...DEFAULT_SERVER_CONFIG },
     client: { ...DEFAULT_CLIENT_CONFIG }
   };
 
-  public superServerBlueprints: BlueprintItem<SuperServerConfig>[] = [];
-  public serverBlueprints: BlueprintItem<ServerConfig>[] = [];
-  public clientBlueprints: BlueprintItem<ClientConfig>[] = [];
-
-  public selectedSuperServerBlueprintIndex: number | null = null;
-  public selectedServerBlueprintIndex: number | null = null;
-  public selectedClientBlueprintIndex: number | null = null;
+  public readonly presets: { [K in PresetKind]: PresetLibrary<PresetConfigs[K]> } = {
+    superserver: new PresetLibrary(this.graphApi, {
+      nodeKind: 'SuperServerNode',
+      label: 'Super Server',
+      defaults: DEFAULT_SUPER_SERVER_CONFIG,
+      nameFor: (config) => config.name,
+    }),
+    server: new PresetLibrary(this.graphApi, {
+      nodeKind: 'ServerNode',
+      label: 'Server Node',
+      defaults: DEFAULT_SERVER_CONFIG,
+      nameFor: (config) => config.name,
+    }),
+    client: new PresetLibrary(this.graphApi, {
+      nodeKind: 'ClientNode',
+      label: 'Client Node',
+      defaults: DEFAULT_CLIENT_CONFIG,
+      nameFor: (config) => `Client ${config.type} x${config.count}`,
+    }),
+  };
 
   private readonly nodeForwardListener = (event: Event): void => {
     const customEvent = event as CustomEvent<{ kind: 'superserver' | 'server' | 'client'; config: Record<string, unknown> }>;
@@ -158,27 +175,6 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
 
     this.openSidebar();
   };
-
-  public superServerBlueprintDraft: BlueprintDraft<SuperServerConfig> = {
-    presetName: '',
-    config: { ...this.configDraft.superserver },
-  };
-
-  public serverBlueprintDraft: BlueprintDraft<ServerConfig> = {
-    presetName: '',
-    config: { ...this.configDraft.server },
-  };
-
-  public clientBlueprintDraft: BlueprintDraft<ClientConfig> = {
-    presetName: '',
-    config: { ...this.configDraft.client },
-  };
-
-  constructor(
-    @Inject(DOCUMENT) private document: Document,
-    private messageService: MessageService,
-    private graphApi: GraphApiService
-  ) {}
 
   public async ngOnInit(): Promise<void> {
     this.sidebarOpenChange.emit(this.isOpen);
@@ -311,33 +307,10 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
     return { ...DEFAULT_CLIENT_CONFIG, ...(config as Partial<ClientConfig>) };
   }
 
-  private mapSuperServerPreset(preset: PresetResponse): BlueprintItem<SuperServerConfig> {
-    return { id: preset.preset_id, name: preset.name, config: this.toSuperServerConfig(preset.config) };
-  }
-
-  private mapServerPreset(preset: PresetResponse): BlueprintItem<ServerConfig> {
-    return { id: preset.preset_id, name: preset.name, config: this.toServerConfig(preset.config) };
-  }
-
-  private mapClientPreset(preset: PresetResponse): BlueprintItem<ClientConfig> {
-    return { id: preset.preset_id, name: preset.name, config: this.toClientConfig(preset.config) };
-  }
-
   private async loadPresetsForCurrentArchitecture(): Promise<void> {
     const architecture = this.currentArchitecture();
     try {
-      const [superPresets, serverPresets, clientPresets] = await Promise.all([
-        this.graphApi.listPresets(architecture, 'SuperServerNode'),
-        this.graphApi.listPresets(architecture, 'ServerNode'),
-        this.graphApi.listPresets(architecture, 'ClientNode'),
-      ]);
-
-      this.superServerBlueprints = superPresets.map((preset) => this.mapSuperServerPreset(preset));
-      this.serverBlueprints = serverPresets.map((preset) => this.mapServerPreset(preset));
-      this.clientBlueprints = clientPresets.map((preset) => this.mapClientPreset(preset));
-      this.selectedSuperServerBlueprintIndex = null;
-      this.selectedServerBlueprintIndex = null;
-      this.selectedClientBlueprintIndex = null;
+      await Promise.all(PRESET_KINDS.map((kind) => this.presets[kind].load(architecture)));
     } catch {
       this.showErrorToast('Could not load presets from backend.');
     }
@@ -392,400 +365,77 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
 
   public openSimulationpopup(): void { this.showSimulationpopup = true; }
   public closeSimulationpopup(): void { this.showSimulationpopup = false; }
-  public openSuperServerBlueprintPopup(): void {
-    this.superServerBlueprintDraft = {
-      presetName: '',
-      config: { ...this.configDraft.superserver },
-    };
-    this.selectedSuperServerBlueprintIndex = null;
-    this.showSuperServerBlueprintPopup = true;
+  public openPresetPopup<K extends PresetKind>(kind: K): void {
+    this.library(kind).openPopup(this.configDraft[kind]);
   }
 
-  public closeSuperServerBlueprintPopup(): void {
-    this.showSuperServerBlueprintPopup = false;
+  /** Selects a preset; its settings become the ones the next dragged node gets. */
+  public selectPreset<K extends PresetKind>(kind: K, index: number): void {
+    const config = this.library(kind).select(index);
+    if (config) {
+      this.setConfig(kind, config);
+    }
   }
 
-  public async saveSuperServerBlueprint(): Promise<void> {
-    const name = this.superServerBlueprintDraft.presetName.trim()
-      || `Super Server Preset ${this.superServerBlueprints.length + 1}`;
-    const selected = this.selectedSuperServerBlueprintIndex;
+  public async savePresetDraft<K extends PresetKind>(kind: K): Promise<void> {
     try {
-      if (selected !== null && this.superServerBlueprints[selected]) {
-        const existing = this.superServerBlueprints[selected];
-        const updated = await this.graphApi.updatePreset(existing.id, {
-          name,
-          config: { ...this.superServerBlueprintDraft.config },
-        });
-        this.superServerBlueprints[selected] = this.mapSuperServerPreset(updated);
-        this.applySuperServerBlueprint(this.superServerBlueprints[selected], selected);
-        this.showSuccessToast(`Updated preset "${name}".`);
-        return;
-      }
-      const created = await this.graphApi.createPreset({
-        architecture: this.currentArchitecture(),
-        node_type: 'SuperServerNode',
-        name,
-        config: { ...this.superServerBlueprintDraft.config },
-      });
-      this.superServerBlueprints.push(this.mapSuperServerPreset(created));
-      this.selectedSuperServerBlueprintIndex = this.superServerBlueprints.length - 1;
-      this.applySuperServerBlueprint(this.superServerBlueprints[this.selectedSuperServerBlueprintIndex], this.selectedSuperServerBlueprintIndex);
-      this.showSuccessToast(`Saved preset "${name}".`);
+      const item = await this.library(kind).saveDraft(this.currentArchitecture());
+      this.setConfig(kind, item.config);
+      this.showSuccessToast(`Saved preset "${item.name}".`);
     } catch {
-      this.showErrorToast('Could not save super server preset.');
+      this.showErrorToast(`Could not save ${PRESET_LABELS[kind].preset} preset.`);
     }
   }
 
-  public async createNewSuperServerPreset(): Promise<void> {
-    const name = `Super Server Preset ${this.superServerBlueprints.length + 1}`;
+  public async createDefaultPreset<K extends PresetKind>(kind: K): Promise<void> {
     try {
-      const created = await this.graphApi.createPreset({
-        architecture: this.currentArchitecture(),
-        node_type: 'SuperServerNode',
-        name,
-        config: { ...DEFAULT_SUPER_SERVER_CONFIG },
-      });
-      this.superServerBlueprints.push(this.mapSuperServerPreset(created));
-      const index = this.superServerBlueprints.length - 1;
-      this.applySuperServerBlueprint(this.superServerBlueprints[index], index);
-      this.showSuccessToast(`Created preset "${name}".`);
+      const item = await this.library(kind).createDefault(this.currentArchitecture());
+      this.setConfig(kind, item.config);
+      this.showSuccessToast(`Created preset "${item.name}".`);
     } catch {
-      this.showErrorToast('Could not create super server preset.');
+      this.showErrorToast(`Could not create ${PRESET_LABELS[kind].preset} preset.`);
     }
   }
 
-  public openServerBlueprintPopup(): void {
-    this.serverBlueprintDraft = {
-      presetName: '',
-      config: { ...this.configDraft.server },
-    };
-    this.selectedServerBlueprintIndex = null;
-    this.showServerBlueprintPopup = true;
-  }
-
-  public closeServerBlueprintPopup(): void {
-    this.showServerBlueprintPopup = false;
-  }
-
-  public async saveServerBlueprint(): Promise<void> {
-    const name = this.serverBlueprintDraft.presetName.trim()
-      || `Server Node Preset ${this.serverBlueprints.length + 1}`;
-    const selected = this.selectedServerBlueprintIndex;
-    try {
-      if (selected !== null && this.serverBlueprints[selected]) {
-        const existing = this.serverBlueprints[selected];
-        const updated = await this.graphApi.updatePreset(existing.id, {
-          name,
-          config: { ...this.serverBlueprintDraft.config },
-        });
-        this.serverBlueprints[selected] = this.mapServerPreset(updated);
-        this.applyServerBlueprint(this.serverBlueprints[selected], selected);
-        this.showSuccessToast(`Updated preset "${name}".`);
-        return;
-      }
-      const created = await this.graphApi.createPreset({
-        architecture: this.currentArchitecture(),
-        node_type: 'ServerNode',
-        name,
-        config: { ...this.serverBlueprintDraft.config },
-      });
-      this.serverBlueprints.push(this.mapServerPreset(created));
-      this.selectedServerBlueprintIndex = this.serverBlueprints.length - 1;
-      this.applyServerBlueprint(this.serverBlueprints[this.selectedServerBlueprintIndex], this.selectedServerBlueprintIndex);
-      this.showSuccessToast(`Saved preset "${name}".`);
-    } catch {
-      this.showErrorToast('Could not save server preset.');
-    }
-  }
-
-  public async createNewServerPreset(): Promise<void> {
-    const name = `Server Node Preset ${this.serverBlueprints.length + 1}`;
-    try {
-      const created = await this.graphApi.createPreset({
-        architecture: this.currentArchitecture(),
-        node_type: 'ServerNode',
-        name,
-        config: { ...DEFAULT_SERVER_CONFIG },
-      });
-      this.serverBlueprints.push(this.mapServerPreset(created));
-      const index = this.serverBlueprints.length - 1;
-      this.applyServerBlueprint(this.serverBlueprints[index], index);
-      this.showSuccessToast(`Created preset "${name}".`);
-    } catch {
-      this.showErrorToast('Could not create server preset.');
-    }
-  }
-
-  public openClientBlueprintPopup(): void {
-    this.clientBlueprintDraft = {
-      presetName: '',
-      config: { ...this.configDraft.client },
-    };
-    this.selectedClientBlueprintIndex = null;
-    this.showClientBlueprintPopup = true;
-  }
-
-  public closeClientBlueprintPopup(): void {
-    this.showClientBlueprintPopup = false;
-  }
-
-  public async saveClientBlueprint(): Promise<void> {
-    const name = this.clientBlueprintDraft.presetName.trim()
-      || `Client Node Preset ${this.clientBlueprints.length + 1}`;
-    const selected = this.selectedClientBlueprintIndex;
-    try {
-      if (selected !== null && this.clientBlueprints[selected]) {
-        const existing = this.clientBlueprints[selected];
-        const updated = await this.graphApi.updatePreset(existing.id, {
-          name,
-          config: { ...this.clientBlueprintDraft.config },
-        });
-        this.clientBlueprints[selected] = this.mapClientPreset(updated);
-        this.applyClientBlueprint(this.clientBlueprints[selected], selected);
-        this.showSuccessToast(`Updated preset "${name}".`);
-        return;
-      }
-      const created = await this.graphApi.createPreset({
-        architecture: this.currentArchitecture(),
-        node_type: 'ClientNode',
-        name,
-        config: { ...this.clientBlueprintDraft.config },
-      });
-      this.clientBlueprints.push(this.mapClientPreset(created));
-      this.selectedClientBlueprintIndex = this.clientBlueprints.length - 1;
-      this.applyClientBlueprint(this.clientBlueprints[this.selectedClientBlueprintIndex], this.selectedClientBlueprintIndex);
-      this.showSuccessToast(`Saved preset "${name}".`);
-    } catch {
-      this.showErrorToast('Could not save client preset.');
-    }
-  }
-
-  public async createNewClientPreset(): Promise<void> {
-    const name = `Client Node Preset ${this.clientBlueprints.length + 1}`;
-    try {
-      const created = await this.graphApi.createPreset({
-        architecture: this.currentArchitecture(),
-        node_type: 'ClientNode',
-        name,
-        config: { ...DEFAULT_CLIENT_CONFIG },
-      });
-      this.clientBlueprints.push(this.mapClientPreset(created));
-      const index = this.clientBlueprints.length - 1;
-      this.applyClientBlueprint(this.clientBlueprints[index], index);
-      this.showSuccessToast(`Created preset "${name}".`);
-    } catch {
-      this.showErrorToast('Could not create client preset.');
-    }
-  }
-
-  public async saveCurrentSuperServerPreset(): Promise<void> {
-    const selected = this.selectedSuperServerBlueprintIndex;
-    if (selected !== null && this.superServerBlueprints[selected]) {
-      this.requestConfirmSavePreset('superserver', selected, this.superServerBlueprints[selected].name);
+  /** Saves the sidebar settings: asks before overwriting a selected preset. */
+  public async saveCurrentPreset(kind: PresetKind): Promise<void> {
+    const library = this.presets[kind];
+    if (library.selected && library.selectedIndex !== null) {
+      this.savePresetTarget = { kind, index: library.selectedIndex, name: library.selected.name };
+      this.showConfirmSavePresetPopup = true;
       return;
     }
-    try {
-      const name = this.configDraft.superserver.name?.trim() || `Super Server Preset ${this.superServerBlueprints.length + 1}`;
-      const created = await this.graphApi.createPreset({
-        architecture: this.currentArchitecture(),
-        node_type: 'SuperServerNode',
-        name,
-        config: { ...this.configDraft.superserver },
-      });
-      this.superServerBlueprints.push(this.mapSuperServerPreset(created));
-      this.selectedSuperServerBlueprintIndex = this.superServerBlueprints.length - 1;
-      this.showSuccessToast(`Saved preset "${name}".`);
-    } catch {
-      this.showErrorToast('Could not save super server preset.');
-    }
+    await this.createPresetFromSettings(kind);
   }
 
-  public async saveCurrentServerPreset(): Promise<void> {
-    const selected = this.selectedServerBlueprintIndex;
-    if (selected !== null && this.serverBlueprints[selected]) {
-      this.requestConfirmSavePreset('server', selected, this.serverBlueprints[selected].name);
+  /** Takes over the selected preset for newly dragged nodes. */
+  public usePreset(kind: PresetKind): void {
+    const library = this.presets[kind];
+    const label = PRESET_LABELS[kind];
+    if (library.selectedIndex === null) {
+      this.showErrorToast(`Select a ${label.preset} preset first.`);
       return;
     }
-    try {
-      const name = this.configDraft.server.name?.trim() || `Server Node Preset ${this.serverBlueprints.length + 1}`;
-      const created = await this.graphApi.createPreset({
-        architecture: this.currentArchitecture(),
-        node_type: 'ServerNode',
-        name,
-        config: { ...this.configDraft.server },
-      });
-      this.serverBlueprints.push(this.mapServerPreset(created));
-      this.selectedServerBlueprintIndex = this.serverBlueprints.length - 1;
-      this.showSuccessToast(`Saved preset "${name}".`);
-    } catch {
-      this.showErrorToast('Could not save server preset.');
-    }
-  }
-
-  public async saveCurrentClientPreset(): Promise<void> {
-    const selected = this.selectedClientBlueprintIndex;
-    if (selected !== null && this.clientBlueprints[selected]) {
-      this.requestConfirmSavePreset('client', selected, this.clientBlueprints[selected].name);
+    if (kind === 'superserver' && this.isSpyker) {
+      this.showErrorToast('No super server is allowed to exist in the Spyker Environment');
       return;
     }
-    try {
-      const fallback = `Client Node Preset ${this.clientBlueprints.length + 1}`;
-      const name = `Client ${this.configDraft.client.type} x${this.configDraft.client.count}`.trim() || fallback;
-      const created = await this.graphApi.createPreset({
-        architecture: this.currentArchitecture(),
-        node_type: 'ClientNode',
-        name,
-        config: { ...this.configDraft.client },
-      });
-      this.clientBlueprints.push(this.mapClientPreset(created));
-      this.selectedClientBlueprintIndex = this.clientBlueprints.length - 1;
-      this.showSuccessToast(`Saved preset "${name}".`);
-    } catch {
-      this.showErrorToast('Could not save client preset.');
-    }
+    this.selectPreset(kind, library.selectedIndex);
+    library.closePopup();
+    this.showSuccessToast(`"${library.selectedName}" is now selected. Drag a ${label.node} node to place it.`);
   }
 
-  public selectSuperServerBlueprint(index: number): void {
-    const item = this.superServerBlueprints[index];
-    if (!item) {
-      return;
+  public requestDeletePreset(kind: PresetKind, index: number): void {
+    const item = this.presets[kind].items[index];
+    if (item) {
+      this.deletePresetTarget = { kind, index, name: item.name };
+      this.showDeletePresetPopup = true;
     }
-    this.applySuperServerBlueprint(item, index);
-  }
-
-  public applySuperServerBlueprint(item: BlueprintItem<SuperServerConfig>, index: number): void {
-    this.selectedSuperServerBlueprintIndex = index;
-    this.superServerBlueprintDraft = {
-      presetName: item.name,
-      config: { ...item.config },
-    };
-    this.configDraft.superserver = { ...item.config };
-  }
-
-  public selectServerBlueprint(index: number): void {
-    const item = this.serverBlueprints[index];
-    if (!item) {
-      return;
-    }
-    this.applyServerBlueprint(item, index);
-  }
-
-  public applyServerBlueprint(item: BlueprintItem<ServerConfig>, index: number): void {
-    this.selectedServerBlueprintIndex = index;
-    this.serverBlueprintDraft = {
-      presetName: item.name,
-      config: { ...item.config },
-    };
-    this.configDraft.server = { ...item.config };
-  }
-
-  public selectClientBlueprint(index: number): void {
-    const item = this.clientBlueprints[index];
-    if (!item) {
-      return;
-    }
-    this.applyClientBlueprint(item, index);
-  }
-
-  public applyClientBlueprint(item: BlueprintItem<ClientConfig>, index: number): void {
-    this.selectedClientBlueprintIndex = index;
-    this.clientBlueprintDraft = {
-      presetName: item.name,
-      config: { ...item.config },
-    };
-    this.configDraft.client = { ...item.config };
-  }
-
-  public selectedSuperServerPresetName(): string {
-    if (this.selectedSuperServerBlueprintIndex === null) {
-      return 'None';
-    }
-    return this.superServerBlueprints[this.selectedSuperServerBlueprintIndex]?.name ?? 'None';
-  }
-
-  public selectedServerPresetName(): string {
-    if (this.selectedServerBlueprintIndex === null) {
-      return 'None';
-    }
-    return this.serverBlueprints[this.selectedServerBlueprintIndex]?.name ?? 'None';
-  }
-
-  public selectedClientPresetName(): string {
-    if (this.selectedClientBlueprintIndex === null) {
-      return 'None';
-    }
-    return this.clientBlueprints[this.selectedClientBlueprintIndex]?.name ?? 'None';
-  }
-
-  public async deleteSuperServerBlueprint(index: number): Promise<void> {
-    const target = this.superServerBlueprints[index];
-    if (!target) {
-      return;
-    }
-    await this.graphApi.deletePreset(target.id);
-    this.superServerBlueprints.splice(index, 1);
-    if (this.selectedSuperServerBlueprintIndex === index) {
-      this.selectedSuperServerBlueprintIndex = null;
-    } else if (this.selectedSuperServerBlueprintIndex !== null && this.selectedSuperServerBlueprintIndex > index) {
-      this.selectedSuperServerBlueprintIndex -= 1;
-    }
-  }
-
-  public async deleteServerBlueprint(index: number): Promise<void> {
-    const target = this.serverBlueprints[index];
-    if (!target) {
-      return;
-    }
-    await this.graphApi.deletePreset(target.id);
-    this.serverBlueprints.splice(index, 1);
-    if (this.selectedServerBlueprintIndex === index) {
-      this.selectedServerBlueprintIndex = null;
-    } else if (this.selectedServerBlueprintIndex !== null && this.selectedServerBlueprintIndex > index) {
-      this.selectedServerBlueprintIndex -= 1;
-    }
-  }
-
-  public async deleteClientBlueprint(index: number): Promise<void> {
-    const target = this.clientBlueprints[index];
-    if (!target) {
-      return;
-    }
-    await this.graphApi.deletePreset(target.id);
-    this.clientBlueprints.splice(index, 1);
-    if (this.selectedClientBlueprintIndex === index) {
-      this.selectedClientBlueprintIndex = null;
-    } else if (this.selectedClientBlueprintIndex !== null && this.selectedClientBlueprintIndex > index) {
-      this.selectedClientBlueprintIndex -= 1;
-    }
-  }
-
-  public requestDeletePreset(kind: 'superserver' | 'server' | 'client', index: number): void {
-    const name = kind === 'superserver'
-      ? this.superServerBlueprints[index]?.name
-      : kind === 'server'
-        ? this.serverBlueprints[index]?.name
-        : this.clientBlueprints[index]?.name;
-
-    if (!name) {
-      return;
-    }
-
-    this.deletePresetTarget = { kind, index, name };
-    this.showDeletePresetPopup = true;
   }
 
   public closeDeletePresetPopup(): void {
     this.showDeletePresetPopup = false;
     this.deletePresetTarget = null;
-  }
-
-  public requestConfirmSavePreset(
-    kind: 'superserver' | 'server' | 'client',
-    index: number,
-    name: string
-  ): void {
-    this.savePresetTarget = { kind, index, name };
-    this.showConfirmSavePresetPopup = true;
   }
 
   public closeConfirmSavePresetPopup(): void {
@@ -797,46 +447,13 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
     if (!this.savePresetTarget) {
       return;
     }
-    const { kind, index } = this.savePresetTarget;
+    const { kind } = this.savePresetTarget;
     try {
-      if (kind === 'superserver') {
-        const existing = this.superServerBlueprints[index];
-        if (!existing) {
-          this.closeConfirmSavePresetPopup();
-          return;
-        }
-        const updated = await this.graphApi.updatePreset(existing.id, {
-          config: { ...this.configDraft.superserver },
-        });
-        this.superServerBlueprints[index] = this.mapSuperServerPreset(updated);
-        this.selectedSuperServerBlueprintIndex = index;
-        this.showSuccessToast(`Updated preset "${this.superServerBlueprints[index].name}".`);
-      } else if (kind === 'server') {
-        const existing = this.serverBlueprints[index];
-        if (!existing) {
-          this.closeConfirmSavePresetPopup();
-          return;
-        }
-        const updated = await this.graphApi.updatePreset(existing.id, {
-          config: { ...this.configDraft.server },
-        });
-        this.serverBlueprints[index] = this.mapServerPreset(updated);
-        this.selectedServerBlueprintIndex = index;
-        this.showSuccessToast(`Updated preset "${this.serverBlueprints[index].name}".`);
-      } else {
-        const existing = this.clientBlueprints[index];
-        if (!existing) {
-          this.closeConfirmSavePresetPopup();
-          return;
-        }
-        const updated = await this.graphApi.updatePreset(existing.id, {
-          config: { ...this.configDraft.client },
-        });
-        this.clientBlueprints[index] = this.mapClientPreset(updated);
-        this.selectedClientBlueprintIndex = index;
-        this.showSuccessToast(`Updated preset "${this.clientBlueprints[index].name}".`);
-      }
+      const item = await this.updateSelectedPreset(kind);
       this.closeConfirmSavePresetPopup();
+      if (item) {
+        this.showSuccessToast(`Updated preset "${item.name}".`);
+      }
     } catch {
       this.showErrorToast('Could not update preset.');
     }
@@ -846,61 +463,18 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
     if (!this.savePresetTarget) {
       return;
     }
-    const kind = this.savePresetTarget.kind;
-    try {
-      if (kind === 'superserver') {
-        const name = this.configDraft.superserver.name?.trim() || `Super Server Preset ${this.superServerBlueprints.length + 1}`;
-        const created = await this.graphApi.createPreset({
-          architecture: this.currentArchitecture(),
-          node_type: 'SuperServerNode',
-          name,
-          config: { ...this.configDraft.superserver },
-        });
-        this.superServerBlueprints.push(this.mapSuperServerPreset(created));
-        this.selectedSuperServerBlueprintIndex = this.superServerBlueprints.length - 1;
-      } else if (kind === 'server') {
-        const name = this.configDraft.server.name?.trim() || `Server Node Preset ${this.serverBlueprints.length + 1}`;
-        const created = await this.graphApi.createPreset({
-          architecture: this.currentArchitecture(),
-          node_type: 'ServerNode',
-          name,
-          config: { ...this.configDraft.server },
-        });
-        this.serverBlueprints.push(this.mapServerPreset(created));
-        this.selectedServerBlueprintIndex = this.serverBlueprints.length - 1;
-      } else {
-        const fallback = `Client Node Preset ${this.clientBlueprints.length + 1}`;
-        const name = `Client ${this.configDraft.client.type} x${this.configDraft.client.count}`.trim() || fallback;
-        const created = await this.graphApi.createPreset({
-          architecture: this.currentArchitecture(),
-          node_type: 'ClientNode',
-          name,
-          config: { ...this.configDraft.client },
-        });
-        this.clientBlueprints.push(this.mapClientPreset(created));
-        this.selectedClientBlueprintIndex = this.clientBlueprints.length - 1;
-      }
-      this.closeConfirmSavePresetPopup();
-      this.showSuccessToast('Created a new preset.');
-    } catch {
-      this.showErrorToast('Could not create new preset.');
-    }
+    const { kind } = this.savePresetTarget;
+    this.closeConfirmSavePresetPopup();
+    await this.createPresetFromSettings(kind);
   }
 
   public async confirmDeletePreset(): Promise<void> {
     if (!this.deletePresetTarget) {
       return;
     }
-
     const { kind, index } = this.deletePresetTarget;
     try {
-      if (kind === 'superserver') {
-        await this.deleteSuperServerBlueprint(index);
-      } else if (kind === 'server') {
-        await this.deleteServerBlueprint(index);
-      } else {
-        await this.deleteClientBlueprint(index);
-      }
+      await this.presets[kind].remove(index);
       this.closeDeletePresetPopup();
       this.showSuccessToast('Preset deleted.');
     } catch {
@@ -908,54 +482,27 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
     }
   }
 
-  public loadSuperServerPreset(): void {
-    if (this.selectedSuperServerBlueprintIndex === null) {
-      this.showErrorToast('Select a super server preset first.');
-      return;
-    }
-    const item = this.superServerBlueprints[this.selectedSuperServerBlueprintIndex];
-    if (!item) {
-      this.showErrorToast('Preset not found.');
-      return;
-    }
-    if (this.isSpyker) {
-      this.showErrorToast('No super server is allowed to exist in the Spyker Environment');
-      return;
-    }
-    this.applySuperServerBlueprint(item, this.selectedSuperServerBlueprintIndex);
-    this.closeSuperServerBlueprintPopup();
-    this.showSuccessToast(`"${item.name}" is now selected. Drag a Super Server node to place it.`);
+  private updateSelectedPreset<K extends PresetKind>(kind: K) {
+    return this.library(kind).updateSelected(this.configDraft[kind]);
   }
 
-  public loadServerPreset(): void {
-    if (this.selectedServerBlueprintIndex === null) {
-      this.showErrorToast('Select a server node preset first.');
-      return;
+  private async createPresetFromSettings<K extends PresetKind>(kind: K): Promise<void> {
+    try {
+      const item = await this.library(kind).saveConfig(this.currentArchitecture(), this.configDraft[kind]);
+      this.showSuccessToast(`Saved preset "${item.name}".`);
+    } catch {
+      this.showErrorToast(`Could not save ${PRESET_LABELS[kind].preset} preset.`);
     }
-    const item = this.serverBlueprints[this.selectedServerBlueprintIndex];
-    if (!item) {
-      this.showErrorToast('Preset not found.');
-      return;
-    }
-    this.applyServerBlueprint(item, this.selectedServerBlueprintIndex);
-    this.closeServerBlueprintPopup();
-    this.showSuccessToast(`"${item.name}" is now selected. Drag a Server node to place it.`);
   }
 
-  public loadClientPreset(): void {
-    if (this.selectedClientBlueprintIndex === null) {
-      this.showErrorToast('Select a client node preset first.');
-      return;
-    }
-    const item = this.clientBlueprints[this.selectedClientBlueprintIndex];
-    if (!item) {
-      this.showErrorToast('Preset not found.');
-      return;
-    }
-    this.applyClientBlueprint(item, this.selectedClientBlueprintIndex);
-    this.closeClientBlueprintPopup();
-    this.showSuccessToast(`"${item.name}" is now selected. Drag a Client node to place it.`);
+  private library<K extends PresetKind>(kind: K): PresetLibrary<PresetConfigs[K]> {
+    return this.presets[kind];
   }
+
+  private setConfig<K extends PresetKind>(kind: K, config: PresetConfigs[K]): void {
+    this.configDraft[kind] = { ...config };
+  }
+
   public onSuperServerSummaryClick(event: Event): void {
     if (this.isSpyker) {
       event.preventDefault();
@@ -1007,16 +554,9 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
       this.closeDeletePresetPopup();
       return;
     }
-    if (this.showClientBlueprintPopup) {
-      this.closeClientBlueprintPopup();
-      return;
-    }
-    if (this.showServerBlueprintPopup) {
-      this.closeServerBlueprintPopup();
-      return;
-    }
-    if (this.showSuperServerBlueprintPopup) {
-      this.closeSuperServerBlueprintPopup();
+    const openLibrary = PRESET_KINDS.map((kind) => this.presets[kind]).find((library) => library.popupOpen);
+    if (openLibrary) {
+      openLibrary.closePopup();
       return;
     }
     if (this.showResetPopup) {
