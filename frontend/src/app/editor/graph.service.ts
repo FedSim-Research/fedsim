@@ -113,8 +113,8 @@ export abstract class GraphService<T extends GraphHistoryService> {
     for (const edge of removedEdges) {
       // Edges attached to a deleted node are removed together with it in the backend.
       if (doomedNodes.has(edge.source) || doomedNodes.has(edge.target)) continue;
-      const backendId = (edge as EdgeWithData).data?.backendId ?? this.extractNumericId(edge.id);
-      if (backendId !== null && backendId !== undefined) {
+      const backendId = (edge as EdgeWithData).data?.backendId;
+      if (backendId !== undefined) {
         void this.api.deleteEdge(backendId).catch(() => undefined);
       }
     }
@@ -142,13 +142,12 @@ export abstract class GraphService<T extends GraphHistoryService> {
       })
     );
     this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
-    const targetId = backendId ?? this.extractNumericId(edgeId);
-    if (targetId === undefined || targetId === null) {
+    if (backendId === undefined) {
       this.pendingEdgeConfig.set(edgeId, normalized);
       return;
     }
     this.pendingEdgeConfig.delete(edgeId);
-    void this.api.updateEdge(targetId, { config: normalized }).catch(() => undefined);
+    void this.api.updateEdge(backendId, { config: normalized }).catch(() => undefined);
   }
 
   public async resetGraph(): Promise<void> {
@@ -370,9 +369,5 @@ export abstract class GraphService<T extends GraphHistoryService> {
 
   private storageKey(): string {
     return `fedsim.graphId.${this.architecture}`;
-  }
-
-  private extractNumericId(edgeId: string): number | null {
-    return typeof edgeId === 'string' && /^\d+$/.test(edgeId) ? Number(edgeId) : null;
   }
 }
