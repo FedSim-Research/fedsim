@@ -10,6 +10,7 @@ import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { Shortcuts } from '../../editor/shortcuts.directive';
 import { GraphApiService, PresetResponse } from '../../api/graph-api.service';
+import { SimulationRequest } from '../../runs/simulation-request';
 import { Architecture } from '../../domain/topology';
 
 type SuperServerConfig = {
@@ -118,26 +119,7 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
   @Output() sidebarOpenChange = new EventEmitter<boolean>();
   @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: Architecture }>();
   @Output() graphDeleted = new EventEmitter<{ graphId: number; architecture: Architecture }>();
-  @Output() simulationRequested = new EventEmitter<{
-    mode: Architecture | 'both';
-    hierfl: {
-      trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
-      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; dataset: string; seedSet: number[]; repetitions: number; outputFilename: string; evaluateModel: boolean };
-    };
-    spyker: {
-      trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
-      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; dataset: string; seedSet: number[]; repetitions: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
-      spykerConfig: {
-        decayBeta: number;
-        minLearningRate: number;
-        hInter: number;
-        hIntra: number;
-        sigmoidPhi: number;
-        serverLearningRate: number;
-        tcpRtoDelay: number;
-      };
-    };
-  }>();
+  @Output() simulationRequested = new EventEmitter<SimulationRequest>();
 
   public architectureMenuOpen = false;
 
@@ -1018,26 +1000,7 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
     this.closeViewGraphsDialog();
   }
 
-  public runSimulation(payload: {
-    mode: Architecture | 'both';
-    hierfl: {
-      trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; dataset: string; seedSet: number[]; repetitions: number; outputFilename: string; evaluateModel: boolean };
-    };
-    spyker: {
-      trainingConfig: { epochs: number; lr: number; modelComplexity: number };
-      simulationSettings: { runTimeLimit: number; evalInterval: number; gpuBudget: number; dataset: string; seedSet: number[]; repetitions: number; idleTokenDelay: number; outputFilename: string; evaluateModel: boolean };
-      spykerConfig: {
-        decayBeta: number;
-        minLearningRate: number;
-        hInter: number;
-        hIntra: number;
-        sigmoidPhi: number;
-        serverLearningRate: number;
-        tcpRtoDelay: number;
-      };
-    };
-  }): void {
+  public runSimulation(payload: SimulationRequest): void {
     this.simulationRequested.emit(payload);
     this.closeSimulationpopup();
   }

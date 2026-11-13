@@ -5,48 +5,8 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { StepperModule } from 'primeng/stepper';
 import { GraphApiService } from '../../api/graph-api.service';
+import { SimulationMode, SimulationRequest } from '../simulation-request';
 import { Architecture } from '../../domain/topology';
-
-type StartMode = Architecture | 'both';
-
-type CommonTrainingConfig = {
-  epochs: number;
-  lr: number;
-  modelComplexity: number;
-  batchSize?: number;
-};
-
-type CommonSimulationConfig = {
-  runTimeLimit: number;
-  evalInterval: number;
-  gpuBudget: number;
-  dataset: string;
-  seedSet: number[];
-  repetitions: number;
-  outputFilename: string;
-  evaluateModel: boolean;
-};
-
-type RunPayload = {
-  mode: StartMode;
-  hierfl: {
-    trainingConfig: CommonTrainingConfig;
-    simulationSettings: CommonSimulationConfig;
-  };
-  spyker: {
-    trainingConfig: CommonTrainingConfig;
-    simulationSettings: CommonSimulationConfig & { idleTokenDelay: number };
-    spykerConfig: {
-      decayBeta: number;
-      minLearningRate: number;
-      hInter: number;
-      hIntra: number;
-      sigmoidPhi: number;
-      serverLearningRate: number;
-      tcpRtoDelay: number;
-    };
-  };
-};
 
 type PersistedStartParams = {
   evaluateAfterRun?: boolean;
@@ -65,10 +25,10 @@ export class StartPopup implements OnInit {
   @Input() hierflGraphId: number | null = null;
   @Input() spykerGraphId: number | null = null;
   @Output() close = new EventEmitter<void>();
-  @Output() run = new EventEmitter<RunPayload>();
+  @Output() run = new EventEmitter<SimulationRequest>();
 
   public activeStep = 1;
-  public selectedMode: StartMode | null = null;
+  public selectedMode: SimulationMode | null = null;
   public evaluateAfterRun = false;
   private evaluateAfterRunByArchitecture: { hierfl: boolean; spyker: boolean } = {
     hierfl: false,
@@ -121,7 +81,7 @@ export class StartPopup implements OnInit {
     this.close.emit();
   }
 
-  public selectMode(mode: StartMode): void {
+  public selectMode(mode: SimulationMode): void {
     this.selectedMode = mode;
     this.applyEvaluateFlagForMode(mode);
     this.activeStep = 1;
@@ -308,7 +268,7 @@ export class StartPopup implements OnInit {
     void this.reconcileWithBackend('spyker', this.spykerGraphId, params);
   }
 
-  private applyEvaluateFlagForMode(mode: StartMode | null): void {
+  private applyEvaluateFlagForMode(mode: SimulationMode | null): void {
     if (mode === 'hierfl') {
       this.evaluateAfterRun = this.evaluateAfterRunByArchitecture.hierfl;
       return;

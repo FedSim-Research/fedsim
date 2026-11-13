@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
 import { Architecture } from '../domain/topology';
 import { canLink } from '../domain/link-rules';
+import { ArchitectureRunConfig } from '../runs/simulation-request';
 
 type FlowNodeData = { type?: string; config?: Record<string, unknown> };
 type FlowEdgeMetrics = {
@@ -19,29 +20,7 @@ export class GraphValidatorService {
     architecture: Architecture,
     nodes: Node[],
     edges: Edge[],
-    config: {
-      trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
-      simulationSettings: {
-        runTimeLimit: number;
-        evalInterval: number;
-        gpuBudget: number;
-        dataset: string;
-        seedSet: number[];
-        repetitions: number;
-        outputFilename: string;
-        evaluateModel: boolean;
-        idleTokenDelay?: number;
-      };
-      spykerConfig?: {
-        decayBeta: number;
-        minLearningRate: number;
-        hInter: number;
-        hIntra: number;
-        sigmoidPhi: number;
-        serverLearningRate: number;
-        tcpRtoDelay: number;
-      };
-    },
+    config: ArchitectureRunConfig,
   ): string[] {
     const errors: string[] = [];
     errors.push(...this.validateTrainingAndSimulationFields(architecture, config));
@@ -51,29 +30,7 @@ export class GraphValidatorService {
 
   private validateTrainingAndSimulationFields(
     architecture: Architecture,
-    config: {
-      trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
-      simulationSettings: {
-        runTimeLimit: number;
-        evalInterval: number;
-        gpuBudget: number;
-        dataset: string;
-        seedSet: number[];
-        repetitions: number;
-        outputFilename: string;
-        evaluateModel: boolean;
-        idleTokenDelay?: number;
-      };
-      spykerConfig?: {
-        decayBeta: number;
-        minLearningRate: number;
-        hInter: number;
-        hIntra: number;
-        sigmoidPhi: number;
-        serverLearningRate: number;
-        tcpRtoDelay: number;
-      };
-    },
+    config: ArchitectureRunConfig,
   ): string[] {
     const errors: string[] = [];
     if (!Number.isFinite(config.trainingConfig.epochs) || config.trainingConfig.epochs < 1) {
