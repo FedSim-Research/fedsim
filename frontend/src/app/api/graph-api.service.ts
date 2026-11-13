@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { APP_CONFIG } from '../config/app-config';
+import { Architecture, NodeKind } from '../domain/topology';
 import { EdgeMetrics } from './edge-metrics';
 import { SILENT_ERRORS } from './global-error.interceptor';
 
@@ -13,7 +14,7 @@ export interface Position {
 export interface GraphResponse {
   graph_id: number;
   name: string | null;
-  architecture: 'spyker' | 'hierfl';
+  architecture: Architecture;
   metadata: Record<string, unknown> | null;
 }
 
@@ -40,7 +41,7 @@ export interface GraphDetail extends GraphResponse {
 
 export interface GraphCreate {
   name?: string | null;
-  architecture: 'spyker' | 'hierfl';
+  architecture: Architecture;
   metadata?: Record<string, unknown> | null;
 }
 
@@ -54,13 +55,13 @@ export interface GraphMetadataPatch {
 
 
 export interface NodeCreate {
-  type: 'ClientNode' | 'ServerNode' | 'SuperServerNode';
+  type: NodeKind;
   config: Record<string, unknown>;
   position: Position;
 }
 
 export interface NodeUpdate {
-  type?: 'ClientNode' | 'ServerNode' | 'SuperServerNode';
+  type?: NodeKind;
   config?: Record<string, unknown>;
   position?: Position;
 }
@@ -76,7 +77,7 @@ export interface EdgeUpdate {
 }
 
 export interface VflowNodeData {
-  type: 'ClientNode' | 'ServerNode' | 'SuperServerNode';
+  type: NodeKind;
   config: Record<string, unknown>;
   environment?: string | null;
   fromJson?: boolean;
@@ -151,7 +152,7 @@ export interface SimulationEvaluation {
 }
 
 export interface SimulationRunResult {
-  architecture?: 'spyker' | 'hierfl' | string;
+  architecture?: Architecture | string;
   graph_id?: number | null;
   seed?: number | null;
   seed_set?: number[] | null;
@@ -215,7 +216,7 @@ export interface SimulationRunResult {
 export interface SimulationRunResponse {
   run_id: string;
   status: 'queued' | 'running' | 'completed' | 'failed';
-  architecture?: 'spyker' | 'hierfl' | 'both';
+  architecture?: Architecture | 'both';
   graph_id?: number | null;
   seed?: number | null;
   queued_at?: string | null;
@@ -259,15 +260,15 @@ export interface SimulationRunResponse {
 
 export interface PresetResponse {
   preset_id: number;
-  architecture: 'spyker' | 'hierfl';
-  node_type: 'SuperServerNode' | 'ServerNode' | 'ClientNode';
+  architecture: Architecture;
+  node_type: NodeKind;
   name: string;
   config: Record<string, unknown>;
 }
 
 export interface PresetCreate {
-  architecture: 'spyker' | 'hierfl';
-  node_type: 'SuperServerNode' | 'ServerNode' | 'ClientNode';
+  architecture: Architecture;
+  node_type: NodeKind;
   name: string;
   config: Record<string, unknown>;
 }
@@ -371,8 +372,8 @@ export class GraphApiService {
   }
 
   public async listPresets(
-    architecture: 'spyker' | 'hierfl',
-    nodeType: 'SuperServerNode' | 'ServerNode' | 'ClientNode'
+    architecture: Architecture,
+    nodeType: NodeKind
   ): Promise<PresetResponse[]> {
     return firstValueFrom(
       this.http.get<PresetResponse[]>(

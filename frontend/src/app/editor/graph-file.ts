@@ -1,6 +1,7 @@
 import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
 import { normalizeEdgeMetrics } from '../api/edge-metrics';
 import { GraphDetail } from '../api/graph-api.service';
+import { Architecture, isNodeKind, NodeKind } from '../domain/topology';
 
 export const GRAPH_FILE_VERSION = 1;
 
@@ -25,7 +26,7 @@ export interface GraphFileEdge {
  */
 export interface GraphFile {
   version: typeof GRAPH_FILE_VERSION;
-  architecture: 'spyker' | 'hierfl';
+  architecture: Architecture;
   nodes: GraphFileNode[];
   edges: GraphFileEdge[];
   nodeCount: number;
@@ -33,7 +34,7 @@ export interface GraphFile {
 }
 
 export function toGraphFile(
-  architecture: 'spyker' | 'hierfl',
+  architecture: Architecture,
   nodes: Node[],
   edges: Edge[],
 ): GraphFile {
@@ -95,10 +96,8 @@ export function graphFileName(graphId: number, name: string | null, architecture
   return `${graphId}_${slug}_${architecture}.json`;
 }
 
-export type ImportedNodeKind = 'ClientNode' | 'ServerNode' | 'SuperServerNode';
-
 export interface ImportedGraph {
-  nodes: Array<{ id: string; point: { x: number; y: number }; kind: ImportedNodeKind; config: Record<string, unknown> }>;
+  nodes: Array<{ id: string; point: { x: number; y: number }; kind: NodeKind; config: Record<string, unknown> }>;
   edges: Array<{
     id: string;
     source: string;
@@ -110,8 +109,6 @@ export interface ImportedGraph {
 }
 
 export class GraphFileError extends Error {}
-
-const NODE_KINDS: readonly ImportedNodeKind[] = ['ClientNode', 'ServerNode', 'SuperServerNode'];
 
 /** Upper bounds that keep a hand-edited or hostile file from freezing the editor. */
 export const GRAPH_FILE_LIMITS = {
@@ -139,7 +136,7 @@ export function parseGraphFile(raw: unknown, createId: () => string): ImportedGr
   const nodes = raw['nodes'].map((entry, index): ImportedGraph['nodes'][number] => {
     const data = isRecord(entry) && isRecord(entry['data']) ? entry['data'] : {};
     const kind = data['type'];
-    if (!isRecord(entry) || !NODE_KINDS.includes(kind as ImportedNodeKind)) {
+    if (!isRecord(entry) || !isNodeKind(kind)) {
       throw new GraphFileError(`Node ${index + 1} has an unknown type.`);
     }
     const id = createId();
@@ -149,7 +146,7 @@ export function parseGraphFile(raw: unknown, createId: () => string): ImportedGr
     return {
       id,
       point: readPoint(entry['point']),
-      kind: kind as ImportedNodeKind,
+      kind,
       config: readConfig(data['config']),
     };
   });
