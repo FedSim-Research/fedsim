@@ -1,4 +1,4 @@
-import { Directive, HostListener, inject, ElementRef, input, ChangeDetectorRef} from '@angular/core';
+import { Directive, HostListener, inject, ElementRef, input, effect, untracked } from '@angular/core';
 import { HierflGraphService } from './topologies/hierfl-graph.service';
 import { SpykerGraphService } from './topologies/spyker-graph.service';
 import { StaticNode as Node } from 'ngx-vflow';
@@ -34,6 +34,14 @@ export class Shortcuts{
   public shiftDown = false;
   private selecting = false;
   private lastSelectElements: Array<HTMLElement | SVGElement> = [];
+
+  constructor() {
+    // A selection only makes sense inside the graph it was made in.
+    effect(() => {
+      this.activeService();
+      untracked(() => this.clearSelectionState());
+    });
+  }
 
   @HostListener('window:keydown', ['$event'])
   public onKeyDown(event: KeyboardEvent): void {
@@ -76,24 +84,9 @@ export class Shortcuts{
     if (event.key === 'Delete' || event.key === 'Backspace') {
       if (!this.selectedEdgeIds.size && !this.selectedNodeIds.size) return;
       event.preventDefault();
-      const edgeIds = Array.from(this.selectedEdgeIds);
-      for (const edgeId of edgeIds) {
-        if (this.graphServiceSpyker.edges().some((e) => e.id === edgeId)) {
-          this.graphServiceSpyker.removeEdgeById(edgeId);
-        } else if (this.graphServiceHierfl.edges().some((e) => e.id === edgeId)) {
-          this.graphServiceHierfl.removeEdgeById(edgeId);
-        }
-      }
-      this.selectedEdgeIds.clear();
-      const nodeIds = Array.from(this.selectedNodeIds);
-      for (const nodeId of nodeIds) {
-        if (this.graphServiceSpyker.nodes().some((node) => node.id === nodeId)) {
-          this.graphServiceSpyker.removeNodeById(nodeId);
-        } else if (this.graphServiceHierfl.nodes().some((node) => node.id === nodeId)) {
-          this.graphServiceHierfl.removeNodeById(nodeId);
-        }
-      }
+      this.activeService().removeEntities(this.selectedNodeIds, this.selectedEdgeIds);
       this.selectedNodeIds.clear();
+      this.selectedEdgeIds.clear();
     }
   }
 
