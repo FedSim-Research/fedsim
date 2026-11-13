@@ -132,7 +132,7 @@ export class App implements OnInit{
   }
 
 
- public changeMode(mode: Architecture): void {
+  public changeMode(mode: Architecture): void {
     if (this.activeMode() === mode) return;
     this.activeMode.set(mode);
   }
