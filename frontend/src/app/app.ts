@@ -1,6 +1,6 @@
 import { Component, inject, ViewChild, computed, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Vflow, VflowComponent, StaticNode as Node, StaticEdge as Edge, NodePositionChange, Connection, ConnectionSettings } from 'ngx-vflow';
+import { Vflow, VflowComponent, StaticEdge as Edge, NodePositionChange, Connection, ConnectionSettings } from 'ngx-vflow';
 import { FlowRenderer } from './editor/flow-renderer';
 import { NgxSelectoModule } from 'ngx-selecto';
 import { Shortcuts } from './editor/shortcuts.directive';
@@ -16,6 +16,7 @@ import { SimulationRequest } from './runs/simulation-request';
 import { v4 as uuidv4 } from 'uuid';
 import { Architecture, isNodeKind, NodeKind } from './domain/topology';
 import { createGraphNode } from './editor/nodes/node-factory';
+import { NodeDrag } from './editor/node-drag';
 import { canConnect, normalizeConnection } from './editor/connection-policy';
 
 export type workspaceView = 'editor' | 'dashboard';
@@ -70,11 +71,10 @@ export class App implements OnInit{
     return graph.getGraphId() ?? graph.loadGraphIdFromStorage();
   }
 
-  private _dragging = false;
-  private _dragCooldown = false;
-
-  private _lastPosChanges: NodePositionChange[] | null = null;
-  private _dragPrimaryId: string | null = null;
+  private readonly drag = new NodeDrag(
+    () => this.activeGraph(),
+    () => this.shortcuts?.selectedNodeIds ?? new Set<string>(),
+  );
 
   public connectionSettings: ConnectionSettings = {
     mode: 'loose',
@@ -182,126 +182,8 @@ export class App implements OnInit{
     console.log('added new edge', newEdge);
   }
 
-  public handleNodePositionChange(posChanges: NodePositionChange[]){
-    if (!posChanges?.length) return;
-
-    if (this._dragCooldown) return;
-
-    const currentId = posChanges[0].id;
-
-    if (this._dragPrimaryId !== currentId) {
-      this._dragPrimaryId = currentId;
-    }
-
-    if (!this._dragging) {
-      this._dragging = true;
-      const dragSessionId = currentId;
-
-      const listeners = new AbortController();
-      const finish = () => {
-        listeners.abort();
-        this._dragging = false;
-        this._dragCooldown = true;
-        setTimeout(() => {
-          this._dragCooldown = false;
-        }, 50);
-
-        if (this._dragPrimaryId === dragSessionId) {
-          this._dragPrimaryId = null;
-        }
-
-        if (this._lastPosChanges) {
-          this.activeGraph().moveNodes(this._lastPosChanges);
-          this._lastPosChanges = null;
-        }
-      };
-
-      // Whichever end event fires first finishes the drag and removes the others.
-      for (const type of ['pointerup', 'pointercancel', 'mouseup', 'touchend', 'touchcancel']) {
-        window.addEventListener(type, finish, { signal: listeners.signal });
-      }
-    }
-
-    const expandedChanges = this.expandSelectedNodeChanges(posChanges);
-    this.previewNodePositionChanges(expandedChanges);
-    this._lastPosChanges = expandedChanges;
-  }
-
-  private expandSelectedNodeChanges(posChanges: NodePositionChange[]): NodePositionChange[] {
-    const selection = this.shortcuts?.selectedNodeIds;
-    if (!selection || selection.size <= 1) {
-      return posChanges;
-    }
-    const nodes = this.activeGraph().nodes();
-    const nodeMap = new Map(nodes.map((node) => [node.id, node]));
-    const primaryChange = posChanges[0];
-    if (!primaryChange) {
-      return posChanges;
-    }
-    if (!selection.has(primaryChange.id)) {
-      return posChanges;
-    }
-    const primaryNode = nodeMap.get(primaryChange.id);
-    if (!primaryNode) {
-      return posChanges;
-    }
-    const basePoint = primaryNode.point ?? { x: 0, y: 0 };
-    const dx = primaryChange.point.x - basePoint.x;
-    const dy = primaryChange.point.y - basePoint.y;
-    if (dx === 0 && dy === 0) {
-      return posChanges;
-    }
-
-    const alreadyChanged = new Set(posChanges.map((change) => change.id));
-    const additions: NodePositionChange[] = [];
-    for (const id of selection) {
-      if (alreadyChanged.has(id)) {
-        continue;
-      }
-      const node = nodeMap.get(id);
-      if (!node) {
-        continue;
-      }
-      const point = node.point ?? { x: 0, y: 0 };
-      additions.push({
-        type: 'position',
-        id,
-        point: {
-          x: point.x + dx,
-          y: point.y + dy,
-        },
-      });
-      alreadyChanged.add(id);
-    }
-
-    if (!additions.length) {
-      return posChanges;
-    }
-    return [...posChanges, ...additions];
-  }
-
-  private previewNodePositionChanges(posChanges: NodePositionChange[]): void {
-    const changeMap = new Map(posChanges.map((change) => [change.id, change.point]));
-    const currentNodes = this.activeGraph().nodes();
-
-    const updatedNodes = currentNodes.map((node) => {
-      const nextPoint = changeMap.get(node.id);
-      if (!nextPoint) {
-        return node;
-      }
-
-      if (node.id === this._dragPrimaryId) {
-        (node as any).point = nextPoint;
-        return node;
-      }
-
-      return {
-        ...node,
-        point: nextPoint,
-      } as Node;
-    });
-
-    this.activeGraph().nodes.set([...updatedNodes]);
+  public handleNodePositionChange(changes: NodePositionChange[]): void {
+    this.drag.handle(changes);
   }
 
   public handleSimulation(request: SimulationRequest): void {
