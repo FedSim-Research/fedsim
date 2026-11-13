@@ -7,7 +7,8 @@ import { DialogModule } from 'primeng/dialog';
 import { ButtonModule } from 'primeng/button';
 import { ListboxModule } from 'primeng/listbox';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
-import { MessageService } from 'primeng/api';
+import { ConfirmationService, MessageService } from 'primeng/api';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { Shortcuts } from '../shortcuts.directive';
 import { graphFileFromDetail, graphFileName } from '../graph-file';
 import { downloadJson } from '../../shared/download';
@@ -17,12 +18,13 @@ import { downloadJson } from '../../shared/download';
   standalone: true,
   templateUrl: './view-graphs.html',
   styleUrls: ['./view-graphs.css'],
-  imports: [CommonModule, FormsModule, ToastModule, DialogModule, ButtonModule, ListboxModule, ProgressSpinnerModule],
+  imports: [CommonModule, FormsModule, ToastModule, DialogModule, ButtonModule, ListboxModule, ProgressSpinnerModule, ConfirmDialogModule],
   providers: [MessageService],
 })
 export class ViewGraphsDialog implements OnInit, OnChanges {
   private graphApiService = inject(GraphApiService);
   private messageService = inject(MessageService);
+  private confirmationService = inject(ConfirmationService);
 
   @Input() isDarkMode = true;
   @Input() shortcuts?: Shortcuts;
@@ -204,8 +206,21 @@ export class ViewGraphsDialog implements OnInit, OnChanges {
     this.editingGraphId = null;
   }
 
-  public async deleteGraph(graph: GraphResponse, event?: Event): Promise<void> {
+  public deleteGraph(graph: GraphResponse, event?: Event): void {
     event?.stopPropagation();
+    this.confirmationService.confirm({
+      key: 'graph-delete',
+      header: 'Delete graph',
+      message: `Delete "${graph.name ?? `Graph ${graph.graph_id}`}" with all its nodes and edges? This cannot be undone.`,
+      acceptLabel: 'Delete',
+      rejectLabel: 'Cancel',
+      acceptButtonStyleClass: 'p-button-danger',
+      rejectButtonStyleClass: 'p-button-text',
+      accept: () => void this.confirmDeleteGraph(graph),
+    });
+  }
+
+  private async confirmDeleteGraph(graph: GraphResponse): Promise<void> {
     try {
       await this.graphApiService.deleteGraph(graph.graph_id);
       this.graphs = this.graphs.filter((item) => item.graph_id !== graph.graph_id);
