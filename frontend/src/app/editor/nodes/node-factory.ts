@@ -24,7 +24,8 @@ export interface GraphNodeInit {
 export function createGraphNode({ id, kind, architecture, point, config }: GraphNodeInit): Node {
   return {
     id,
-    point,
+    // Canvas coordinates arrive as DOMPoint, whose x/y getters do not survive spreading or JSON.
+    point: { x: point.x, y: point.y },
     type: NODE_COMPONENTS[kind],
     data: { type: kind, config, environment: architecture, selected: false },
   };

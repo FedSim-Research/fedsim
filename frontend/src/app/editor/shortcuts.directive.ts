@@ -237,7 +237,7 @@ export class Shortcuts{
       .filter((node) => this.selectedNodeIds.has(node.id))
       .map((node) => {
         const data = (node as { data?: { type?: NodeKind; config?: Record<string, unknown> } }).data ?? {};
-        return { kind: data.type!, point: { ...node.point }, config: { ...(data.config ?? {}) } };
+        return { kind: data.type!, point: { x: node.point.x, y: node.point.y }, config: { ...(data.config ?? {}) } };
       });
   }
 

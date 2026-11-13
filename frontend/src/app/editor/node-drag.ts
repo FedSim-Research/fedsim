@@ -51,7 +51,7 @@ export class NodeDrag {
 
   private begin(draggedId: string): void {
     this.draggedId = draggedId;
-    this.origin = new Map(this.graph().nodes().map((node) => [node.id, { ...node.point }]));
+    this.origin = new Map(this.graph().nodes().map((node) => [node.id, { x: node.point.x, y: node.point.y }]));
     this.endListeners = new AbortController();
     for (const type of END_EVENTS) {
       window.addEventListener(type, () => this.finish(), { signal: this.endListeners.signal });
