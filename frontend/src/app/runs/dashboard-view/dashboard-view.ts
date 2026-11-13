@@ -5,6 +5,7 @@ import { GraphApiService, SimulationRunResponse, SimulationRunResult } from '../
 import { APP_CONFIG } from '../../config/app-config';
 import { FrameworkJobsService } from '../framework-jobs.service';
 import { DashboardRunsService } from '../dashboard-runs.service';
+import { formatRunProgress } from '../run-progress';
 
 type ComparableMetrics = {
   accuracy: number | null;
@@ -160,9 +161,9 @@ export class DashboardViewComponent {
   }
 
   public formatProgress(run: SimulationRunResponse): string {
-    const progress = this.getProgressPercent(run);
-    return progress === null ? '-' : `${progress.toFixed(1)}%`;
+    return formatRunProgress(run);
   }
+
 
   public getRunMetrics(run: SimulationRunResult): ComparableMetrics {
     if (run.evaluation) {
@@ -318,24 +319,6 @@ export class DashboardViewComponent {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }
-
-  private getProgressPercent(run: SimulationRunResponse): number | null {
-    const currentRaw = run.current_sim_time;
-    const limitRaw = run.run_time_limit;
-
-    const current = currentRaw === null || currentRaw === undefined ? Number.NaN : Number(currentRaw);
-    const limit = limitRaw === null || limitRaw === undefined ? Number.NaN : Number(limitRaw);
-
-    if (!Number.isFinite(current)) {
-      return null;
-    }
-    if (!Number.isFinite(limit) || limit <= 0) {
-      return null;
-    }
-
-    const percent = (current / limit) * 100;
-    return Math.max(0, Math.min(100, percent));
   }
 
   private runTimeRange(run: SimulationRunResponse | null): { from: number; to: number } {
