@@ -140,7 +140,7 @@ export class Shortcuts{
   public onSelectoDragStart(event: SelectoDragStart) {
     const input = event.inputEvent as PointerEvent | MouseEvent | TouchEvent | undefined;
 
-    const targetEl = (input && 'target' in input) ? (input as any).target as Element | null : null;
+    const targetEl = input?.target instanceof Element ? input.target : null;
     if (targetEl && targetEl.closest('app-sidebar')) {
       event.stop();
       return;
