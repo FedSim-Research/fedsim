@@ -10,7 +10,7 @@ import { nodeLimitViolation } from '../domain/node-limits';
 /** Edits within this window are written to the backend as one request. */
 const SAVE_DEBOUNCE_MS = 300;
 
-type NodeWithData = Node & { data?: Record<string, any> };
+type NodeWithData = Node & { data?: { type?: NodeKind; config?: Record<string, unknown> } };
 type EdgeDataPayload = {
   metrics: EdgeMetrics;
   selected?: boolean;
@@ -29,7 +29,6 @@ export abstract class GraphService {
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private saveQueue: Promise<void> = Promise.resolve();
   private hasUnsavedChanges = false;
-
   protected readonly graphHistory = new GraphHistory();
 
   protected constructor(public readonly architecture: Architecture) {}
@@ -59,28 +58,6 @@ export abstract class GraphService {
     this.graphHistory.resetHistory(this.applyState(nodes, edges));
   }
 
-  /** Steps back in history. Returns false when there was nothing to undo. */
-  public undo(): boolean {
-    return this.moveInHistory(() => this.graphHistory.undo());
-  }
-
-  /** Re-applies an undone step. Returns false when there was nothing to redo. */
-  public redo(): boolean {
-    return this.moveInHistory(() => this.graphHistory.redo());
-  }
-
-  private moveInHistory(step: () => void): boolean {
-    const before = this.graphHistory.getState();
-    step();
-    const after = this.graphHistory.getState();
-    if (after === before) {
-      return false;
-    }
-    this.applyState(after.nodes, after.edges);
-    this.scheduleSave();
-    return true;
-  }
-
   /** Adds a node. Returns why it was rejected, or null when it was added. */
   public addNode(newNode: Node): string | null {
     return this.addEntities([newNode], []);
@@ -105,25 +82,6 @@ export abstract class GraphService {
     this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
     this.scheduleSave();
     return null;
-  }
-
-  /**
-   * Marks exactly the given nodes and edges as selected. Selection is view state:
-   * it is neither recorded in history nor saved.
-   */
-  public setSelection(nodeIds: ReadonlySet<string>, edgeIds: ReadonlySet<string>): void {
-    this.nodes.set(withSelection(this.nodes(), nodeIds));
-    this.edges.set(withSelection(this.edges(), edgeIds));
-  }
-
-  /** Topology hook: adjusts edges after nodes moved. Must return `edges` itself when nothing changed. */
-  protected linksAfterMove(_nodes: Node[], edges: Edge[]): Edge[] {
-    return edges;
-  }
-
-  /** Topology hook: edges an architecture adds automatically for new nodes. */
-  protected linksForNewNodes(_newNodes: Node[]): Edge[] {
-    return [];
   }
 
   public removeNodeById(nodeId: string): void {
@@ -151,6 +109,25 @@ export abstract class GraphService {
     this.scheduleSave();
   }
 
+  public updateNodeConfig(nodeId: string, configPatch: Record<string, unknown>): void {
+    this.nodes.update((nodes) =>
+      nodes.map((node) => {
+        if (node.id !== nodeId) return node;
+        const nodeData = (node as NodeWithData).data ?? {};
+        const currentConfig = nodeData.config ?? {};
+        return {
+          ...node,
+          data: {
+            ...nodeData,
+            config: { ...currentConfig, ...configPatch },
+          },
+        } as NodeWithData;
+      })
+    );
+    this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
+    this.scheduleSave();
+  }
+
   public updateEdgeMetrics(edgeId: string, metrics: EdgeMetrics): void {
     const normalized = normalizeEdgeMetrics(metrics);
     this.edges.update((edges) =>
@@ -165,20 +142,6 @@ export abstract class GraphService {
     );
     this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
     this.scheduleSave();
-  }
-
-  /** Replaces the whole graph content as one undoable step, e.g. for imports. */
-  public replaceContents(nodes: Node[], edges: Edge[]): void {
-    this.applyState(nodes, edges);
-    this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
-    this.scheduleSave();
-  }
-
-  /** Removes all nodes and edges; the graph itself and its settings are kept. */
-  public resetGraph(): void {
-    if (this.nodes().length || this.edges().length) {
-      this.replaceContents([], []);
-    }
   }
 
   /** Shows intermediate drag positions; neither recorded in history nor saved. */
@@ -205,24 +168,37 @@ export abstract class GraphService {
     this.scheduleSave();
   }
 
+  /**
+   * Marks exactly the given nodes and edges as selected. Selection is view state:
+   * it is neither recorded in history nor saved.
+   */
+  public setSelection(nodeIds: ReadonlySet<string>, edgeIds: ReadonlySet<string>): void {
+    this.nodes.set(withSelection(this.nodes(), nodeIds));
+    this.edges.set(withSelection(this.edges(), edgeIds));
+  }
 
-  public updateNodeConfig(nodeId: string, configPatch: Record<string, unknown>): void {
-    this.nodes.update((nodes) =>
-      nodes.map((node) => {
-        if (node.id !== nodeId) return node;
-        const nodeData = (node as NodeWithData).data ?? {};
-        const currentConfig = (nodeData['config'] as Record<string, unknown>) ?? {};
-        return {
-          ...node,
-          data: {
-            ...nodeData,
-            config: { ...currentConfig, ...configPatch },
-          },
-        } as NodeWithData;
-      })
-    );
+  /** Replaces the whole graph content as one undoable step, e.g. for imports. */
+  public replaceContents(nodes: Node[], edges: Edge[]): void {
+    this.applyState(nodes, edges);
     this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
     this.scheduleSave();
+  }
+
+  /** Removes all nodes and edges; the graph itself and its settings are kept. */
+  public resetGraph(): void {
+    if (this.nodes().length || this.edges().length) {
+      this.replaceContents([], []);
+    }
+  }
+
+  /** Steps back in history. Returns false when there was nothing to undo. */
+  public undo(): boolean {
+    return this.moveInHistory(() => this.graphHistory.undo());
+  }
+
+  /** Re-applies an undone step. Returns false when there was nothing to redo. */
+  public redo(): boolean {
+    return this.moveInHistory(() => this.graphHistory.redo());
   }
 
   /** Forgets the open graph after it was deleted elsewhere; pending edits are dropped. */
@@ -246,6 +222,16 @@ export abstract class GraphService {
     return this.saveQueue;
   }
 
+  /** Topology hook: edges an architecture adds automatically for new nodes. */
+  protected linksForNewNodes(_newNodes: Node[]): Edge[] {
+    return [];
+  }
+
+  /** Topology hook: adjusts edges after nodes moved. Must return `edges` itself when nothing changed. */
+  protected linksAfterMove(_nodes: Node[], edges: Edge[]): Edge[] {
+    return edges;
+  }
+
   /** Persists the current state shortly; bursts of edits are coalesced into one request. */
   protected scheduleSave(): void {
     this.hasUnsavedChanges = true;
@@ -253,6 +239,18 @@ export abstract class GraphService {
       clearTimeout(this.saveTimer);
     }
     this.saveTimer = setTimeout(() => void this.flushSave(), SAVE_DEBOUNCE_MS);
+  }
+
+  private moveInHistory(step: () => void): boolean {
+    const before = this.graphHistory.getState();
+    step();
+    const after = this.graphHistory.getState();
+    if (after === before) {
+      return false;
+    }
+    this.applyState(after.nodes, after.edges);
+    this.scheduleSave();
+    return true;
   }
 
   private async saveNow(): Promise<void> {
@@ -313,7 +311,7 @@ export abstract class GraphService {
 }
 
 function kindsOf(nodes: Node[]): NodeKind[] {
-  return nodes.map((node) => (node as NodeWithData).data?.['type'] as NodeKind);
+  return nodes.map((node) => (node as NodeWithData).data?.type as NodeKind);
 }
 
 /** Returns `items` with updated selection flags, keeping unchanged items (and the array) as they are. */
