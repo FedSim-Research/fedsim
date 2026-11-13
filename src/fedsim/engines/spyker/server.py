@@ -59,6 +59,8 @@ class SpykerServer(BaseAsyncServer):
         # A round includes our own broadcast and one contribution per peer.
         self._sync_participants: OrderedDict[str, set[str]] = OrderedDict()
         self._sync_sequence = 0
+        self._sync_rounds_completed = 0
+        self._peer_models_aggregated = 0
         self.MAX_BROADCAST_CACHE = 1000
 
         self._cached_global_weights_ref = None
@@ -121,6 +123,9 @@ class SpykerServer(BaseAsyncServer):
             "model_age": self.model_age,
             "total_client_updates": sum(self.client_update_counts.values()),
             "has_token": int(self.has_token),
+            "sync_rounds_initiated": self._sync_sequence,
+            "sync_rounds_completed": self._sync_rounds_completed,
+            "peer_models_aggregated": self._peer_models_aggregated,
         }
 
     # ==============================================================
@@ -306,6 +311,10 @@ class SpykerServer(BaseAsyncServer):
 
         self.model_age = max(old_age, self.model_age)
         self.server_ages[self.server_id] = self.model_age
+
+        self._peer_models_aggregated += 1
+        if len(participants) == self.total_servers:
+            self._sync_rounds_completed += 1
 
         if self.model_age > old_age:
             print(

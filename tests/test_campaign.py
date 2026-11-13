@@ -28,6 +28,19 @@ def config(**changes):
     )
 
 
+def exchange_details():
+    return {
+        f"server-{i}": {
+            "server_stats": {
+                "sync_rounds_initiated": int(i == 0),
+                "sync_rounds_completed": 1,
+                "peer_models_aggregated": 2,
+            }
+        }
+        for i in range(3)
+    }
+
+
 def test_plan_has_matched_inputs_unique_outputs_and_alternating_order():
     plan = campaign.build_plan(config(), "test-campaign")
     assert len(plan["cases"]) == 12
@@ -150,11 +163,11 @@ def test_campaign_round_trip_uses_real_graph_and_export_routes(
                     "log_type": "periodic_evaluation",
                     "run_id": run_id,
                     "architecture": architecture,
-                    "virtual_time": 0,
+                    "virtual_time": 60,
                     "round": 0,
                     "accuracy": 0.5,
                     "loss": 1,
-                    "server_stats": {"per_server": {"A": {"round": 0}}},
+                    "server_stats": {"per_server": exchange_details()},
                 }
             )
         return SimpleNamespace(run_id=identity, to_api_dict=lambda: state)
@@ -187,7 +200,7 @@ def test_campaign_round_trip_uses_real_graph_and_export_routes(
         folder = output / case["key"]
         points = json.loads((folder / "evaluations.json").read_text())
         assert len(points) == 1 and points[0]["run_id"].endswith(":42:1")
-        assert points[0]["server_stats"]["per_server"] == {"A": {"round": 0}}
+        assert points[0]["server_stats"]["per_server"] == exchange_details()
         assert (
             folder / "checkpoint-1.pth"
         ).read_bytes() == b"checkpoint fixture, not trained weights"
@@ -219,6 +232,9 @@ def test_campaign_round_trip_uses_real_graph_and_export_routes(
     network = json.loads((CONFIG.parent / "network-sensitivity.json").read_text())["network"]
     with pytest.raises(ValueError, match="conditions_mismatch"):
         campaign._calibration_review(review, config(network=network))
+    parameters = config().spyker_config.model_dump()
+    with pytest.raises(ValueError, match="conditions_mismatch"):
+        campaign._calibration_review(review, config(spyker_config={**parameters, "h_intra": 8}))
     campaign._write_json(review, {**decision, "rationale": "  "})
     with pytest.raises(ValueError, match="requires_rationale"):
         campaign._calibration_review(review, config())
@@ -282,7 +298,7 @@ def test_incomplete_or_invalid_server_evidence_cannot_complete_a_campaign(defect
         },
         "server_checkpoints": {key: "model.pth" for key in peers},
     }
-    points = [{"virtual_time": 0}]
+    points = [{"virtual_time": 60, "server_stats": {"per_server": exchange_details()}}]
     campaign._check_result(result, case, points)
     if defect == "missing_peer":
         peers.pop("server-2")
@@ -512,4 +528,89 @@ def test_plan_reuse_cannot_overwrite_existing_checkpoint_directory(tmp_path):
         campaign.execute_plan(
             plan, tmp_path, "http://backend", client=client, checkpoint_root=tmp_path
         )
+    assert client.request.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "defect", ["token_only", "partial_round", "missing_counter", "boolean_counter"]
+)
+def test_exchange_requirement_rejects_missing_or_incomplete_peer_exchange(defect):
+    case = next(
+        c
+        for c in campaign.build_plan(config(), "sync-proof")["cases"]
+        if c["architecture"] == "spyker"
+    )
+    peers = {key: {"accuracy": 0.5, "avg_loss": 1.0} for key in exchange_details()}
+    result = {
+        "runs": [{"seed": 42}],
+        "server_checkpoints": dict.fromkeys(peers, "model.pth"),
+        "evaluation": {
+            "accuracy": 0.5,
+            "avg_loss": 1.0,
+            "aggregation": "server_macro_mean",
+            "server_count": 3,
+            "per_server": peers,
+        },
+    }
+    details = exchange_details()
+    points = [{"virtual_time": 60, "server_stats": {"per_server": details}}]
+    campaign._check_result(result, case, points)
+    if defect == "token_only":
+        for item in details.values():
+            item["server_stats"] = dict.fromkeys(item["server_stats"], 0)
+    elif defect == "partial_round":
+        details["server-2"]["server_stats"]["sync_rounds_completed"] = 0
+    elif defect == "missing_counter":
+        details["server-0"]["server_stats"].pop("sync_rounds_initiated")
+    else:
+        details["server-0"]["server_stats"]["sync_rounds_initiated"] = True
+    with pytest.raises(ValueError, match="missing_peer_exchange_evidence"):
+        campaign._check_result(result, case, points)
+
+
+def test_saved_legacy_plans_retain_default_algorithm_and_do_not_invent_sync_evidence(tmp_path):
+    legacy = config(spyker_config=None, require_peer_exchange=None)
+    plan = campaign.build_plan(legacy, "legacy-plan")
+    assert "spyker_config" not in plan["config"]
+    assert "require_peer_exchange" not in plan["config"]
+    spyker = next(c for c in plan["cases"] if c["architecture"] == "spyker")
+    assert spyker["request"]["spyker_config"]["h_intra"] == 350
+    assert "require_peer_exchange" not in spyker
+    path = tmp_path / "plan.json"
+    campaign._write_json(path, plan)
+    assert campaign.read_plan(path) == plan
+    assert config().spyker_config.h_intra == 4
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("h_intra", 0), ("h_inter", True), ("decay_beta", float("nan")), ("tcp_rto_delay", -1)],
+)
+def test_invalid_campaign_algorithm_parameters_are_rejected(field, value):
+    with pytest.raises(ValidationError):
+        config(spyker_config={**config().spyker_config.model_dump(), field: value})
+
+
+def test_status_transport_errors_are_retried_without_repeating_submissions(monkeypatch):
+    monkeypatch.setattr(campaign.time, "sleep", lambda _: None)
+    client = Mock()
+    response = Mock()
+    client.request.side_effect = [requests.ConnectionError("reset"), requests.Timeout(), response]
+    assert campaign._request(client, "GET", "http://backend/runs/test") is response
+    assert client.request.call_count == 3
+    client.reset_mock()
+    client.request.side_effect = requests.ConnectionError("reset")
+    with pytest.raises(requests.ConnectionError):
+        campaign._request(client, "GET", "http://backend/runs/test")
+    assert client.request.call_count == 3
+    for method in ("POST", "PUT"):
+        client.reset_mock()
+        with pytest.raises(requests.ConnectionError):
+            campaign._request(client, method, "http://backend/start_simulation")
+        assert client.request.call_count == 1
+    client.reset_mock()
+    client.request.side_effect = None
+    client.request.return_value.raise_for_status.side_effect = requests.HTTPError("404")
+    with pytest.raises(requests.HTTPError):
+        campaign._request(client, "GET", "http://backend/runs/missing")
     assert client.request.call_count == 1

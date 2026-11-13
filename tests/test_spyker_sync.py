@@ -87,6 +87,10 @@ def test_initiator_aggregates_each_peer_before_releasing_token(servers):
     receive(server, "C", bid, 300)
     assert weight(server) == pytest.approx(18.1)
     assert not server._get_and_clear_events()
+    metrics = server.get_metrics()
+    assert metrics["sync_rounds_initiated"] == 1
+    assert metrics["sync_rounds_completed"] == 1
+    assert metrics["peer_models_aggregated"] == 2
 
 
 @pytest.mark.parametrize(
@@ -197,6 +201,11 @@ def test_three_server_exchange_delivers_all_six_models(reverse_ties, slow_initia
     assert weight(servers["C"]) == pytest.approx(22.8)
     assert len(token_events) == 1 and token_events[0][1] == "B"
     assert sum(server.has_token for server in servers.values()) == 0  # Token is in transit.
+    for name, server in servers.items():
+        metrics = server.get_metrics()
+        assert metrics["sync_rounds_initiated"] == int(name == "A")
+        assert metrics["sync_rounds_completed"] == 1
+        assert metrics["peer_models_aggregated"] == 2
     assert not ray.is_initialized()
 
 
@@ -217,6 +226,9 @@ def test_single_server_starts_without_self_messages(local_actor, next_peer):
     server._pass_token()
     assert server.has_token
     assert not server._get_and_clear_events()
+    assert server.get_metrics()["sync_rounds_initiated"] == 0
+    assert server.get_metrics()["sync_rounds_completed"] == 0
+    assert server.get_metrics()["peer_models_aggregated"] == 0
 
 
 @pytest.mark.parametrize("self_link", [False, True])

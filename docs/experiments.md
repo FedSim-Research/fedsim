@@ -25,12 +25,35 @@ reproduce the historical large experiments or establish protocol fidelity.
 | Timing noise / jitter / loss | Zero |
 | GPU budget | Zero; CPU training and evaluation |
 
-HierFL adds its coordinator; Spyker connects all peers. Spyker algorithm parameters
-are expanded from the current defaults into the archived request. Generated node
+HierFL adds its coordinator; Spyker connects all peers. Both supplied profiles
+explicitly record all Spyker algorithm parameters. They retain the engine defaults
+except `h_intra=4`, which requests synchronization at a model-age difference of
+four since the last exchange; `h_inter` remains 5. This is a small-topology
+calibration choice, not an optimal setting or a new protocol. The first real
+60-second pilot with the original `h_intra=350` completed eight client updates per
+server without any peer-model exchange. Its results remain a separate baseline.
+Global engine defaults are unchanged. Generated node
 order fixes server registration and client partition-index mapping. Changing the
 placement changes which server owns each index, while retaining the six partitions.
 Architecture order alternates between seeds to reduce first-run/cache effects.
 This is a fixed order, not a randomized experimental design.
+
+The supplied profiles set `require_peer_exchange=true`. Collection then requires
+at least one locally completed exchange at every Spyker server and one initiated
+round somewhere in the mesh, evidenced by the last periodic snapshot. Each server
+must have accepted at least one contribution per peer. Token circulation or
+positive accuracy alone cannot satisfy this check. A proof failure retains the
+raw results but marks the campaign interrupted. This evidence establishes that
+exchange occurred, not model consensus, convergence, or superiority.
+
+`sync_rounds_initiated` counts initiations by that actor,
+`sync_rounds_completed` counts rounds in which that actor accepted all distinct
+peer contributions, and `peer_models_aggregated` counts accepted contributions.
+These are local cumulative counters, not a global barrier or a count of independent
+observations. Duplicate messages in the retained cache do not increase them.
+Saved v1 plans without these optional controls remain readable, retain their
+original defaults and do not acquire fabricated exchange evidence. Such plans
+cannot approve a new measurement profile with different algorithm controls.
 
 The shared virtual horizon does **not** imply equal numbers of updates or equal
 wall-clock training work. Report that distinction, both time scales and Spyker's
@@ -163,7 +186,8 @@ horizon. Update the measurement configuration to the selected values and commit
 it before execution. If too little progress is visible, extend calibration first.
 `pilot_archive` is relative to the review file's directory (or absolute). The
 runner verifies its checksums, completed calibration pair, raw evaluation evidence,
-frozen definitions and checkpoint mapping. Training/network conditions must match;
+frozen definitions and checkpoint mapping. Training, network and Spyker algorithm
+controls must match;
 the selected horizon/interval must match the measurement configuration. The
 written rationale remains a human judgment, not an automated convergence test.
 If simulation code, dataset or resource conditions change, recalibrate.
@@ -201,7 +225,9 @@ contents and settings are checked against the plan before polling continues.
 Jobs run sequentially. The runner stops on failure, missing evaluation evidence,
 checkpoint-copy failure, or a 24-hour per-job polling timeout. Interruptions retain
 the execution journal and checksums of available artifacts. There is no automatic
-retry, resume, cancellation or graph deletion. A timed-out submission may already
+submission retry, resume, cancellation or graph deletion. Transport failures on
+GET requests are retried at most twice; HTTP error responses are not retried.
+A timed-out submission may already
 have been accepted: inspect the backend before starting another campaign. Stopping
 the client does not stop its backend job. Created graphs and backend files remain
 available for inspection.

@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import logging
 import math
 import re
 import shutil
@@ -37,6 +38,20 @@ class NetworkProfile(BaseModel):
     server_latency_ms: NonnegativeInt
 
 
+class SpykerParameters(BaseModel):
+    """Explicit campaign parameters; omitted profiles retain the engine defaults."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    decay_beta: Annotated[float, Field(ge=0, allow_inf_nan=False)]
+    min_learning_rate: PositiveFloat
+    h_inter: PositiveInt
+    h_intra: PositiveInt
+    sigmoid_phi: PositiveFloat
+    server_learning_rate: PositiveFloat
+    tcp_rto_delay: Annotated[float, Field(ge=0, allow_inf_nan=False)]
+
+
 class CampaignConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -53,6 +68,8 @@ class CampaignConfig(BaseModel):
     batch_size: PositiveInt
     model_complexity: PositiveFloat
     client_compute_factor: PositiveFloat
+    spyker_config: SpykerParameters | None = None
+    require_peer_exchange: Annotated[bool, Field(strict=True)] | None = None
 
     @model_validator(mode="after")
     def validate_comparison(self):
@@ -65,6 +82,8 @@ class CampaignConfig(BaseModel):
         server_count = len(next(iter(self.scenarios.values())))
         if server_count == 0:
             raise ValueError("campaign_requires_servers")
+        if self.require_peer_exchange and server_count < 2:
+            raise ValueError("campaign_peer_exchange_requires_multiple_servers")
         for field, values in self.network.model_dump().items():
             if field != "server_latency_ms" and len(values) != server_count:
                 raise ValueError("campaign_network_region_count_mismatch")
@@ -189,16 +208,23 @@ def build_plan(config: CampaignConfig, campaign_id: str) -> dict:
                                 "evaluate_model": True,
                                 "output_filename": f"campaigns/{campaign_id}/{key}/model.pth",
                             },
-                            "spyker_config": asdict(SpykerAlgorithmConfig())
+                            "spyker_config": (
+                                config.spyker_config.model_dump()
+                                if config.spyker_config is not None
+                                else asdict(SpykerAlgorithmConfig())
+                            )
                             if architecture == "spyker"
                             else None,
                         },
                     }
                 )
+                if config.require_peer_exchange is not None:
+                    cases[-1]["require_peer_exchange"] = config.require_peer_exchange
     return {
         "schema_version": 1,
         "campaign_id": campaign_id,
-        "config": config.model_dump(),
+        # Keep saved v1 plans without the optional controls byte-compatible.
+        "config": config.model_dump(exclude_none=True),
         "cases": cases,
     }
 
@@ -272,8 +298,10 @@ def _calibration_review(path: Path, config: CampaignConfig) -> dict:
         "batch_size",
         "model_complexity",
         "client_compute_factor",
+        "spyker_config",
+        "require_peer_exchange",
     ):
-        if pilot["config"][field] != config.model_dump()[field]:
+        if pilot["config"].get(field) != config.model_dump().get(field):
             raise ValueError("campaign_calibration_conditions_mismatch")
     if next(iter(pilot["config"]["scenarios"].values())) not in config.scenarios.values():
         raise ValueError("campaign_calibration_topology_mismatch")
@@ -307,10 +335,21 @@ def _validate_environment(environment: dict, source: dict) -> None:
 
 
 def _request(client, method, url, **kwargs):
-    # Never retry a submission: the server may have accepted a timed-out POST.
-    response = client.request(method, url, timeout=30, **kwargs)
-    response.raise_for_status()
-    return response
+    # Only reads may be repeated. A failed POST may already have been accepted.
+    attempts = 3 if method == "GET" else 1
+    for attempt in range(attempts):
+        try:
+            response = client.request(method, url, timeout=30, **kwargs)
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            if attempt + 1 == attempts:
+                raise
+            logging.getLogger(__name__).warning(
+                "campaign_read_retry attempt=%d error=%s", attempt + 1, type(exc).__name__
+            )
+            time.sleep(0.2)
+            continue
+        response.raise_for_status()
+        return response
 
 
 def _check_definition(metadata: dict, case: dict) -> None:
@@ -381,6 +420,25 @@ def _check_result(result: dict, case: dict, points: list[dict]) -> None:
         for field in ("accuracy", "avg_loss"):
             if not math.isclose(evaluation[field], sum(p[field] for p in peers.values()) / count):
                 raise ValueError("campaign_server_mean_mismatch")
+        if case.get("require_peer_exchange"):
+            latest = max(points, key=lambda point: point["virtual_time"])
+            details = latest.get("server_stats", {}).get("per_server", {})
+            if set(details) != set(peers):
+                raise ValueError("campaign_missing_peer_exchange_evidence")
+            counters = [item.get("server_stats", {}) for item in details.values()]
+            for item in counters:
+                for field in (
+                    "sync_rounds_initiated",
+                    "sync_rounds_completed",
+                    "peer_models_aggregated",
+                ):
+                    value = item.get(field)
+                    if type(value) is not int or value < 0:
+                        raise ValueError("campaign_missing_peer_exchange_evidence")
+                if item["sync_rounds_completed"] < 1 or item["peer_models_aggregated"] < count - 1:
+                    raise ValueError("campaign_missing_peer_exchange_evidence")
+            if sum(item["sync_rounds_initiated"] for item in counters) < 1:
+                raise ValueError("campaign_missing_peer_exchange_evidence")
     if any(not math.isfinite(m[field]) for m in metrics for field in ("accuracy", "avg_loss")):
         raise ValueError("campaign_nonfinite_metric")
 
