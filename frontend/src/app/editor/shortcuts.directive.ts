@@ -2,16 +2,22 @@ import { Directive, HostListener, inject, ElementRef, input, effect, untracked }
 import { HierflGraphService } from './topologies/hierfl-graph.service';
 import { SpykerGraphService } from './topologies/spyker-graph.service';
 import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
-import { ClientNode } from './nodes/client-node/client-node';
-import { ServerNode } from './nodes/server-node/server-node';
-import { SuperServerNode } from './nodes/super-server-node/super-server-node';
 import { MessageService } from 'primeng/api';
 import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'selecto';
 import { v4 as uuidv4 } from 'uuid';
 import { GRAPH_FILE_LIMITS, GraphFileError, parseGraphFile } from './graph-file';
 import { createGraphNode } from './nodes/node-factory';
-import { Architecture } from '../domain/topology';
+import { NodeKind } from '../domain/topology';
 
+
+/** Offset of pasted nodes from their originals, in canvas units. */
+const PASTE_OFFSET = 50;
+
+interface CopiedNode {
+  kind: NodeKind;
+  point: { x: number; y: number };
+  config: Record<string, unknown>;
+}
 
 @Directive({
   selector: '[appShortcuts]',
@@ -24,12 +30,7 @@ export class Shortcuts{
   protected messageService = inject(MessageService);
   protected elRef = inject(ElementRef) as ElementRef<HTMLElement>;
   public activeService = input.required<SpykerGraphService | HierflGraphService>();
-  private readonly nodeTypeMap = {
-    ClientNode,
-    ServerNode,
-    SuperServerNode,
-  } as const;
-  private clipboard: Node[] = [];
+  private clipboard: CopiedNode[] = [];
   public selectedNodeIds: Set<string> = new Set();
   public selectedEdgeIds: Set<string> = new Set();
   public shiftDown = false;
@@ -270,76 +271,33 @@ export class Shortcuts{
     this.resetBoxSelectionState();
   }
 
-  public copySelectedNodes() {
-    const ids = Array.from(this.selectedNodeIds);
-    const copied: any[] = [];
-    for (const id of ids) {
-      const n1 = this.graphServiceSpyker.nodes().find((n) => n.id === id);
-      const n2 = this.graphServiceHierfl.nodes().find((n) => n.id === id);
-      const src = n1 ?? n2;
-      if (src) {
-        const { id, ...rest } = src;
-        copied.push(JSON.parse(JSON.stringify(rest)));
-      }
-    }
-    this.clipboard = copied;
-  }
-
-  public pasteCopiedNodes() {
-    if (!this.clipboard.length) return;
-    const targetArchitecture = this.activeService() instanceof HierflGraphService ? 'hierfl' : 'spyker';
-    let blockedSuperServer = false;
-
-    const newNodeIds = this.clipboard.flatMap((node) => {
-      const typeString = ((node as any).data as any)?.type as keyof typeof this.nodeTypeMap | undefined;
-      if (targetArchitecture === 'spyker' && typeString === 'SuperServerNode') {
-        blockedSuperServer = true;
-        return [];
-      }
-      const newNode = this.buildPastedNode(node, targetArchitecture, typeString);
-      this.activeService().addNode(newNode);
-      return [newNode.id];
-    });
-
-    if (blockedSuperServer) {
-      this.messageService.add({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'No super server is allowed to exist in the Spyker Environment',
+  public copySelectedNodes(): void {
+    this.clipboard = this.activeService()
+      .nodes()
+      .filter((node) => this.selectedNodeIds.has(node.id))
+      .map((node) => {
+        const data = (node as { data?: { type?: NodeKind; config?: Record<string, unknown> } }).data ?? {};
+        return { kind: data.type!, point: { ...node.point }, config: { ...(data.config ?? {}) } };
       });
-    }
-
-    if (newNodeIds.length) {
-      this.applySelection(new Set(newNodeIds));
-    }
   }
 
-  private buildPastedNode(
-    sourceNode: Node,
-    targetArchitecture: Architecture,
-    typeString?: keyof typeof this.nodeTypeMap
-  ): Node {
-    const clone = JSON.parse(JSON.stringify(sourceNode));
-    const data = ((clone as any).data as any) ?? {};
-    const config = (data.config as Record<string, unknown> | undefined) ?? {};
-    const nextData = {
-      ...data,
-      selected: false,
-      fromJson: false,
-      environment: targetArchitecture,
-      config: {
-        ...config,
-        environment: targetArchitecture,
-      },
-    } as Record<string, unknown>;
-
-    return {
-      ...clone,
+  /** Pastes the copied nodes slightly offset, as one undoable step. */
+  public pasteCopiedNodes(): void {
+    if (!this.clipboard.length) return;
+    const service = this.activeService();
+    const nodes = this.clipboard.map((entry) => createGraphNode({
       id: uuidv4(),
-      type: typeString ? this.nodeTypeMap[typeString] : undefined,
-      point: { x: (sourceNode.point?.x ?? 0) + 50, y: (sourceNode.point?.y ?? 0) + 50 },
-      data: nextData,
-    };
+      kind: entry.kind,
+      architecture: service.architecture,
+      point: { x: entry.point.x + PASTE_OFFSET, y: entry.point.y + PASTE_OFFSET },
+      config: { ...entry.config, environment: service.architecture },
+    }));
+    const rejection = service.addEntities(nodes, []);
+    if (rejection) {
+      this.messageService.add({ severity: 'error', summary: 'Error', detail: rejection });
+      return;
+    }
+    this.applySelection(new Set(nodes.map((node) => node.id)));
   }
 
   private applyHistoryAction(action: 'undo' | 'redo'): void {

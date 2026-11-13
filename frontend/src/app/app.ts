@@ -114,22 +114,17 @@ export class App implements OnInit{
     if (!payload) {
       return;
     }
-    if (this.activeMode() === 'spyker' && payload.kind === 'SuperServerNode') {
-      this.messageService.add({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'No super server is allowed to exist in the Spyker Environment',
-      });
-      return;
-    }
     const pointer = { x: event.clientX, y: event.clientY };
-    this.activeGraph().addNode(createGraphNode({
+    const rejection = this.activeGraph().addNode(createGraphNode({
       id: uuidv4(),
       kind: payload.kind,
       architecture: this.activeMode(),
       point: this.flow?.documentPointToFlowPoint(pointer) ?? pointer,
       config: payload.config,
     }));
+    if (rejection) {
+      this.messageService.add({ severity: 'error', summary: 'Error', detail: rejection });
+    }
   }
 
   /** Reads the node template the sidebar put on the drag, ignoring foreign drops. */
