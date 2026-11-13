@@ -2,14 +2,14 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { StaticNode } from 'ngx-vflow';
-import { ServerNode } from '../nodes/server-node/server-node';
+import { createGraphNode } from '../nodes/node-factory';
 import { SpykerGraphService } from './spyker-graph.service';
 
 describe('SpykerGraphService', () => {
   let service: SpykerGraphService;
 
   function server(id: string): StaticNode {
-    return { id, point: { x: 0, y: 0 }, type: ServerNode, data: { type: 'ServerNode', config: {} } };
+    return createGraphNode({ id, kind: 'ServerNode', architecture: 'spyker', point: { x: 0, y: 0 }, config: {} });
   }
 
   beforeEach(() => {
