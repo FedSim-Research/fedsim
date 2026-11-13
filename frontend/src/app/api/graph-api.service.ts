@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { environment } from '../../environments/environment';
+import { APP_CONFIG } from '../config/app-config';
 import { EdgeMetrics } from './edge-metrics';
 import { SILENT_ERRORS } from './global-error.interceptor';
 
@@ -280,13 +280,22 @@ export interface PresetUpdate {
 @Injectable({ providedIn: 'root' })
 export class GraphApiService {
   private http = inject(HttpClient);
-  private baseUrl = (window as any).FEDSIM_API_BASE_URL ?? environment.apiBaseUrl;
+  private baseUrl = inject(APP_CONFIG).apiBaseUrl;
 
   private readonly silent = { context: new HttpContext().set(SILENT_ERRORS, true) };
 
   private url(path: string): string {
-    const trimmed = this.baseUrl.replace(/\/+$/, '');
-    return `${trimmed}${path}`;
+    return `${this.baseUrl}${path}`;
+  }
+
+  /** Download link for a run's results as CSV. */
+  public runCsvUrl(runId: string): string {
+    return this.url(`/runs/${encodeURIComponent(runId)}/export/csv`);
+  }
+
+  /** Download link for a run's log file. */
+  public runLogsUrl(runId: string): string {
+    return this.url(`/runs/${encodeURIComponent(runId)}/logs`);
   }
 
   public async createGraph(payload: GraphCreate): Promise<GraphResponse> {
