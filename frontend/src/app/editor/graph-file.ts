@@ -1,5 +1,6 @@
 import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
 import { normalizeEdgeMetrics } from '../api/edge-metrics';
+import { GraphDetail } from '../api/graph-api.service';
 
 export const GRAPH_FILE_VERSION = 1;
 
@@ -66,6 +67,32 @@ export function toGraphFile(
     nodeCount: fileNodes.length,
     edgeCount: fileEdges.length,
   };
+}
+
+/** Builds an export straight from a stored graph, independent of what the canvas shows. */
+export function graphFileFromDetail(detail: GraphDetail): GraphFile {
+  const nodes = detail.nodes.map((node) => ({
+    id: node.node_id,
+    point: node.position,
+    data: { type: node.type, config: node.config },
+  }));
+  const edges = detail.edges.map((edge) => ({
+    id: String(edge.edge_id),
+    source: edge.source_node_id,
+    target: edge.target_node_id,
+    data: { metrics: edge.config },
+  }));
+  return toGraphFile(detail.architecture, nodes as unknown as Node[], edges);
+}
+
+/** Lowercase, dash-separated name that is safe to use in a download file name. */
+export function graphFileName(graphId: number, name: string | null, architecture: string): string {
+  const slug = (name ?? '')
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-_]+/g, '')
+    .slice(0, 48) || 'graph';
+  return `${graphId}_${slug}_${architecture}.json`;
 }
 
 export type ImportedNodeKind = 'ClientNode' | 'ServerNode' | 'SuperServerNode';

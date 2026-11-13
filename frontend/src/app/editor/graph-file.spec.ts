@@ -1,5 +1,5 @@
 import { StaticEdge, StaticNode } from 'ngx-vflow';
-import { parseGraphFile, toGraphFile } from './graph-file';
+import { graphFileFromDetail, graphFileName, parseGraphFile, toGraphFile } from './graph-file';
 
 describe('toGraphFile', () => {
   it('exports topology and config without backend ids or view state', () => {
@@ -57,5 +57,27 @@ describe('parseGraphFile', () => {
     [{ nodes: [], edges: [{ source: 'x', target: 'y' }] }, 'missing node'],
   ])('rejects malformed files (%#)', (raw, message) => {
     expect(() => parseGraphFile(raw, createId)).toThrow(message);
+  });
+});
+
+describe('graphFileFromDetail', () => {
+  it('exports the stored graph including its edge metrics', () => {
+    const metrics = { pingMs: 30, jitterMs: 3, packetloss: 0.1, packetlossStddev: 0.01 };
+    const file = graphFileFromDetail({
+      graph_id: 4, name: 'Lab', architecture: 'spyker', metadata: null,
+      nodes: [
+        { node_id: 'a', graph_id: 4, type: 'ServerNode', config: {}, position: { x: 1, y: 1 } },
+        { node_id: 'b', graph_id: 4, type: 'ClientNode', config: {}, position: { x: 2, y: 2 } },
+      ],
+      edges: [{ edge_id: 9, graph_id: 4, source_node_id: 'a', target_node_id: 'b', config: metrics }],
+    });
+
+    expect(file.architecture).toBe('spyker');
+    expect(file.edges[0]).toMatchObject({ source: 'a', target: 'b', data: { metrics } });
+  });
+
+  it('builds a safe file name', () => {
+    expect(graphFileName(4, 'My Lab / v2!', 'spyker')).toBe('4_my-lab--v2_spyker.json');
+    expect(graphFileName(4, null, 'hierfl')).toBe('4_graph_hierfl.json');
   });
 });
