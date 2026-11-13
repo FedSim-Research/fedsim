@@ -11,7 +11,7 @@ import { MessageService } from 'primeng/api';
 import { Shortcuts } from '../../editor/shortcuts.directive';
 import { GraphApiService, PresetResponse } from '../../api/graph-api.service';
 import { SimulationRequest } from '../../runs/simulation-request';
-import { Architecture } from '../../domain/topology';
+import { Architecture, NodeKind } from '../../domain/topology';
 
 type SuperServerConfig = {
   name: string;
@@ -369,25 +369,13 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
     else { this.document.body.classList.add('light-mode'); }
   }
 
-  public onDragStart(event: DragEvent, kind: 'SuperServerNode' | 'ServerNode' | 'ClientNode'): void {
-    if (kind === 'SuperServerNode') {
-      if (this.isSpyker) {
-        event.preventDefault();
-        event.stopPropagation();
-        this.showErrorToast('No super server is allowed to exist in the Spyker Environment');
-        return;
-      }
-      const allGraphNodes = document.querySelectorAll('.vflow-node');
-      const alreadyExists = Array.from(allGraphNodes).some(node => {
-        const text = node.textContent?.toLowerCase().replace(/\s+/g, '') ?? '';
-        return text.includes('superserver');
-      });
-      if (alreadyExists) {
-        event.preventDefault();
-        event.stopPropagation();
-        this.showErrorToast('Only one Super Server can exist in the Environment Hierarchical.');
-        return;
-      }
+  public onDragStart(event: DragEvent, kind: NodeKind): void {
+    // Node limits are enforced on drop; this only spares a pointless drag in Spyker.
+    if (kind === 'SuperServerNode' && this.isSpyker) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.showErrorToast('No super server is allowed to exist in the Spyker Environment');
+      return;
     }
     const configByKind = {
       SuperServerNode: { ...this.configDraft.superserver },
