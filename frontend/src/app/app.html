@@ -51,8 +51,8 @@
   }
   <app-sidebar
     [shortcuts]="shortcuts"
-    [hierflGraphId]="hierflGraphId()"
-    [spykerGraphId]="spykerGraphId()"
+    [hierflGraphId]="graphIdOf('hierfl')"
+    [spykerGraphId]="graphIdOf('spyker')"
     [activeView]="activeView()"
     [activeMode]="activeMode()"
     (resetGraph)="handleReset()"

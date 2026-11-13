@@ -6,8 +6,7 @@ import { NgxSelectoModule } from 'ngx-selecto';
 import { Shortcuts } from './editor/shortcuts.directive';
 import { SidebarComponent } from './shell/sidebar/sidebar';
 import { EdgeMetricsBoxComponent } from './editor/edges/edge-metrics-box/edge-metrics-box';
-import { SpykerGraphService } from './editor/topologies/spyker-graph.service';
-import { HierflGraphService } from './editor/topologies/hierfl-graph.service';
+import { GraphWorkspace } from './editor/graph-workspace.service';
 import { GraphPersistenceService } from './editor/graph-persistence.service';
 import { MessageService } from 'primeng/api';
 import { FrameworkJobsPopupComponent } from './runs/framework-jobs-popup/framework-jobs-popup';
@@ -42,21 +41,14 @@ export class App implements OnInit{
   @ViewChild(VflowComponent) public flow?: VflowComponent;
   @ViewChild(Shortcuts) private shortcuts?: Shortcuts;
   public keyContainer = window;
-  protected graphServiceSpyker = inject(SpykerGraphService);
-  protected graphServiceHierfl = inject(HierflGraphService);
+  private workspace = inject(GraphWorkspace);
   private graphPersistence = inject(GraphPersistenceService);
   private messageService = inject(MessageService);
   private simulationRunner = inject(SimulationRunner);
   public activeMode = signal<Architecture>('hierfl');
   public activeView = signal<workspaceView>('editor');
   public sidebarOpen = signal(true);
-  public activeGraph = computed(() => {
-    if (this.activeMode() === 'spyker') {
-      return this.graphServiceSpyker;
-    } else {
-      return this.graphServiceHierfl;
-    }
-  });
+  public activeGraph = computed(() => this.workspace.graphFor(this.activeMode()));
   public nodes = computed(() => {
     return this.activeGraph().nodes();
   });
@@ -73,12 +65,9 @@ export class App implements OnInit{
     return this.edges().find(edge => edge.id === id);
   }
 
-  public hierflGraphId(): number | null {
-    return this.graphServiceHierfl.getGraphId() ?? this.graphServiceHierfl.loadGraphIdFromStorage();
-  }
-
-  public spykerGraphId(): number | null {
-    return this.graphServiceSpyker.getGraphId() ?? this.graphServiceSpyker.loadGraphIdFromStorage();
+  public graphIdOf(architecture: Architecture): number | null {
+    const graph = this.workspace.graphFor(architecture);
+    return graph.getGraphId() ?? graph.loadGraphIdFromStorage();
   }
 
   private _dragging = false;
@@ -93,8 +82,9 @@ export class App implements OnInit{
   };
 
   public ngOnInit(): void {
-    void this.graphPersistence.initializeGraph(this.graphServiceSpyker, 'spyker', false);
-    void this.graphPersistence.initializeGraph(this.graphServiceHierfl, 'hierfl', false);
+    for (const architecture of ['spyker', 'hierfl'] as const) {
+      void this.graphPersistence.initializeGraph(this.workspace.graphFor(architecture), architecture, false);
+    }
   }
 
   public handleReset(): void {
@@ -223,7 +213,7 @@ export class App implements OnInit{
         if (this._lastPosChanges) {
           this.activeGraph().updateNodePositions(this._lastPosChanges);
           if (this.activeMode() === 'spyker') {
-            const spyker = this.graphServiceSpyker;
+            const spyker = this.workspace.graphFor('spyker');
             spyker.edges.set(orientServerLinks(spyker.nodes(), spyker.edges()));
           }
           this.activeGraph().getGraphHistory().saveState({nodes: this.activeGraph().nodes(), edges: this.activeGraph().edges()});
@@ -324,7 +314,7 @@ export class App implements OnInit{
   }
 
   public handleGraphDeleted(event: { graphId: number; architecture: Architecture }): void {
-    const service = event.architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierfl;
+    const service = this.workspace.graphFor(event.architecture);
     if (service.getGraphId() === event.graphId) {
       service.detachGraph();
     }
@@ -332,7 +322,7 @@ export class App implements OnInit{
 
   public async handleGraphSelected(event: { graphId: number; architecture: Architecture }): Promise<void> {
     this.activeMode.set(event.architecture);
-    const service = event.architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierfl;
+    const service = this.workspace.graphFor(event.architecture);
     try {
       await this.graphPersistence.loadGraph(service, event.architecture, event.graphId);
     } catch (error) {
