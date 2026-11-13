@@ -34,6 +34,14 @@ describe('SpykerGraphService', () => {
     expect(pairs).toEqual(['a->b', 'a->c', 'b->c']);
   });
 
+  it('re-orients peer links when servers swap sides', () => {
+    service.addNode(server('a'));
+    service.addNode({ ...server('b'), point: { x: 100, y: 0 } });
+    service.moveNodes([{ type: 'position', id: 'a', point: { x: 200, y: 0 } }]);
+
+    expect(service.edges()[0]).toMatchObject({ source: 'b', target: 'a' });
+  });
+
   it('undoes a server and its mesh edges in a single step', () => {
     service.addNode(server('a'));
     service.addNode(server('b'));

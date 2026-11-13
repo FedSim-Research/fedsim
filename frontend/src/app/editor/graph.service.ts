@@ -121,6 +121,11 @@ export abstract class GraphService<T extends GraphHistoryService> {
     this.edges.set(withSelection(this.edges(), edgeIds));
   }
 
+  /** Topology hook: adjusts edges after nodes moved. Must return `edges` itself when nothing changed. */
+  protected linksAfterMove(_nodes: Node[], edges: Edge[]): Edge[] {
+    return edges;
+  }
+
   /** Topology hook: edges an architecture adds automatically for new nodes. */
   protected linksForNewNodes(_newNodes: Node[]): Edge[] {
     return [];
@@ -189,20 +194,19 @@ export abstract class GraphService<T extends GraphHistoryService> {
     return this.graphHistory
   }
 
-  public updateNodePositions(posChanges: NodePositionChange[]){
-    const changeMap = new Map(posChanges.map(c => [c.id, c.point]));
-    const newNodes = this.nodes().map(node => {
-    if (changeMap.has(node.id)) {
-      return {
-        ...node,
-        point: changeMap.get(node.id)!
-      };
-    }
-    return node;
-  });
-  this.nodes.set(newNodes);
-  this.scheduleSave();
+  /** Commits a finished drag as one undoable step. */
+  public moveNodes(changes: NodePositionChange[]): void {
+    const points = new Map(changes.map((change) => [change.id, change.point]));
+    const nodes = this.nodes().map((node) => {
+      const point = points.get(node.id);
+      return point ? { ...node, point } : node;
+    });
+    this.nodes.set(nodes);
+    this.edges.set(this.linksAfterMove(nodes, this.edges()));
+    this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
+    this.scheduleSave();
   }
+
 
   public updateNodeConfig(nodeId: string, configPatch: Record<string, unknown>): void {
     this.nodes.update((nodes) =>

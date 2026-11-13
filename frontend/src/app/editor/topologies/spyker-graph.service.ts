@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
 import { v4 as uuidv4 } from 'uuid';
 import { GraphService } from '../graph.service';
+import { orientServerLinks } from '../connection-policy';
 import { SpykerGraphHistoryService } from './spyker-graph-history.service';
 
 @Injectable({
@@ -10,6 +11,11 @@ import { SpykerGraphHistoryService } from './spyker-graph-history.service';
 export class SpykerGraphService extends GraphService<SpykerGraphHistoryService> {
   constructor(graphHistory: SpykerGraphHistoryService) {
     super(graphHistory, 'spyker');
+  }
+
+  /** Peer links run from the left to the right server. */
+  protected override linksAfterMove(nodes: Node[], edges: Edge[]): Edge[] {
+    return orientServerLinks(nodes, edges);
   }
 
   /** Spyker servers form a full mesh, so every new server is linked to every other one. */

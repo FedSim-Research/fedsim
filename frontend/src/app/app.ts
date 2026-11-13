@@ -16,7 +16,7 @@ import { SimulationRequest } from './runs/simulation-request';
 import { v4 as uuidv4 } from 'uuid';
 import { Architecture, isNodeKind, NodeKind } from './domain/topology';
 import { createGraphNode } from './editor/nodes/node-factory';
-import { canConnect, normalizeConnection, orientServerLinks } from './editor/connection-policy';
+import { canConnect, normalizeConnection } from './editor/connection-policy';
 
 export type workspaceView = 'editor' | 'dashboard';
 
@@ -211,12 +211,7 @@ export class App implements OnInit{
         }
 
         if (this._lastPosChanges) {
-          this.activeGraph().updateNodePositions(this._lastPosChanges);
-          if (this.activeMode() === 'spyker') {
-            const spyker = this.workspace.graphFor('spyker');
-            spyker.edges.set(orientServerLinks(spyker.nodes(), spyker.edges()));
-          }
-          this.activeGraph().getGraphHistory().saveState({nodes: this.activeGraph().nodes(), edges: this.activeGraph().edges()});
+          this.activeGraph().moveNodes(this._lastPosChanges);
           this._lastPosChanges = null;
         }
       };
