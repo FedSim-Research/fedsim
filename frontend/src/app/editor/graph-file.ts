@@ -67,3 +67,80 @@ export function toGraphFile(
     edgeCount: fileEdges.length,
   };
 }
+
+export type ImportedNodeKind = 'ClientNode' | 'ServerNode' | 'SuperServerNode';
+
+export interface ImportedGraph {
+  nodes: Array<{ id: string; point: { x: number; y: number }; kind: ImportedNodeKind; config: Record<string, unknown> }>;
+  edges: Array<{
+    id: string;
+    source: string;
+    target: string;
+    sourceHandle: string | null;
+    targetHandle: string | null;
+    metrics: ReturnType<typeof normalizeEdgeMetrics>;
+  }>;
+}
+
+export class GraphFileError extends Error {}
+
+const NODE_KINDS: readonly ImportedNodeKind[] = ['ClientNode', 'ServerNode', 'SuperServerNode'];
+
+/**
+ * Reads a graph export (current or legacy format). Every node and edge gets a
+ * fresh id, so an import can never point at entities of another graph.
+ */
+export function parseGraphFile(raw: unknown, createId: () => string): ImportedGraph {
+  if (!isRecord(raw) || !Array.isArray(raw['nodes'])) {
+    throw new GraphFileError('The file does not contain a node list.');
+  }
+
+  const idMap = new Map<string, string>();
+  const nodes = raw['nodes'].map((entry, index): ImportedGraph['nodes'][number] => {
+    const data = isRecord(entry) && isRecord(entry['data']) ? entry['data'] : {};
+    const kind = data['type'];
+    if (!isRecord(entry) || !NODE_KINDS.includes(kind as ImportedNodeKind)) {
+      throw new GraphFileError(`Node ${index + 1} has an unknown type.`);
+    }
+    const id = createId();
+    if (typeof entry['id'] === 'string') {
+      idMap.set(entry['id'], id);
+    }
+    return {
+      id,
+      point: readPoint(entry['point']),
+      kind: kind as ImportedNodeKind,
+      config: isRecord(data['config']) ? { ...data['config'] } : {},
+    };
+  });
+
+  const rawEdges = Array.isArray(raw['edges']) ? raw['edges'] : [];
+  const edges = rawEdges.map((entry, index): ImportedGraph['edges'][number] => {
+    const source = isRecord(entry) ? idMap.get(String(entry['source'])) : undefined;
+    const target = isRecord(entry) ? idMap.get(String(entry['target'])) : undefined;
+    if (!isRecord(entry) || !source || !target) {
+      throw new GraphFileError(`Edge ${index + 1} references a missing node.`);
+    }
+    const data = isRecord(entry['data']) ? entry['data'] : {};
+    return {
+      id: createId(),
+      source,
+      target,
+      sourceHandle: typeof entry['sourceHandle'] === 'string' ? entry['sourceHandle'] : null,
+      targetHandle: typeof entry['targetHandle'] === 'string' ? entry['targetHandle'] : null,
+      metrics: normalizeEdgeMetrics(isRecord(data['metrics']) ? data['metrics'] : null),
+    };
+  });
+
+  return { nodes, edges };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readPoint(value: unknown): { x: number; y: number } {
+  const point = isRecord(value) ? value : {};
+  const coordinate = (axis: unknown) => (typeof axis === 'number' && Number.isFinite(axis) ? axis : 0);
+  return { x: coordinate(point['x']), y: coordinate(point['y']) };
+}
