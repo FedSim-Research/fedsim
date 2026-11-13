@@ -132,17 +132,6 @@ export class Shortcuts{
     this.clearNodeSelection();
   }
 
-  @HostListener('document:pointermove', ['$event'])
-  public onPointerMove(event: PointerEvent) {
-    if (!this.shiftDown || event.buttons !== 1) return;
-  }
-
-  @HostListener('document:pointerup', ['$event'])
-  public onPointerUp(event: PointerEvent) {
-    if (this.shiftDown && event.button === 0) {
-    }
-  }
-
   public onSelectoDragStart(event: SelectoDragStart) {
     const input = event.inputEvent as PointerEvent | MouseEvent | TouchEvent | undefined;
 

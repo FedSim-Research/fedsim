@@ -135,7 +135,6 @@ export class App implements OnInit{
  public changeMode(mode: Architecture): void {
     if (this.activeMode() === mode) return;
     this.activeMode.set(mode);
-    console.log("changed mode to:" + mode);
   }
 
   public changeView(view: workspaceView): void {
@@ -161,11 +160,6 @@ export class App implements OnInit{
     }
   }
 
-  public reloadUI(){
-    this.activeGraph().nodes.set(this.activeGraph().nodes());
-    this.activeGraph().edges.set(this.activeGraph().edges());
-  }
-
   public handleConnect(connection: Connection): void {
     const resolved = normalizeConnection(this.nodes(), connection);
     const newEdge: Edge = {
@@ -179,7 +173,6 @@ export class App implements OnInit{
     };
 
     this.activeGraph().addEdge(newEdge);
-    console.log('added new edge', newEdge);
   }
 
   public handleNodePositionChange(changes: NodePositionChange[]): void {

@@ -121,8 +121,8 @@ export class ViewGraphsDialog implements OnInit, OnChanges {
       try {
         await this.shortcuts.importGraph();
         this.onClose();
-      } catch (error) {
-        console.log("Error importing:", error);
+      } catch {
+        // The import already reported the problem; keep the dialog open.
       }
     }
   }
