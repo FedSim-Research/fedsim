@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { GRAPH_FILE_LIMITS, GraphFileError, parseGraphFile } from './graph-file';
 import { createGraphNode } from './nodes/node-factory';
 import { NodeKind } from '../domain/topology';
+import { nodeLimitViolation } from '../domain/node-limits';
 
 
 /** Offset of pasted nodes from their originals, in canvas units. */
@@ -365,18 +366,14 @@ export class Shortcuts{
 
   private async importGraphFile(file: File): Promise<void> {
     const service = this.activeService();
-    const architecture = service instanceof HierflGraphService ? 'hierfl' : 'spyker';
+    const architecture = service.architecture;
     if (file.size > GRAPH_FILE_LIMITS.bytes) {
       throw new GraphFileError('The file is too large for a graph export.');
     }
     const graph = parseGraphFile(JSON.parse(await file.text()), uuidv4);
-    const superServers = graph.nodes.filter((node) => node.kind === 'SuperServerNode').length;
-    if (superServers > (architecture === 'hierfl' ? 1 : 0)) {
-      throw new GraphFileError(
-        architecture === 'hierfl'
-          ? 'A hierarchical graph can contain only one Super Server.'
-          : 'Spyker graphs cannot contain a Super Server.',
-      );
+    const violation = nodeLimitViolation(architecture, [], graph.nodes.map((node) => node.kind));
+    if (violation) {
+      throw new GraphFileError(violation);
     }
 
     const nodes = graph.nodes.map((node) => createGraphNode({ ...node, architecture }));
