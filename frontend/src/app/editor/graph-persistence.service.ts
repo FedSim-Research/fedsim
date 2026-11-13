@@ -1,12 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { StaticNode as Node, StaticEdge as Edge } from 'ngx-vflow';
-import { GraphApiService, GraphDetail, VflowGraph } from '../api/graph-api.service';
+import { GraphApiService, GraphDetail } from '../api/graph-api.service';
 import { GraphService } from './graph.service';
 import { ClientNode } from './nodes/client-node/client-node';
 import { ServerNode } from './nodes/server-node/server-node';
 import { SuperServerNode } from './nodes/super-server-node/super-server-node';
-import { EDGE_METRIC_DEFAULTS, normalizeEdgeMetrics } from '../api/edge-metrics';
+import { EDGE_METRIC_DEFAULTS } from '../api/edge-metrics';
 import { State } from './graph-history.service';
+import { toVflowGraph } from './graph-serialization';
 
 const NODE_TYPE_MAP = {
   ClientNode: ClientNode,
@@ -190,7 +191,7 @@ export class GraphPersistenceService {
     await service.waitForGraphReady();
     const graphId = service.getGraphId() ?? service.loadGraphIdFromStorage();
     if (graphId === null) return;
-    const payload = this.buildVflowGraph(service, architecture);
+    const payload = toVflowGraph(architecture, service.nodes(), service.edges());
     const updated = await this.api.replaceGraphState(graphId, payload);
     if (refreshFromBackend) {
       this.applyGraph(service, architecture, updated);
@@ -198,49 +199,5 @@ export class GraphPersistenceService {
       this.reconcileGraph(service, architecture, updated);
     }
     service.setGraphId(graphId);
-  }
-
-  private buildVflowGraph(service: GraphService<any>, architecture: Architecture): VflowGraph {
-    const nodes = service.nodes().map((node) => {
-      const data = (node as any).data ?? {};
-      const type = data.type ?? (node.type as any)?.name ?? 'Unknown';
-      const point = (node as any).point ?? {};
-      const normalizedPoint = {
-        x: typeof point.x === 'number' ? point.x : 0,
-        y: typeof point.y === 'number' ? point.y : 0,
-      };
-      return {
-        id: node.id,
-        point: normalizedPoint,
-        type,
-        data: {
-          type,
-          config: data.config ?? {},
-          environment: data.environment ?? architecture,
-          fromJson: true,
-          selected: Boolean(data.selected),
-        },
-      };
-    });
-
-    const edges = service.edges().map((edge) => {
-      const payload = (edge as any).data ?? {};
-      const metrics = normalizeEdgeMetrics(payload.metrics);
-      const reconnectable = edge.reconnectable === 'source' || edge.reconnectable === 'target'
-        ? true
-        : edge.reconnectable ?? true;
-      return {
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        config: metrics,
-        sourceHandle: edge.sourceHandle ?? null,
-        targetHandle: edge.targetHandle ?? null,
-        reconnectable,
-        floating: edge.floating ?? false,
-      };
-    });
-
-    return { nodes, edges };
   }
 }
