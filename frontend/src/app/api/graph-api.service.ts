@@ -1,8 +1,9 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { EdgeMetrics } from './edge-metrics';
+import { SILENT_ERRORS } from './global-error.interceptor';
 
 export interface Position {
   x: number;
@@ -281,6 +282,8 @@ export class GraphApiService {
   private http = inject(HttpClient);
   private baseUrl = (window as any).FEDSIM_API_BASE_URL ?? environment.apiBaseUrl;
 
+  private readonly silent = { context: new HttpContext().set(SILENT_ERRORS, true) };
+
   private url(path: string): string {
     const trimmed = this.baseUrl.replace(/\/+$/, '');
     return `${trimmed}${path}`;
@@ -343,11 +346,11 @@ export class GraphApiService {
   }
 
   public async getRunStatus(runId: string): Promise<SimulationRunResponse> {
-    return firstValueFrom(this.http.get<SimulationRunResponse>(this.url(`/runs/${runId}`)));
+    return firstValueFrom(this.http.get<SimulationRunResponse>(this.url(`/runs/${runId}`), this.silent));
   }
 
   public async listRuns(): Promise<SimulationRunResponse[]> {
-    return firstValueFrom(this.http.get<SimulationRunResponse[]>(this.url('/runs')));
+    return firstValueFrom(this.http.get<SimulationRunResponse[]>(this.url('/runs'), this.silent));
   }
 
   public async deleteRun(runId: string): Promise<void> {

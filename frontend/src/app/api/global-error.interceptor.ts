@@ -1,9 +1,15 @@
 import { inject } from '@angular/core';
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { HttpContextToken, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { MessageService } from 'primeng/api';
 import { catchError, throwError } from 'rxjs';
 
+/** Marks requests whose failures the caller reports itself, e.g. background polling. */
+export const SILENT_ERRORS = new HttpContextToken<boolean>(() => false);
+
 export const globalErrorInterceptor: HttpInterceptorFn = (req, next) => {
+  if (req.context.get(SILENT_ERRORS)) {
+    return next(req);
+  }
   const messageService = inject(MessageService);
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
