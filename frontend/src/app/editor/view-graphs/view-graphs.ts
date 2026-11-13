@@ -41,6 +41,7 @@ export class ViewGraphsDialog implements OnInit, OnChanges {
   @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
   @Output() close = new EventEmitter<void>();
   @Output() modeRequested = new EventEmitter<'spyker' | 'hierfl'>();
+  @Output() graphDeleted = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
 
   public ngOnInit(): void {
     this.selectedMode = this.activeMode;
@@ -223,6 +224,7 @@ export class ViewGraphsDialog implements OnInit, OnChanges {
   private async confirmDeleteGraph(graph: GraphResponse): Promise<void> {
     try {
       await this.graphApiService.deleteGraph(graph.graph_id);
+      this.graphDeleted.emit({ graphId: graph.graph_id, architecture: graph.architecture });
       this.graphs = this.graphs.filter((item) => item.graph_id !== graph.graph_id);
       if (this.selectedGraph?.graph_id === graph.graph_id) {
         this.selectedGraph = null;

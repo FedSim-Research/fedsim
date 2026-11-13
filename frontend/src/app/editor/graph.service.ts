@@ -198,6 +198,17 @@ export abstract class GraphService<T extends GraphHistoryService> {
     this.scheduleSave();
   }
 
+  /** Forgets the open graph after it was deleted elsewhere; pending edits are dropped. */
+  public detachGraph(): void {
+    if (this.saveTimer !== null) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
+    this.hasUnsavedChanges = false;
+    this.setGraphId(null);
+    this.setGraphState([], [], true);
+  }
+
   /** Writes pending changes now. Saves run strictly one after another. */
   public flushSave(): Promise<void> {
     if (this.saveTimer !== null) {

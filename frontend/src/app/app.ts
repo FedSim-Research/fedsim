@@ -910,6 +910,13 @@ export class App implements OnInit{
     return first.length === second.length && first.every((value, index) => value === second[index]);
   }
 
+  public handleGraphDeleted(event: { graphId: number; architecture: modes }): void {
+    const service = event.architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierfl;
+    if (service.getGraphId() === event.graphId) {
+      service.detachGraph();
+    }
+  }
+
   public async handleGraphSelected(event: { graphId: number; architecture: modes }): Promise<void> {
     this.activeMode.set(event.architecture);
     const service = event.architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierfl;

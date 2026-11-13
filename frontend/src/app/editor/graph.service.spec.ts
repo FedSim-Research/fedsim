@@ -124,3 +124,23 @@ describe('GraphService undo', () => {
     vi.useRealTimers();
   });
 });
+
+describe('GraphService detachGraph', () => {
+  it('drops pending saves for a graph that no longer exists', async () => {
+    vi.useFakeTimers();
+    localStorage.clear();
+    const replaceGraphState = vi.fn().mockResolvedValue({});
+    TestBed.configureTestingModule({ providers: [{ provide: GraphApiService, useValue: { replaceGraphState } }] });
+    const service = TestBed.inject(HierflGraphService);
+    service.setGraphId(5);
+    service.addNode({ id: 'a', point: { x: 0, y: 0 }, type: ClientNode, data: { type: 'ClientNode', config: {} } } as StaticNode);
+
+    service.detachGraph();
+    await vi.runAllTimersAsync();
+
+    expect(replaceGraphState).not.toHaveBeenCalled();
+    expect(service.getGraphId()).toBeNull();
+    expect(service.nodes()).toEqual([]);
+    vi.useRealTimers();
+  });
+});

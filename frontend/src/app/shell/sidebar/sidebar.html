@@ -291,6 +291,7 @@
   [activeMode]="activeMode"
   (modeRequested)="selectArchitectureMode($event)"
   (graphSelected)="onGraphSelected($event)"
+  (graphDeleted)="graphDeleted.emit($event)"
   (close)="closeViewGraphsDialog()"></app-view-graphs-dialog>
 }
 

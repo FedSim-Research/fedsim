@@ -116,6 +116,7 @@ export class SidebarComponent implements OnInit, OnChanges, OnDestroy {
   @Output() viewChange = new EventEmitter<WorkspaceView>();
   @Output() sidebarOpenChange = new EventEmitter<boolean>();
   @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
+  @Output() graphDeleted = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
   @Output() simulationRequested = new EventEmitter<{
     mode: 'spyker' | 'hierfl' | 'both';
     hierfl: {
