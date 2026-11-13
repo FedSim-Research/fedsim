@@ -194,6 +194,17 @@ export abstract class GraphService<T extends GraphHistoryService> {
     return this.graphHistory
   }
 
+  /** Shows intermediate drag positions; neither recorded in history nor saved. */
+  public previewPositions(changes: NodePositionChange[]): void {
+    const points = new Map(changes.map((change) => [change.id, change.point]));
+    this.nodes.update((nodes) =>
+      nodes.map((node) => {
+        const point = points.get(node.id);
+        return point ? { ...node, point } : node;
+      }),
+    );
+  }
+
   /** Commits a finished drag as one undoable step. */
   public moveNodes(changes: NodePositionChange[]): void {
     const points = new Map(changes.map((change) => [change.id, change.point]));
