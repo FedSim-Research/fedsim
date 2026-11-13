@@ -9,6 +9,7 @@ import { MessageService } from 'primeng/api';
 import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'selecto';
 import { GraphPersistenceService } from './graph-persistence.service';
 import { v4 as uuidv4 } from 'uuid';
+import { toGraphFile } from './graph-file';
 
 
 @Directive({
@@ -405,19 +406,9 @@ export class Shortcuts{
     graphName?: string | null;
     architecture?: 'spyker' | 'hierfl';
   }) {
-    const serializedNodes = this.activeService().nodes().map((node) => {
-      const { type, ...rest } = node as any;
-      return rest;
-    });
-    const serializedEdges = this.activeService().edges().map((edge) => ({
-      ...edge
-    }));
-    const data = {
-      nodes: serializedNodes,
-      edges: serializedEdges,
-      nodeCount: serializedNodes.length,
-      edgeCount: serializedEdges.length
-    };
+    const activeArchitecture = this.activeService() instanceof HierflGraphService ? 'hierfl' : 'spyker';
+    const architecture = options?.architecture ?? activeArchitecture;
+    const data = toGraphFile(activeArchitecture, this.activeService().nodes(), this.activeService().edges());
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -430,9 +421,6 @@ export class Shortcuts{
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9-_]+/g, '')
       .slice(0, 48) || 'graph';
-    const architecture =
-      options?.architecture ??
-      (this.activeService() instanceof HierflGraphService ? 'hierfl' : 'spyker');
     const filename = `${graphId}_${safeName}_${architecture}.json`;
     link.download = filename;
     link.click();
