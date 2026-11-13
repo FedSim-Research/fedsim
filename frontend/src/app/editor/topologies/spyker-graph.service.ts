@@ -3,14 +3,13 @@ import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
 import { v4 as uuidv4 } from 'uuid';
 import { GraphService } from '../graph.service';
 import { orientServerLinks } from '../connection-policy';
-import { SpykerGraphHistoryService } from './spyker-graph-history.service';
 
 @Injectable({
   providedIn: 'root',
 })
-export class SpykerGraphService extends GraphService<SpykerGraphHistoryService> {
-  constructor(graphHistory: SpykerGraphHistoryService) {
-    super(graphHistory, 'spyker');
+export class SpykerGraphService extends GraphService {
+  constructor() {
+    super('spyker');
   }
 
   /** Peer links run from the left to the right server. */

@@ -3,7 +3,7 @@ import { StaticNode as Node, StaticEdge as Edge } from 'ngx-vflow';
 import { GraphApiService, GraphDetail } from '../api/graph-api.service';
 import { GraphService } from './graph.service';
 import { EDGE_METRIC_DEFAULTS } from '../api/edge-metrics';
-import { State } from './graph-history.service';
+import { GraphState } from './graph-history';
 import { Architecture, isNodeKind } from '../domain/topology';
 import { createGraphNode } from './nodes/node-factory';
 
@@ -12,7 +12,7 @@ export class GraphPersistenceService {
   private api = inject(GraphApiService);
 
   public async initializeGraph(
-    service: GraphService<any>,
+    service: GraphService,
     architecture: Architecture,
     createIfMissing: boolean = true
   ): Promise<void> {
@@ -41,7 +41,7 @@ export class GraphPersistenceService {
 
   /** Loads a stored graph into the given workspace and makes it the active graph. */
   public async loadGraph(
-    service: GraphService<any>,
+    service: GraphService,
     architecture: Architecture,
     graphId: number
   ): Promise<void> {
@@ -53,7 +53,7 @@ export class GraphPersistenceService {
   }
 
   private async tryLoadGraph(
-    service: GraphService<any>,
+    service: GraphService,
     architecture: Architecture,
     graphId: number
   ): Promise<boolean> {
@@ -65,12 +65,12 @@ export class GraphPersistenceService {
     }
   }
 
-  private applyGraph(service: GraphService<any>, architecture: Architecture, graph: GraphDetail): void {
+  private applyGraph(service: GraphService, architecture: Architecture, graph: GraphDetail): void {
     const snapshot = this.toStateSnapshot(architecture, graph);
     service.setGraphState(snapshot.nodes, snapshot.edges, true);
   }
 
-  private toStateSnapshot(architecture: Architecture, graph: GraphDetail): State {
+  private toStateSnapshot(architecture: Architecture, graph: GraphDetail): GraphState {
     const nodes: Node[] = [];
 
     for (const node of graph.nodes) {

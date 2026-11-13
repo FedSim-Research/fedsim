@@ -14,7 +14,7 @@ import { GraphService } from '../../graph.service';
 })
 export class EdgeMetricsBoxComponent implements OnChanges {
   @Input({ required: true }) edge!: Edge;
-  @Input({ required: true }) graphService!: GraphService<any>;
+  @Input({ required: true }) graphService!: GraphService;
 
   public form: EdgeMetrics = { ...EDGE_METRIC_DEFAULTS };
 

@@ -1,6 +1,6 @@
 import { Injectable, WritableSignal, signal, inject } from '@angular/core';
 import { StaticNode as Node, StaticEdge as Edge, NodePositionChange } from 'ngx-vflow';
-import { GraphHistoryService, State } from './graph-history.service';
+import { GraphHistory, GraphState } from './graph-history';
 import { GraphApiService } from '../api/graph-api.service';
 import { EdgeMetrics, EDGE_METRIC_DEFAULTS, normalizeEdgeMetrics } from '../api/edge-metrics';
 import { toVflowGraph } from './graph-serialization';
@@ -20,7 +20,7 @@ type EdgeWithData = Edge & { data?: EdgeDataPayload };
 @Injectable({
   providedIn: 'root',
 })
-export abstract class GraphService<T extends GraphHistoryService> {
+export abstract class GraphService {
   public nodes: WritableSignal<Node[]> = signal([]);
   public edges: WritableSignal<Edge[]> = signal([]);
   protected api = inject(GraphApiService);
@@ -29,7 +29,9 @@ export abstract class GraphService<T extends GraphHistoryService> {
   private saveQueue: Promise<void> = Promise.resolve();
   private hasUnsavedChanges = false;
 
-  protected constructor(protected graphHistory: T, public readonly architecture: Architecture) {}
+  protected readonly graphHistory = new GraphHistory();
+
+  protected constructor(public readonly architecture: Architecture) {}
 
   public getGraphId(): number | null {
     return this.graphId;
@@ -60,7 +62,7 @@ export abstract class GraphService<T extends GraphHistoryService> {
     }
   }
 
-  public applyHistoryState(state: State): void {
+  public applyHistoryState(state: GraphState): void {
     this.applyState(state.nodes, state.edges);
   }
 
@@ -282,7 +284,7 @@ export abstract class GraphService<T extends GraphHistoryService> {
     }
   }
 
-  private applyState(nodes: Node[], edges: Edge[]): State {
+  private applyState(nodes: Node[], edges: Edge[]): GraphState {
     const normalizedEdges = edges.map((edge) => this.normalizeEdge(edge));
     const snapshot = { nodes, edges: normalizedEdges };
     this.nodes.set(nodes);
