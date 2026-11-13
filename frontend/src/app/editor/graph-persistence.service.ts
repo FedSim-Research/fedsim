@@ -99,7 +99,6 @@ export class GraphPersistenceService {
           environment: architecture,
           fromJson: true,
           selected: false,
-          backendId: node.node_id,
         },
       });
     }
@@ -118,7 +117,6 @@ export class GraphPersistenceService {
         reconnectable: true,
         floating: false,
         data: {
-          backendId: edge.edge_id,
           metrics: edge.config ?? EDGE_METRIC_DEFAULTS,
         },
       });

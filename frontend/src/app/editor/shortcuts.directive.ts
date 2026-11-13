@@ -330,7 +330,6 @@ export class Shortcuts{
         environment: targetArchitecture,
       },
     } as Record<string, unknown>;
-    delete nextData['backendId'];
 
     return {
       ...clone,
