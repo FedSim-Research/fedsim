@@ -1,4 +1,4 @@
-import { Injectable, WritableSignal, signal, inject } from '@angular/core';
+import { WritableSignal, signal, inject } from '@angular/core';
 import { StaticNode as Node, StaticEdge as Edge, NodePositionChange } from 'ngx-vflow';
 import { GraphHistory, GraphState } from './graph-history';
 import { GraphApiService } from '../api/graph-api.service';
@@ -17,9 +17,10 @@ type EdgeDataPayload = {
 };
 type EdgeWithData = Edge & { data?: EdgeDataPayload };
 
-@Injectable({
-  providedIn: 'root',
-})
+/**
+ * Editor state of one architecture's graph: nodes, edges, undo history and the
+ * debounced saving to the backend. Subclasses add topology specific behaviour.
+ */
 export abstract class GraphService {
   public nodes: WritableSignal<Node[]> = signal([]);
   public edges: WritableSignal<Edge[]> = signal([]);
