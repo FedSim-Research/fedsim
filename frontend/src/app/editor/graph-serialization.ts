@@ -1,8 +1,8 @@
 import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
 import { normalizeEdgeMetrics } from '../api/edge-metrics';
 import { VflowGraph } from '../api/graph-api.service';
+import { Architecture } from '../domain/topology';
 
-type Architecture = 'spyker' | 'hierfl';
 
 interface NodePayloadData {
   type?: VflowGraph['nodes'][number]['data']['type'];

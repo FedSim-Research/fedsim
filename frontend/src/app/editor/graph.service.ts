@@ -4,6 +4,7 @@ import { GraphHistoryService, State } from './graph-history.service';
 import { GraphApiService } from '../api/graph-api.service';
 import { EdgeMetrics, EDGE_METRIC_DEFAULTS, normalizeEdgeMetrics } from '../api/edge-metrics';
 import { toVflowGraph } from './graph-serialization';
+import { Architecture } from '../domain/topology';
 
 /** Edits within this window are written to the backend as one request. */
 const SAVE_DEBOUNCE_MS = 300;
@@ -27,7 +28,7 @@ export abstract class GraphService<T extends GraphHistoryService> {
   private saveQueue: Promise<void> = Promise.resolve();
   private hasUnsavedChanges = false;
 
-  protected constructor(protected graphHistory: T, private architecture: 'spyker' | 'hierfl'){}
+  protected constructor(protected graphHistory: T, private architecture: Architecture){}
 
   public getGraphId(): number | null {
     return this.graphId;

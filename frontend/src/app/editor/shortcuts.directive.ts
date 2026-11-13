@@ -9,6 +9,7 @@ import { MessageService } from 'primeng/api';
 import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'selecto';
 import { v4 as uuidv4 } from 'uuid';
 import { GRAPH_FILE_LIMITS, GraphFileError, parseGraphFile } from './graph-file';
+import { Architecture } from '../domain/topology';
 
 
 @Directive({
@@ -314,7 +315,7 @@ export class Shortcuts{
 
   private buildPastedNode(
     sourceNode: Node,
-    targetArchitecture: 'spyker' | 'hierfl',
+    targetArchitecture: Architecture,
     typeString?: keyof typeof this.nodeTypeMap
   ): Node {
     const clone = JSON.parse(JSON.stringify(sourceNode));

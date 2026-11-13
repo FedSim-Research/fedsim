@@ -7,6 +7,7 @@ import { ServerNode } from './nodes/server-node/server-node';
 import { SuperServerNode } from './nodes/super-server-node/super-server-node';
 import { EDGE_METRIC_DEFAULTS } from '../api/edge-metrics';
 import { State } from './graph-history.service';
+import { Architecture } from '../domain/topology';
 
 const NODE_TYPE_MAP = {
   ClientNode: ClientNode,
@@ -14,7 +15,6 @@ const NODE_TYPE_MAP = {
   SuperServerNode: SuperServerNode,
 } as const;
 
-type Architecture = 'spyker' | 'hierfl';
 
 @Injectable({ providedIn: 'root' })
 export class GraphPersistenceService {

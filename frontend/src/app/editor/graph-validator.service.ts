@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
+import { Architecture } from '../domain/topology';
 
-type SupportedArchitecture = 'spyker' | 'hierfl';
 type FlowNodeData = { type?: string; config?: Record<string, unknown> };
 type FlowEdgeMetrics = {
   pingMs?: number;
@@ -15,7 +15,7 @@ type FlowEdgeMetrics = {
 })
 export class GraphValidatorService {
   public validateSimulationRequest(
-    architecture: SupportedArchitecture,
+    architecture: Architecture,
     nodes: Node[],
     edges: Edge[],
     config: {
@@ -49,7 +49,7 @@ export class GraphValidatorService {
   }
 
   private validateTrainingAndSimulationFields(
-    architecture: SupportedArchitecture,
+    architecture: Architecture,
     config: {
       trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
       simulationSettings: {
@@ -142,7 +142,7 @@ export class GraphValidatorService {
     return errors;
   }
 
-  private validateGraph(architecture: SupportedArchitecture, nodes: Node[], edges: Edge[]): string[] {
+  private validateGraph(architecture: Architecture, nodes: Node[], edges: Edge[]): string[] {
     const errors: string[] = [];
     const nodeTypeById = new Map<string, string>();
     for (const node of nodes) {
@@ -221,7 +221,7 @@ export class GraphValidatorService {
     return errors;
   }
 
-  private validateNodeConfig(architecture: SupportedArchitecture, node: Node): string[] {
+  private validateNodeConfig(architecture: Architecture, node: Node): string[] {
     const errors: string[] = [];
     const data = this.getNodeData(node);
     const config = data.config ?? {};
@@ -255,7 +255,7 @@ export class GraphValidatorService {
     return errors;
   }
 
-  private validateEdgeMetrics(architecture: SupportedArchitecture, edge: Edge): string[] {
+  private validateEdgeMetrics(architecture: Architecture, edge: Edge): string[] {
     const errors: string[] = [];
     const rawMetrics = this.getEdgeMetrics(edge);
     const ping = Number(rawMetrics.pingMs);
@@ -282,7 +282,7 @@ export class GraphValidatorService {
     return metrics ?? (data as FlowEdgeMetrics);
   }
 
-  private isValidEdgePair(architecture: SupportedArchitecture, sourceType: string, targetType: string): boolean {
+  private isValidEdgePair(architecture: Architecture, sourceType: string, targetType: string): boolean {
     const pair = `${sourceType}->${targetType}`;
     if (architecture === 'hierfl') {
       return (

@@ -12,6 +12,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { Shortcuts } from '../shortcuts.directive';
 import { graphFileFromDetail, graphFileName } from '../graph-file';
 import { downloadJson } from '../../shared/download';
+import { Architecture } from '../../domain/topology';
 
 @Component({
   selector: 'app-view-graphs-dialog',
@@ -28,7 +29,7 @@ export class ViewGraphsDialog implements OnInit, OnChanges {
 
   @Input() isDarkMode = true;
   @Input() shortcuts?: Shortcuts;
-  @Input() activeMode: 'spyker' | 'hierfl' = 'hierfl';
+  @Input() activeMode: Architecture = 'hierfl';
   public graphs: GraphResponse[] = [];
   public isLoading = true;
   public selectedGraph: GraphResponse | null = null;
@@ -36,12 +37,12 @@ export class ViewGraphsDialog implements OnInit, OnChanges {
   public editingGraphId: number | null = null;
   public editingName = '';
   public createName = 'New Graph';
-  public selectedMode: 'spyker' | 'hierfl' = 'hierfl';
+  public selectedMode: Architecture = 'hierfl';
 
-  @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
+  @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: Architecture }>();
   @Output() close = new EventEmitter<void>();
-  @Output() modeRequested = new EventEmitter<'spyker' | 'hierfl'>();
-  @Output() graphDeleted = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
+  @Output() modeRequested = new EventEmitter<Architecture>();
+  @Output() graphDeleted = new EventEmitter<{ graphId: number; architecture: Architecture }>();
 
   public ngOnInit(): void {
     this.selectedMode = this.activeMode;
@@ -126,15 +127,15 @@ export class ViewGraphsDialog implements OnInit, OnChanges {
     }
   }
 
-  public graphsForMode(mode: 'spyker' | 'hierfl'): GraphResponse[] {
+  public graphsForMode(mode: Architecture): GraphResponse[] {
     return this.graphs.filter((graph) => graph.architecture === mode);
   }
 
-  public hasGraphsForMode(mode: 'spyker' | 'hierfl'): boolean {
+  public hasGraphsForMode(mode: Architecture): boolean {
     return this.graphsForMode(mode).length > 0;
   }
 
-  public currentGraphLabel(mode: 'spyker' | 'hierfl'): string {
+  public currentGraphLabel(mode: Architecture): string {
     const stored = localStorage.getItem(`fedsim.graphId.${mode}`);
     const id = stored ? Number(stored) : null;
     if (!id || !Number.isFinite(id)) return 'None';
@@ -164,7 +165,7 @@ export class ViewGraphsDialog implements OnInit, OnChanges {
     }
   }
 
-  public setMode(mode: 'spyker' | 'hierfl'): void {
+  public setMode(mode: Architecture): void {
     this.selectedMode = mode;
     this.modeRequested.emit(mode);
   }
