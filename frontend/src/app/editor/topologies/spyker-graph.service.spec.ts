@@ -26,6 +26,14 @@ describe('SpykerGraphService', () => {
     expect(pairs).toEqual(['a->b', 'a->c', 'b->c']);
   });
 
+  it('links pasted servers with each other and with existing ones', () => {
+    service.addNode(server('a'));
+    service.addEntities([server('b'), server('c')], []);
+
+    const pairs = service.edges().map((edge) => `${edge.source}->${edge.target}`);
+    expect(pairs).toEqual(['a->b', 'a->c', 'b->c']);
+  });
+
   it('undoes a server and its mesh edges in a single step', () => {
     service.addNode(server('a'));
     service.addNode(server('b'));

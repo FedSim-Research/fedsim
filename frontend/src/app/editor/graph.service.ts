@@ -104,12 +104,17 @@ export abstract class GraphService<T extends GraphHistoryService> {
     if (violation) {
       return violation;
     }
-    const normalizedEdges = newEdges.map((edge) => this.normalizeEdge(edge));
+    const normalizedEdges = [...newEdges, ...this.linksForNewNodes(newNodes)].map((edge) => this.normalizeEdge(edge));
     this.nodes.update((nodes) => [...nodes, ...newNodes]);
     this.edges.update((edges) => [...edges, ...normalizedEdges]);
     this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
     this.scheduleSave();
     return null;
+  }
+
+  /** Topology hook: edges an architecture adds automatically for new nodes. */
+  protected linksForNewNodes(_newNodes: Node[]): Edge[] {
+    return [];
   }
 
   public removeNodeById(nodeId: string): void {
