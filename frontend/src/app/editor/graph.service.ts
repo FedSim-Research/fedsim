@@ -59,16 +59,25 @@ export abstract class GraphService<T extends GraphHistoryService> {
   }
 
   public addNode(newNode: Node): void {
-    this.nodes.update((nodes) => [...nodes, newNode]);
-    this.graphHistory.saveState({nodes: this.nodes(), edges: this.edges()});
-    void this.persistCreateNode(newNode);
+    this.addEntities([newNode], []);
   }
 
-  public addEdge(newEdge: Edge) {
-    const normalizedEdge = this.normalizeEdge(newEdge);
-    this.edges.update((edges) => [...edges, normalizedEdge]);
-    this.graphHistory.saveState({nodes: this.nodes(), edges: this.edges()});
-    void this.persistCreateEdge(normalizedEdge);
+  public addEdge(newEdge: Edge): void {
+    this.addEntities([], [newEdge]);
+  }
+
+  /** Adds nodes and edges as one undoable step. */
+  protected addEntities(newNodes: Node[], newEdges: Edge[]): void {
+    const normalizedEdges = newEdges.map((edge) => this.normalizeEdge(edge));
+    this.nodes.update((nodes) => [...nodes, ...newNodes]);
+    this.edges.update((edges) => [...edges, ...normalizedEdges]);
+    this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
+    for (const node of newNodes) {
+      void this.persistCreateNode(node);
+    }
+    for (const edge of normalizedEdges) {
+      void this.persistCreateEdge(edge);
+    }
   }
 
   public removeNodeById(nodeId: String){
