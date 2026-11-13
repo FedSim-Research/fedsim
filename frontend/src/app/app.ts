@@ -23,6 +23,10 @@ import { v4 as uuidv4 } from 'uuid';
 export type modes = 'spyker' | 'hierfl';
 export type workspaceView = 'editor' | 'dashboard';
 
+const RUN_STATUS_POLL_MS = 2000;
+/** Consecutive status request failures tolerated before a run is reported as lost. */
+const MAX_FAILED_STATUS_POLLS = 5;
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -883,8 +887,22 @@ export class App implements OnInit{
     jobId: string
   ): Promise<SimulationRunResponse | null> {
     let lastStatus: SimulationRunResponse['status'] | null = null;
+    let failedPolls = 0;
     for (;;) {
-      const run = await this.graphApi.getRunStatus(runId);
+      let run: SimulationRunResponse;
+      try {
+        run = await this.graphApi.getRunStatus(runId);
+        failedPolls = 0;
+      } catch {
+        failedPolls += 1;
+        if (failedPolls >= MAX_FAILED_STATUS_POLLS) {
+          this.frameworkJobs.markFailed(jobId);
+          this.showErrorToast(`Lost track of the ${label} run ${runId}. Check the dashboard for its status.`);
+          return null;
+        }
+        await this.sleep(RUN_STATUS_POLL_MS);
+        continue;
+      }
       if (run.status !== lastStatus) {
         console.info(`[simulation] run status changed: runId=${runId} run=${label} status=${run.status}`);
         lastStatus = run.status;
@@ -902,7 +920,7 @@ export class App implements OnInit{
         this.showErrorToast(`${label} simulation failed${detail}`);
         return null;
       }
-      await this.sleep(2000);
+      await this.sleep(RUN_STATUS_POLL_MS);
     }
   }
 
