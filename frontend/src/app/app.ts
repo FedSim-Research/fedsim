@@ -255,7 +255,9 @@ export class App implements OnInit{
       this._dragging = true;
       const dragSessionId = currentId;
 
+      const listeners = new AbortController();
       const finish = () => {
+        listeners.abort();
         this._dragging = false;
         this._dragCooldown = true;
         setTimeout(() => {
@@ -276,9 +278,10 @@ export class App implements OnInit{
         }
       };
 
-      window.addEventListener('pointerup', finish, { once: true });
-      window.addEventListener('mouseup', finish, { once: true });
-      window.addEventListener('touchend', finish, { once: true });
+      // Whichever end event fires first finishes the drag and removes the others.
+      for (const type of ['pointerup', 'pointercancel', 'mouseup', 'touchend', 'touchcancel']) {
+        window.addEventListener(type, finish, { signal: listeners.signal });
+      }
     }
 
     const expandedChanges = this.expandSelectedNodeChanges(posChanges);
