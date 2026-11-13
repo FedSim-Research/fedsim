@@ -27,7 +27,7 @@ def _parse_datetime(value: str | None) -> datetime | None:
         return None
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
-    return parsed
+    return parsed.astimezone(timezone.utc)
 
 
 def _json_dumps(value: Any) -> str | None:
@@ -225,15 +225,44 @@ def ensure_run_points(run_id: str) -> None:
     backfill_periodic_evaluations_from_log_file(run_id)
 
 
+def evaluation_run_ids(run_id: str, result: dict[str, Any] | None) -> list[str]:
+    """Resolve only identities actually recorded in a job's result."""
+    identities = [run_id]
+    result = result or {}
+    series = [result]
+    combined = result.get("results_by_architecture")
+    if isinstance(combined, dict):
+        series.extend(combined.values())
+    for item in series:
+        if not isinstance(item, dict):
+            continue
+        repetitions = item.get("runs")
+        for repetition in [item, *(repetitions if isinstance(repetitions, list) else [])]:
+            if isinstance(repetition, dict):
+                identity = repetition.get("run_id")
+                if isinstance(identity, str) and identity.strip():
+                    identities.append(identity)
+    return list(dict.fromkeys(identities))
+
+
 def get_matching_run_ids(run_id_regex: str) -> list[str]:
     pattern = re.compile(run_id_regex)
     session = SessionLocal()
     try:
         rows = session.execute(
-            select(SimulationRun.run_id).order_by(SimulationRun.queued_at.desc())
+            select(SimulationRun.run_id, SimulationRun.result_json).order_by(
+                SimulationRun.queued_at.desc()
+            )
         ).all()
-        run_ids = [str(row[0]) for row in rows if pattern.search(str(row[0]))]
-        return run_ids
+        identities = []
+        for row in rows:
+            children = evaluation_run_ids(row.run_id, _json_loads(row.result_json))
+            identities.extend(
+                children
+                if pattern.search(row.run_id)
+                else [child for child in children if pattern.search(child)]
+            )
+        return list(dict.fromkeys(identities))
     finally:
         session.close()
 
@@ -244,7 +273,6 @@ def get_evaluation_rows(
     start_ms: int | None = None,
     end_ms: int | None = None,
 ) -> list[dict[str, Any]]:
-    run_pattern = re.compile(run_id_regex)
     architecture_pattern = re.compile(architecture_regex)
     run_ids = get_matching_run_ids(run_id_regex)
 
@@ -256,12 +284,19 @@ def get_evaluation_rows(
     session = SessionLocal()
     try:
         runs = session.execute(
-            select(SimulationRun.run_id, SimulationRun.finished_at, SimulationRun.status).where(
-                SimulationRun.run_id.in_(run_ids)
+            select(
+                SimulationRun.run_id,
+                SimulationRun.result_json,
+                SimulationRun.finished_at,
+                SimulationRun.status,
             )
         ).all()
+        selected_ids = set(run_ids)
         run_info: dict[str, dict[str, Any] | None] = {
-            str(row[0]): {"finished_at": row[1], "status": row[2]} for row in runs
+            identity: {"finished_at": row.finished_at, "status": row.status}
+            for row in runs
+            for identity in evaluation_run_ids(row.run_id, _json_loads(row.result_json))
+            if identity in selected_ids
         }
 
         stmt = select(EvaluationPoint).where(EvaluationPoint.run_id.in_(run_ids))
@@ -271,8 +306,6 @@ def get_evaluation_rows(
 
     output: list[dict[str, Any]] = []
     for record in records:
-        if not run_pattern.search(record.run_id):
-            continue
         if not architecture_pattern.search(record.architecture):
             continue
 
@@ -284,7 +317,10 @@ def get_evaluation_rows(
                 # Skip points that were recorded after the run finished (defensive)
                 continue
 
-        timestamp_ms = int(record.timestamp_real.timestamp() * 1000)
+        timestamp = record.timestamp_real
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
+        timestamp_ms = int(timestamp.timestamp() * 1000)
         if start_ms is not None and timestamp_ms < start_ms:
             continue
         if end_ms is not None and timestamp_ms > end_ms:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import statistics
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from queue import Empty, Queue
 from threading import Event, Lock, Thread
@@ -15,6 +15,7 @@ import ray
 from fedsim.runtime import ensure_ray_initialized, managed_ray_runtime
 from fedsim.services import simulation_run_store
 from fedsim.services.controller import SimulationController
+from fedsim.services.evaluation_point_store import evaluation_run_ids
 from fedsim.services.grafana_snapshot_service import create_accuracy_loss_snapshot_url
 from fedsim.services.loki_sync_service import sync_run_to_loki
 from fedsim.services.run_definition import RunDefinition, delete_archived_definition
@@ -203,28 +204,9 @@ class SimulationRunQueue:
             logger.exception("simulation_run_persist_failed run_id=%s", job.run_id)
 
     def _sync_accuracy_loss_to_loki(self, job: RunJob, result: dict[str, Any]) -> None:
-        run_ids: list[str] = []
-        if job.architecture == "both":
-            results_by_architecture = result.get("results_by_architecture")
-            if isinstance(results_by_architecture, dict):
-                for architecture_result in results_by_architecture.values():
-                    if not isinstance(architecture_result, dict):
-                        continue
-                    runs = architecture_result.get("runs")
-                    if not isinstance(runs, list):
-                        continue
-                    for run in runs:
-                        if not isinstance(run, dict):
-                            continue
-                        run_id = run.get("run_id")
-                        if isinstance(run_id, str) and run_id.strip():
-                            run_ids.append(run_id)
-        else:
-            run_id = result.get("run_id") or job.run_id
-            if isinstance(run_id, str) and run_id.strip():
-                run_ids.append(run_id)
-
-        for run_id in dict.fromkeys(run_ids):
+        run_ids = evaluation_run_ids(job.run_id, result)
+        # Modern jobs store metrics under repetition IDs; legacy jobs used the parent.
+        for run_id in run_ids[1:] or run_ids:
             if not sync_run_to_loki(run_id):
                 logger.warning("simulation_run_loki_sync_failed run_id=%s", run_id)
 
@@ -403,13 +385,23 @@ class SimulationRunQueue:
                 finished_at=finished_at,
             )
             result.update(snapshot_data)
+        # Persist the terminal snapshot before exposing completion to API pollers.
+        # Otherwise a client can see completed and immediately receive a CSV 404.
+        terminal = replace(
+            job,
+            status=status,
+            result=result,
+            error=error,
+            finished_at=finished_at.isoformat(),
+            duration_seconds=duration_seconds,
+        )
+        self._persist_final_run_safe(terminal)
         with self._lock:
             job.status = status
             job.result = result
             job.error = error
             job.finished_at = finished_at.isoformat()
             job.duration_seconds = duration_seconds
-        self._persist_final_run_safe(job)
         if status == "completed":
             logger.info(
                 "simulation_run_completed run_id=%s graph_id=%s architecture=%s duration_seconds=%.3f",

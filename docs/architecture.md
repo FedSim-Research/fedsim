@@ -224,6 +224,21 @@ architecture and extract only the fields needed for each summary metric.
 Historical records without server details remain readable and gain no invented
 server identities or aggregation semantics.
 
+## Completed-run monitoring identities
+
+One queued job can contain multiple seeded repetitions. Evaluation rows retain
+their exact repetition IDs, while the job record stores those IDs in its result.
+Parent-job selectors expand to that recorded set; an exact repetition selector
+can inspect one run. No prefix inference or averaging across repetitions is used.
+The CSV/raw-point export, archived chart reader and Loki sync share this mapping.
+Loki accepts repetition points without inventing separate job records and keeps
+the original repetition ID in stream labels. Parsed timestamps are normalized to
+UTC; SQLite timestamps without an offset follow the same UTC convention.
+
+The terminal snapshot is persisted before its in-memory status is published.
+Persistence errors retain the existing logged, best-effort behavior. These paths
+cover completed-run data; they do not establish live streaming or crash recovery.
+
 ## Spyker peer synchronization
 
 Multi-server Spyker graphs require a direct link between every pair of servers.

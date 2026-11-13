@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from fedsim.persistence.database import SessionLocal
 from fedsim.persistence.models import EvaluationPoint, SimulationRun
-from fedsim.services.evaluation_point_store import ensure_run_points
+from fedsim.services.evaluation_point_store import ensure_run_points, evaluation_run_ids
 
 logger = logging.getLogger(__name__)
 
@@ -85,11 +85,11 @@ def _format_evaluation_log_line(row: EvaluationPoint) -> str:
     )
 
 
-def _evaluation_points_for_run(session, run_id: str) -> list[EvaluationPoint]:
+def _evaluation_points_for_run(session, run_ids: list[str]) -> list[EvaluationPoint]:
     return list(
         session.execute(
             select(EvaluationPoint)
-            .where(EvaluationPoint.run_id == run_id)
+            .where(EvaluationPoint.run_id.in_(run_ids))
             .order_by(EvaluationPoint.timestamp_real)
         )
         .scalars()
@@ -107,35 +107,41 @@ def sync_run_to_loki(run_id: str) -> bool:
     Returns:
         True if sync succeeded, False otherwise
     """
-    ensure_run_points(run_id)
-    session = SessionLocal()
     try:
-        # Fetch run metadata
-        run = session.execute(
-            select(SimulationRun).where(SimulationRun.run_id == run_id)
-        ).scalar_one_or_none()
-
-        if not run:
-            logger.warning("Run not found: %s", run_id)
-            return False
-
+        with SessionLocal() as metadata_session:
+            run = metadata_session.get(SimulationRun, run_id)
+            known_run = run is not None
+            result = json.loads(run.result_json) if run and run.result_json else {}
+            identities = evaluation_run_ids(run_id, result if isinstance(result, dict) else {})
+        for identity in identities:
+            ensure_run_points(identity)
         # Fetch evaluation points for this run, ordered by timestamp
-        eval_points = _evaluation_points_for_run(session, run_id)
+        with SessionLocal() as session:
+            eval_points = _evaluation_points_for_run(session, identities)
 
         if not eval_points:
+            if not known_run:
+                logger.warning("No run or evaluation points found: %s", run_id)
+                return False
             logger.info("No evaluation points to sync for run: %s", run_id)
             return True
+
+        # Repetitions own evaluation rows, not separate SimulationRun records.
+        # Each point already carries all metadata required by the Loki stream.
 
         # Build Loki push payload
         # Group entries by (run_id, architecture) to reuse streams efficiently
         streams_dict: dict[tuple[str, str], list[tuple[str, str]]] = {}
 
         for ep in eval_points:
-            timestamp_ns = int(ep.timestamp_real.timestamp() * 1_000_000_000)
+            timestamp = ep.timestamp_real
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
+            timestamp_ns = int(timestamp.timestamp() * 1_000_000_000)
             log_line = _format_evaluation_log_line(ep)
             architecture = _normalize_architecture_label(ep.architecture)
 
-            key = (run_id, architecture)
+            key = (ep.run_id, architecture)
             if key not in streams_dict:
                 streams_dict[key] = []
 
@@ -178,8 +184,6 @@ def sync_run_to_loki(run_id: str) -> bool:
     except Exception:
         logger.exception("sync_run_to_loki failed for run %s", run_id)
         return False
-    finally:
-        session.close()
 
 
 def reconstruct_from_loki(run_id: str) -> int:
