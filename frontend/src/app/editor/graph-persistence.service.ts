@@ -54,6 +54,8 @@ export class GraphPersistenceService {
     architecture: Architecture,
     graphId: number
   ): Promise<void> {
+    // Edits still waiting for their debounced save belong to the graph that is open now.
+    await service.flushSave();
     const graph = await this.api.getGraph(graphId);
     this.applyGraph(service, architecture, graph);
     service.setGraphId(graphId);

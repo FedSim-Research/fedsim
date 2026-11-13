@@ -19,13 +19,16 @@ describe('GraphPersistenceService', () => {
     edges: [{ edge_id: 3, graph_id: 7, source_node_id: 's', target_node_id: 'c', config: metrics }],
   };
 
+  const replaceGraphState = vi.fn().mockResolvedValue({});
+
   beforeEach(() => {
     localStorage.clear();
+    replaceGraphState.mockClear();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: GraphApiService, useValue: { getGraph: vi.fn().mockResolvedValue(detail) } },
+        { provide: GraphApiService, useValue: { getGraph: vi.fn().mockResolvedValue(detail), replaceGraphState } },
       ],
     });
   });
@@ -36,5 +39,16 @@ describe('GraphPersistenceService', () => {
 
     expect(service.getGraphId()).toBe(7);
     expect((service.edges()[0].data as { metrics: unknown }).metrics).toEqual(metrics);
+  });
+
+  it('saves pending edits of the previous graph before switching', async () => {
+    const service = TestBed.inject(HierflGraphService);
+    service.setGraphId(1);
+    service.addNode({ id: 'x', point: { x: 0, y: 0 }, type: 'default', data: { type: 'ClientNode', config: {} } } as never);
+
+    await TestBed.inject(GraphPersistenceService).loadGraph(service, 'hierfl', 7);
+
+    expect(replaceGraphState).toHaveBeenCalledWith(1, expect.objectContaining({ nodes: [expect.objectContaining({ id: 'x' })] }));
+    expect(service.getGraphId()).toBe(7);
   });
 });
