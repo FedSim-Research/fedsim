@@ -67,7 +67,7 @@ export abstract class GraphService<T extends GraphHistoryService> {
   }
 
   /** Adds nodes and edges as one undoable step. */
-  protected addEntities(newNodes: Node[], newEdges: Edge[]): void {
+  public addEntities(newNodes: Node[], newEdges: Edge[]): void {
     const normalizedEdges = newEdges.map((edge) => this.normalizeEdge(edge));
     this.nodes.update((nodes) => [...nodes, ...newNodes]);
     this.edges.update((edges) => [...edges, ...normalizedEdges]);

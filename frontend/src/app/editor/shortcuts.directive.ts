@@ -1,7 +1,7 @@
 import { Directive, HostListener, inject, ElementRef, input, effect, untracked } from '@angular/core';
 import { HierflGraphService } from './topologies/hierfl-graph.service';
 import { SpykerGraphService } from './topologies/spyker-graph.service';
-import { StaticNode as Node } from 'ngx-vflow';
+import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
 import { ClientNode } from './nodes/client-node/client-node';
 import { ServerNode } from './nodes/server-node/server-node';
 import { SuperServerNode } from './nodes/super-server-node/super-server-node';
@@ -9,7 +9,7 @@ import { MessageService } from 'primeng/api';
 import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'selecto';
 import { GraphPersistenceService } from './graph-persistence.service';
 import { v4 as uuidv4 } from 'uuid';
-import { toGraphFile } from './graph-file';
+import { GraphFileError, parseGraphFile, toGraphFile } from './graph-file';
 
 
 @Directive({
@@ -439,36 +439,49 @@ export class Shortcuts{
           return;
         }
         try {
-          const text = await file.text();
-          const data = JSON.parse(text);
-          if (!data.nodes || !Array.isArray(data.nodes)) {
-            throw new Error('No nodes!');
-          }
-          const NODE_TYPE_MAP = {
-            ClientNode, ServerNode, SuperServerNode
-          } as const;
-          await this.activeService().resetGraph();
-          for (const nodeData of data.nodes) {
-            const typeString = nodeData.data?.type;
-            const node: Node = {
-              ...nodeData,
-              id: nodeData.id,
-              type: typeString ? NODE_TYPE_MAP[typeString as keyof typeof NODE_TYPE_MAP] : undefined,
-            };
-            this.activeService().addNode(node);
-          }
-          if (data.edges && Array.isArray(data.edges)) {
-            for (const edgeData of data.edges) {
-              this.activeService().addEdge(edgeData);
-            }
-          }
+          await this.importGraphFile(file);
           resolve();
         } catch (error) {
-          console.log("import error:", error)
+          const detail = error instanceof GraphFileError ? error.message : 'The file is not a valid graph export.';
+          this.messageService.add({ severity: 'error', summary: 'Import failed', detail });
           reject(error);
         }
       };
       input.click();
     });
+  }
+
+  private async importGraphFile(file: File): Promise<void> {
+    const service = this.activeService();
+    const architecture = service instanceof HierflGraphService ? 'hierfl' : 'spyker';
+    const graph = parseGraphFile(JSON.parse(await file.text()), uuidv4);
+    const superServers = graph.nodes.filter((node) => node.kind === 'SuperServerNode').length;
+    if (superServers > (architecture === 'hierfl' ? 1 : 0)) {
+      throw new GraphFileError(
+        architecture === 'hierfl'
+          ? 'A hierarchical graph can contain only one Super Server.'
+          : 'Spyker graphs cannot contain a Super Server.',
+      );
+    }
+
+    const nodes: Node[] = graph.nodes.map((node) => ({
+      id: node.id,
+      point: node.point,
+      type: this.nodeTypeMap[node.kind],
+      data: { type: node.kind, config: node.config, environment: architecture, fromJson: true, selected: false },
+    }));
+    const edges: Edge[] = graph.edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle ?? undefined,
+      targetHandle: edge.targetHandle ?? undefined,
+      reconnectable: true,
+      floating: false,
+      data: { metrics: edge.metrics },
+    }));
+
+    await service.resetGraph();
+    service.addEntities(nodes, edges);
   }
 }
