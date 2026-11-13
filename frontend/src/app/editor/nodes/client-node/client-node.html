@@ -95,7 +95,7 @@
       <select
         *ngIf="isEditing()"
         class="spec-input spec-select"
-        [value]="editDraft().type || defaultClientType"
+        [value]="(editDraft().type || defaultClientType) | lowercase"
         (mousedown)="$event.stopPropagation()"
         (click)="$event.stopPropagation()"
         (change)="updateTextField('type', $event)"

@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { NgIf, TitleCasePipe } from '@angular/common';
+import { LowerCasePipe, NgIf, TitleCasePipe } from '@angular/common';
 import { ButtonModule } from 'primeng/button';
 import { HandleComponent } from 'ngx-vflow';
 import { GraphNodeComponent } from '../graph-node.component';
@@ -16,7 +16,7 @@ type ClientSettings = {
 @Component({
   selector: 'app-client-node',
   standalone: true,
-  imports: [NgIf, TitleCasePipe, HandleComponent, ButtonModule],
+  imports: [NgIf, LowerCasePipe, TitleCasePipe, HandleComponent, ButtonModule],
   templateUrl: './client-node.html',
   styleUrl: './client-node.css',
 })
