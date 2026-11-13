@@ -113,6 +113,13 @@ export class GraphFileError extends Error {}
 
 const NODE_KINDS: readonly ImportedNodeKind[] = ['ClientNode', 'ServerNode', 'SuperServerNode'];
 
+/** Upper bounds that keep a hand-edited or hostile file from freezing the editor. */
+export const GRAPH_FILE_LIMITS = {
+  bytes: 5 * 1024 * 1024,
+  nodes: 2000,
+  edges: 20000,
+} as const;
+
 /**
  * Reads a graph export (current or legacy format). Every node and edge gets a
  * fresh id, so an import can never point at entities of another graph.
@@ -120,6 +127,12 @@ const NODE_KINDS: readonly ImportedNodeKind[] = ['ClientNode', 'ServerNode', 'Su
 export function parseGraphFile(raw: unknown, createId: () => string): ImportedGraph {
   if (!isRecord(raw) || !Array.isArray(raw['nodes'])) {
     throw new GraphFileError('The file does not contain a node list.');
+  }
+  const rawEdges = Array.isArray(raw['edges']) ? raw['edges'] : [];
+  if (raw['nodes'].length > GRAPH_FILE_LIMITS.nodes || rawEdges.length > GRAPH_FILE_LIMITS.edges) {
+    throw new GraphFileError(
+      `Graphs are limited to ${GRAPH_FILE_LIMITS.nodes} nodes and ${GRAPH_FILE_LIMITS.edges} edges.`,
+    );
   }
 
   const idMap = new Map<string, string>();
@@ -137,11 +150,10 @@ export function parseGraphFile(raw: unknown, createId: () => string): ImportedGr
       id,
       point: readPoint(entry['point']),
       kind: kind as ImportedNodeKind,
-      config: isRecord(data['config']) ? { ...data['config'] } : {},
+      config: readConfig(data['config']),
     };
   });
 
-  const rawEdges = Array.isArray(raw['edges']) ? raw['edges'] : [];
   const edges = rawEdges.map((entry, index): ImportedGraph['edges'][number] => {
     const source = isRecord(entry) ? idMap.get(String(entry['source'])) : undefined;
     const target = isRecord(entry) ? idMap.get(String(entry['target'])) : undefined;
@@ -164,6 +176,22 @@ export function parseGraphFile(raw: unknown, createId: () => string): ImportedGr
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Node configs are flat settings; anything that is not a plain value is dropped. */
+function readConfig(value: unknown): Record<string, string | number | boolean> {
+  if (!isRecord(value)) {
+    return {};
+  }
+  const config: Record<string, string | number | boolean> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    const isPlain = typeof entry === 'string' || typeof entry === 'boolean'
+      || (typeof entry === 'number' && Number.isFinite(entry));
+    if (isPlain) {
+      config[key] = entry;
+    }
+  }
+  return config;
 }
 
 function readPoint(value: unknown): { x: number; y: number } {

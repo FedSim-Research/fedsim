@@ -42,6 +42,13 @@ describe('parseGraphFile', () => {
     expect(JSON.stringify(graph)).not.toContain('backendId');
   });
 
+  it('keeps only plain config values', () => {
+    const graph = parseGraphFile({
+      nodes: [{ id: 'a', data: { type: 'ClientNode', config: { count: 3, type: 'laptop', nested: { x: 1 }, bad: NaN } } }],
+    }, createId);
+    expect(graph.nodes[0].config).toEqual({ count: 3, type: 'laptop' });
+  });
+
   it('round-trips an export', () => {
     const exported = toGraphFile('hierfl', [
       { id: 'a', point: { x: 0, y: 0 }, type: 'default', data: { type: 'ClientNode', config: { count: 3 } } },
@@ -55,6 +62,7 @@ describe('parseGraphFile', () => {
     [{}, 'node list'],
     [{ nodes: [{ data: { type: 'Laptop' } }] }, 'unknown type'],
     [{ nodes: [], edges: [{ source: 'x', target: 'y' }] }, 'missing node'],
+    [{ nodes: new Array(2001).fill({ data: { type: 'ClientNode' } }) }, 'limited to'],
   ])('rejects malformed files (%#)', (raw, message) => {
     expect(() => parseGraphFile(raw, createId)).toThrow(message);
   });

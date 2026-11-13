@@ -8,7 +8,7 @@ import { SuperServerNode } from './nodes/super-server-node/super-server-node';
 import { MessageService } from 'primeng/api';
 import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'selecto';
 import { v4 as uuidv4 } from 'uuid';
-import { GraphFileError, parseGraphFile } from './graph-file';
+import { GRAPH_FILE_LIMITS, GraphFileError, parseGraphFile } from './graph-file';
 
 
 @Directive({
@@ -406,6 +406,9 @@ export class Shortcuts{
   private async importGraphFile(file: File): Promise<void> {
     const service = this.activeService();
     const architecture = service instanceof HierflGraphService ? 'hierfl' : 'spyker';
+    if (file.size > GRAPH_FILE_LIMITS.bytes) {
+      throw new GraphFileError('The file is too large for a graph export.');
+    }
     const graph = parseGraphFile(JSON.parse(await file.text()), uuidv4);
     const superServers = graph.nodes.filter((node) => node.kind === 'SuperServerNode').length;
     if (superServers > (architecture === 'hierfl' ? 1 : 0)) {
