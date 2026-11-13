@@ -1,41 +1,26 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { GraphService } from '../graph.service';
-import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
+import { StaticNode as Node } from 'ngx-vflow';
 import { SuperServerNode } from '../nodes/super-server-node/super-server-node';
 import { HierflGraphHistoryService } from './hierfl-graph-history.service';
-import { State } from '../graph-history.service';
 
 @Injectable({
   providedIn: 'root',
 })
-export class HierflGraphService extends GraphService<HierflGraphHistoryService>{
-  private hasSuperServer = false;
-
-  constructor(graphHistory: HierflGraphHistoryService){
+export class HierflGraphService extends GraphService<HierflGraphHistoryService> {
+  constructor(graphHistory: HierflGraphHistoryService) {
     super(graphHistory, 'hierfl');
   }
 
   public override addNode(newNode: Node): void {
-    if (newNode.type==SuperServerNode){
-      if (this.hasSuperServer){
-        // error toast
-        console.warn('Block: SuperServer already exists')
-        return;
-      }
-      this.hasSuperServer = true;
+    if (newNode.type === SuperServerNode && this.hasSuperServer()) {
+      console.warn('Block: SuperServer already exists');
+      return;
     }
     super.addNode(newNode);
   }
 
-  public override removeNodeById(nodeId: String): void {
-    const node = this.nodes().find((n) => n.id === nodeId);
-    if (node?.type === SuperServerNode) {
-      this.hasSuperServer = false;
-    }
-    super.removeNodeById(nodeId);
-  }
-
-  protected override onStateApplied(state: State): void {
-    this.hasSuperServer = state.nodes.some((node) => node.type === SuperServerNode);
+  private hasSuperServer(): boolean {
+    return this.nodes().some((node) => node.type === SuperServerNode);
   }
 }

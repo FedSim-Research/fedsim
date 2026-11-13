@@ -1,0 +1,49 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { StaticNode } from 'ngx-vflow';
+import { ClientNode } from './nodes/client-node/client-node';
+import { ServerNode } from './nodes/server-node/server-node';
+import { SuperServerNode } from './nodes/super-server-node/super-server-node';
+import { HierflGraphService } from './topologies/hierfl-graph.service';
+
+describe('GraphService', () => {
+  let service: HierflGraphService;
+
+  function node(id: string, type: StaticNode['type']): StaticNode {
+    return { id, point: { x: 0, y: 0 }, type, data: { config: {} } } as StaticNode;
+  }
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    service = TestBed.inject(HierflGraphService);
+    service.addNode(node('server', ServerNode));
+    service.addNode(node('client-a', ClientNode));
+    service.addNode(node('client-b', ClientNode));
+    service.addEdge({ id: 'e1', source: 'server', target: 'client-a' });
+    service.addEdge({ id: 'e2', source: 'server', target: 'client-b' });
+  });
+
+  it('removes nodes with their attached edges as one undo step', () => {
+    service.removeEntities(['client-a'], ['e2']);
+
+    expect(service.nodes().map((n) => n.id)).toEqual(['server', 'client-b']);
+    expect(service.edges()).toEqual([]);
+
+    const history = service.getGraphHistory();
+    history.undo();
+    service.applyHistoryState(history.getState());
+    expect(service.nodes()).toHaveLength(3);
+    expect(service.edges().map((e) => e.id)).toEqual(['e1', 'e2']);
+  });
+
+  it('allows a new super server once the previous one was removed', () => {
+    service.addNode(node('super-1', SuperServerNode));
+    service.addNode(node('super-2', SuperServerNode));
+    expect(service.nodes().filter((n) => n.type === SuperServerNode)).toHaveLength(1);
+
+    service.removeNodeById('super-1');
+    service.addNode(node('super-2', SuperServerNode));
+    expect(service.nodes().map((n) => n.id)).toContain('super-2');
+  });
+});

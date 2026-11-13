@@ -80,39 +80,51 @@ export abstract class GraphService<T extends GraphHistoryService> {
     }
   }
 
-  public removeNodeById(nodeId: String){
-    const node = this.nodes().find((n) => n.id === nodeId) as NodeWithData | undefined;
-    const backendId = node?.data?.['backendId'] as string | undefined;
-    if (backendId !== undefined) {
-      void this.api.deleteNode(backendId).catch(() => undefined);
-    }
-    this.nodes.update(nodes => nodes.filter(node => node.id !== nodeId));
-    this.edges.update(edges => edges.filter(edge => edge.source !== nodeId && edge.target !== nodeId));
-    this.graphHistory.saveState({nodes: this.nodes(), edges: this.edges()});
+  public removeNodeById(nodeId: string): void {
+    this.removeEntities([nodeId], []);
   }
 
-  public removeEdge(edgeToRemove: Edge){
-    const edge = edgeToRemove as EdgeWithData;
-    const backendId = edge.data?.backendId;
-    if (backendId !== undefined) {
-      void this.api.deleteEdge(backendId).catch(() => undefined);
-    }
-    this.pendingEdgeConfig.delete(edge.id);
-    this.edges.update(edges => edges.filter(edge => edge !== edgeToRemove));
-    this.graphHistory.saveState({nodes: this.nodes(), edges: this.edges()});
+  public removeEdge(edge: Edge): void {
+    this.removeEntities([], [edge.id]);
   }
 
-  public removeEdgeById(edgeId: String){
-    const edge = this.edges().find((e) => e.id === edgeId) as EdgeWithData | undefined;
-    const backendId = edge?.data?.backendId;
-    if (backendId !== undefined) {
-      void this.api.deleteEdge(backendId).catch(() => undefined);
-    } else if (typeof edgeId === 'string' && /^\d+$/.test(edgeId)) {
-      void this.api.deleteEdge(Number(edgeId)).catch(() => undefined);
+  public removeEdgeById(edgeId: string): void {
+    this.removeEntities([], [edgeId]);
+  }
+
+  /** Removes nodes (with their attached edges) and edges as one undoable step. */
+  public removeEntities(nodeIds: Iterable<string>, edgeIds: Iterable<string>): void {
+    const doomedNodes = new Set(nodeIds);
+    const doomedEdges = new Set(edgeIds);
+    const removedNodes = this.nodes().filter((node) => doomedNodes.has(node.id));
+    const isRemovedEdge = (edge: Edge) =>
+      doomedEdges.has(edge.id) || doomedNodes.has(edge.source) || doomedNodes.has(edge.target);
+    const removedEdges = this.edges().filter(isRemovedEdge);
+    if (!removedNodes.length && !removedEdges.length) {
+      return;
     }
-    this.pendingEdgeConfig.delete(String(edgeId));
-    this.edges.update(edges => edges.filter(edge => edge.id !== edgeId));
-    this.graphHistory.saveState({nodes: this.nodes(), edges: this.edges()});
+
+    for (const node of removedNodes) {
+      const backendId = (node as NodeWithData).data?.['backendId'] as string | undefined;
+      if (backendId !== undefined) {
+        void this.api.deleteNode(backendId).catch(() => undefined);
+      }
+    }
+    for (const edge of removedEdges) {
+      // Edges attached to a deleted node are removed together with it in the backend.
+      if (doomedNodes.has(edge.source) || doomedNodes.has(edge.target)) continue;
+      const backendId = (edge as EdgeWithData).data?.backendId ?? this.extractNumericId(edge.id);
+      if (backendId !== null && backendId !== undefined) {
+        void this.api.deleteEdge(backendId).catch(() => undefined);
+      }
+    }
+    for (const edge of removedEdges) {
+      this.pendingEdgeConfig.delete(edge.id);
+    }
+
+    this.nodes.update((nodes) => nodes.filter((node) => !doomedNodes.has(node.id)));
+    this.edges.update((edges) => edges.filter((edge) => !isRemovedEdge(edge)));
+    this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
   }
 
   public updateEdgeMetrics(edgeId: string, metrics: EdgeMetrics): void {
@@ -202,14 +214,11 @@ export abstract class GraphService<T extends GraphHistoryService> {
     void this.api.updateNode(backendId, { config: updatedConfig }).catch(() => undefined);
   }
 
-  protected onStateApplied(_state: State): void {}
-
   private applyState(nodes: Node[], edges: Edge[]): State {
     const normalizedEdges = edges.map((edge) => this.normalizeEdge(edge));
     const snapshot = { nodes, edges: normalizedEdges };
     this.nodes.set(nodes);
     this.edges.set(normalizedEdges);
-    this.onStateApplied(snapshot);
     return snapshot;
   }
 
