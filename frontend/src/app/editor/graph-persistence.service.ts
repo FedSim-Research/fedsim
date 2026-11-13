@@ -48,15 +48,24 @@ export class GraphPersistenceService {
     service.setGraphState([], [], true);
   }
 
+  /** Loads a stored graph into the given workspace and makes it the active graph. */
+  public async loadGraph(
+    service: GraphService<any>,
+    architecture: Architecture,
+    graphId: number
+  ): Promise<void> {
+    const graph = await this.api.getGraph(graphId);
+    this.applyGraph(service, architecture, graph);
+    service.setGraphId(graphId);
+  }
+
   private async tryLoadGraph(
     service: GraphService<any>,
     architecture: Architecture,
     graphId: number
   ): Promise<boolean> {
     try {
-      const graph = await this.api.getGraph(graphId);
-      this.applyGraph(service, architecture, graph);
-      service.setGraphId(graphId);
+      await this.loadGraph(service, architecture, graphId);
       return true;
     } catch {
       return false;

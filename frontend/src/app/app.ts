@@ -929,75 +929,11 @@ export class App implements OnInit{
     return first.length === second.length && first.every((value, index) => value === second[index]);
   }
 
-  public async handleGraphSelected(event: { graphId: number; architecture: 'spyker' | 'hierfl' }): Promise<void> {
+  public async handleGraphSelected(event: { graphId: number; architecture: modes }): Promise<void> {
+    this.activeMode.set(event.architecture);
+    const service = event.architecture === 'spyker' ? this.graphServiceSpyker : this.graphServiceHierfl;
     try {
-      // Switch to the selected architecture mode
-      this.activeMode.set(event.architecture);
-
-      // Get the graph data from the API
-      const graphDetail = await this.graphApi.getGraph(event.graphId);
-
-      // Get the appropriate graph service
-      const targetService = event.architecture === 'spyker'
-        ? this.graphServiceSpyker
-        : this.graphServiceHierfl;
-
-      // Set the graph ID in the service
-      targetService.setGraphId(event.graphId);
-
-      // Convert backend nodes to frontend nodes
-      const NODE_TYPE_MAP = {
-        ClientNode: ClientNode,
-        ServerNode: ServerNode,
-        SuperServerNode: SuperServerNode,
-      } as const;
-
-      const nodes: Node[] = [];
-    const externalByBackendId = new Map<string, string>();
-
-      for (const node of graphDetail.nodes) {
-        const nodeType = NODE_TYPE_MAP[node.type as keyof typeof NODE_TYPE_MAP];
-        if (!nodeType) {
-          continue;
-        }
-      externalByBackendId.set(node.node_id, node.node_id);
-        nodes.push({
-        id: node.node_id,
-          point: node.position,
-          type: nodeType,
-          data: {
-            type: node.type,
-            config: node.config,
-            environment: event.architecture,
-            fromJson: true,
-            selected: false,
-          backendId: node.node_id,
-          },
-        });
-      }
-
-      // Convert backend edges to frontend edges
-      const edges: Edge[] = [];
-      for (const edge of graphDetail.edges) {
-        const source = externalByBackendId.get(edge.source_node_id);
-        const target = externalByBackendId.get(edge.target_node_id);
-        if (!source || !target) {
-          continue;
-        }
-        edges.push({
-          id: `${edge.edge_id}`,
-          source,
-          target,
-          reconnectable: true,
-          floating: false,
-          data: {
-            backendId: edge.edge_id,
-          },
-        });
-      }
-
-      // Load the graph into the active service
-      targetService.setGraphState(nodes, edges, true);
+      await this.graphPersistence.loadGraph(service, event.architecture, event.graphId);
     } catch (error) {
       console.error('Failed to load graph:', error);
     }
