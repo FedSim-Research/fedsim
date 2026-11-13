@@ -3,10 +3,13 @@ import { StaticNode as Node, StaticEdge as Edge, NodePositionChange } from 'ngx-
 import { GraphHistoryService, State } from './graph-history.service';
 import { GraphApiService } from '../api/graph-api.service';
 import { EdgeMetrics, EDGE_METRIC_DEFAULTS, normalizeEdgeMetrics } from '../api/edge-metrics';
+import { toVflowGraph } from './graph-serialization';
+
+/** Edits within this window are written to the backend as one request. */
+const SAVE_DEBOUNCE_MS = 300;
 
 type NodeWithData = Node & { data?: Record<string, any> };
 type EdgeDataPayload = {
-  backendId?: number;
   metrics: EdgeMetrics;
   selected?: boolean;
 };
@@ -20,8 +23,10 @@ export abstract class GraphService<T extends GraphHistoryService> {
   public edges: WritableSignal<Edge[]> = signal([]);
   protected api = inject(GraphApiService);
   private graphId: number | null = null;
-  private pendingEdgeConfig = new Map<string, EdgeMetrics>();
   private pendingGraphReset: Promise<void> = Promise.resolve();
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private saveQueue: Promise<void> = Promise.resolve();
+  private hasUnsavedChanges = false;
 
   protected constructor(protected graphHistory: T, private architecture: 'spyker' | 'hierfl'){}
 
@@ -72,12 +77,7 @@ export abstract class GraphService<T extends GraphHistoryService> {
     this.nodes.update((nodes) => [...nodes, ...newNodes]);
     this.edges.update((edges) => [...edges, ...normalizedEdges]);
     this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
-    for (const node of newNodes) {
-      void this.persistCreateNode(node);
-    }
-    for (const edge of normalizedEdges) {
-      void this.persistCreateEdge(edge);
-    }
+    this.scheduleSave();
   }
 
   public removeNodeById(nodeId: string): void {
@@ -96,45 +96,25 @@ export abstract class GraphService<T extends GraphHistoryService> {
   public removeEntities(nodeIds: Iterable<string>, edgeIds: Iterable<string>): void {
     const doomedNodes = new Set(nodeIds);
     const doomedEdges = new Set(edgeIds);
-    const removedNodes = this.nodes().filter((node) => doomedNodes.has(node.id));
     const isRemovedEdge = (edge: Edge) =>
       doomedEdges.has(edge.id) || doomedNodes.has(edge.source) || doomedNodes.has(edge.target);
-    const removedEdges = this.edges().filter(isRemovedEdge);
-    if (!removedNodes.length && !removedEdges.length) {
+    const removesNodes = this.nodes().some((node) => doomedNodes.has(node.id));
+    if (!removesNodes && !this.edges().some(isRemovedEdge)) {
       return;
-    }
-
-    for (const node of removedNodes) {
-      const backendId = (node as NodeWithData).data?.['backendId'] as string | undefined;
-      if (backendId !== undefined) {
-        void this.api.deleteNode(backendId).catch(() => undefined);
-      }
-    }
-    for (const edge of removedEdges) {
-      // Edges attached to a deleted node are removed together with it in the backend.
-      if (doomedNodes.has(edge.source) || doomedNodes.has(edge.target)) continue;
-      const backendId = (edge as EdgeWithData).data?.backendId;
-      if (backendId !== undefined) {
-        void this.api.deleteEdge(backendId).catch(() => undefined);
-      }
-    }
-    for (const edge of removedEdges) {
-      this.pendingEdgeConfig.delete(edge.id);
     }
 
     this.nodes.update((nodes) => nodes.filter((node) => !doomedNodes.has(node.id)));
     this.edges.update((edges) => edges.filter((edge) => !isRemovedEdge(edge)));
     this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
+    this.scheduleSave();
   }
 
   public updateEdgeMetrics(edgeId: string, metrics: EdgeMetrics): void {
     const normalized = normalizeEdgeMetrics(metrics);
-    let backendId: number | undefined;
     this.edges.update((edges) =>
       edges.map((edge) => {
         if (edge.id !== edgeId) return edge;
         const payload = (edge as EdgeWithData).data ?? { metrics: normalized };
-        backendId = payload.backendId;
         return {
           ...edge,
           data: { ...payload, metrics: normalized },
@@ -142,12 +122,7 @@ export abstract class GraphService<T extends GraphHistoryService> {
       })
     );
     this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
-    if (backendId === undefined) {
-      this.pendingEdgeConfig.set(edgeId, normalized);
-      return;
-    }
-    this.pendingEdgeConfig.delete(edgeId);
-    void this.api.updateEdge(backendId, { config: normalized }).catch(() => undefined);
+    this.scheduleSave();
   }
 
   public async resetGraph(): Promise<void> {
@@ -184,17 +159,15 @@ export abstract class GraphService<T extends GraphHistoryService> {
     return node;
   });
   this.nodes.set(newNodes);
-  void this.persistPositionUpdates(posChanges);
+  this.scheduleSave();
   }
 
   public updateNodeConfig(nodeId: string, configPatch: Record<string, unknown>): void {
-    let backendId: string | undefined;
     this.nodes.update((nodes) =>
       nodes.map((node) => {
         if (node.id !== nodeId) return node;
         const nodeData = (node as NodeWithData).data ?? {};
         const currentConfig = (nodeData['config'] as Record<string, unknown>) ?? {};
-        backendId = nodeData['backendId'] as string | undefined;
         return {
           ...node,
           data: {
@@ -205,12 +178,41 @@ export abstract class GraphService<T extends GraphHistoryService> {
       })
     );
     this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
+    this.scheduleSave();
+  }
 
-    if (backendId === undefined) return;
-    const updatedNode = this.nodes().find((n) => n.id === nodeId) as NodeWithData | undefined;
-    const updatedConfig =
-      ((updatedNode?.data?.['config'] as Record<string, unknown>) ?? configPatch);
-    void this.api.updateNode(backendId, { config: updatedConfig }).catch(() => undefined);
+  /** Writes pending changes now. Saves run strictly one after another. */
+  public flushSave(): Promise<void> {
+    if (this.saveTimer !== null) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
+    this.saveQueue = this.saveQueue.then(() => this.saveNow());
+    return this.saveQueue;
+  }
+
+  /** Persists the current state shortly; bursts of edits are coalesced into one request. */
+  protected scheduleSave(): void {
+    this.hasUnsavedChanges = true;
+    if (this.saveTimer !== null) {
+      clearTimeout(this.saveTimer);
+    }
+    this.saveTimer = setTimeout(() => void this.flushSave(), SAVE_DEBOUNCE_MS);
+  }
+
+  private async saveNow(): Promise<void> {
+    await this.waitForGraphReady();
+    if (!this.hasUnsavedChanges || this.graphId === null) {
+      return;
+    }
+    this.hasUnsavedChanges = false;
+    try {
+      const payload = toVflowGraph(this.architecture, this.nodes(), this.edges());
+      await this.api.replaceGraphState(this.graphId, payload);
+    } catch {
+      // The interceptor already reported it; the next edit retries with the full state.
+      this.hasUnsavedChanges = true;
+    }
   }
 
   private applyState(nodes: Node[], edges: Edge[]): State {
@@ -249,106 +251,6 @@ export abstract class GraphService<T extends GraphHistoryService> {
         },
       },
     };
-  }
-
-  protected async persistCreateNode(newNode: Node): Promise<void> {
-    await this.waitForGraphReady();
-    if (this.graphId === null) return;
-    const data = (newNode as NodeWithData).data ?? {};
-    const point = (newNode as any)?.point ?? {};
-    const position = {
-      x: typeof point.x === 'number' ? point.x : 0,
-      y: typeof point.y === 'number' ? point.y : 0,
-    };
-    const payload = {
-      type: data['type'],
-      config: data['config'] ?? {},
-      position,
-    };
-    void this.api.createNode(this.graphId, payload).then((created) => {
-      const oldId = newNode.id;
-      this.nodes.update((nodes) =>
-        nodes.map((node) => {
-          if (node.id !== oldId) return node;
-          const nodeData = (node as NodeWithData).data ?? {};
-          return {
-            ...node,
-            id: created.node_id,
-            data: { ...nodeData, backendId: created.node_id, config: created.config },
-          };
-        })
-      );
-      this.edges.update((edges) =>
-        edges.map((edge) => {
-          if (edge.source === oldId || edge.target === oldId) {
-            return {
-              ...edge,
-              source: edge.source === oldId ? created.node_id : edge.source,
-              target: edge.target === oldId ? created.node_id : edge.target,
-            };
-          }
-          return edge;
-        })
-      );
-      this.persistPendingEdgesForNode(created.node_id);
-    }).catch(() => undefined);
-  }
-
-  protected async persistCreateEdge(newEdge: Edge): Promise<void> {
-    await this.waitForGraphReady();
-    if (this.graphId === null) return;
-    const edgeInState = this.edges().find((edge) => edge.id === newEdge.id) as EdgeWithData | undefined;
-    const existingBackendId = edgeInState?.data?.backendId;
-    if (existingBackendId !== undefined) return;
-    const sourceNode = this.nodes().find((n) => n.id === newEdge.source) as NodeWithData | undefined;
-    const targetNode = this.nodes().find((n) => n.id === newEdge.target) as NodeWithData | undefined;
-    const sourceBackend = sourceNode?.data?.['backendId'] as string | undefined;
-    const targetBackend = targetNode?.data?.['backendId'] as string | undefined;
-    if (!sourceBackend || !targetBackend) {
-      return;
-    }
-    const metrics = edgeInState?.data?.metrics ?? EDGE_METRIC_DEFAULTS;
-    const payload = {
-      source_node_id: sourceBackend,
-      target_node_id: targetBackend,
-      config: metrics,
-    };
-    void this.api.createEdge(this.graphId, payload).then((created) => {
-      this.edges.update((edges) =>
-        edges.map((edge) => {
-          if (edge.id !== newEdge.id) return edge;
-          const edgeData = (edge as EdgeWithData).data ?? {};
-          return { ...edge, data: { ...edgeData, backendId: created.edge_id } } as Edge;
-        })
-      );
-      const pending = this.pendingEdgeConfig.get(newEdge.id);
-      if (pending) {
-        this.pendingEdgeConfig.delete(newEdge.id);
-        void this.api.updateEdge(created.edge_id, { config: pending }).catch(() => undefined);
-      }
-    }).catch(() => undefined);
-  }
-
-  private persistPendingEdgesForNode(nodeId: string): void {
-    const candidateEdges = this.edges().filter((edge) =>
-      edge.source === nodeId || edge.target === nodeId
-    );
-    for (const edge of candidateEdges) {
-      const backendId = (edge as EdgeWithData).data?.backendId;
-      if (backendId !== undefined) continue;
-      this.persistCreateEdge(edge);
-    }
-  }
-
-  private async persistPositionUpdates(posChanges: NodePositionChange[]): Promise<void> {
-    await this.waitForGraphReady();
-    if (this.graphId === null) return;
-    for (const change of posChanges) {
-      const node = this.nodes().find((n) => n.id === change.id) as NodeWithData | undefined;
-    const backendId = node?.data?.['backendId'] as string | undefined;
-    if (backendId === undefined) continue;
-    void this.api.updateNode(backendId, { position: change.point }).catch(() => undefined);
-    }
   }
 
   private async resetGraphInBackend(): Promise<void> {

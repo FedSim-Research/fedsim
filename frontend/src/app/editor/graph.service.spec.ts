@@ -6,6 +6,7 @@ import { ClientNode } from './nodes/client-node/client-node';
 import { ServerNode } from './nodes/server-node/server-node';
 import { SuperServerNode } from './nodes/super-server-node/super-server-node';
 import { HierflGraphService } from './topologies/hierfl-graph.service';
+import { GraphApiService } from '../api/graph-api.service';
 
 describe('GraphService', () => {
   let service: HierflGraphService;
@@ -45,5 +46,50 @@ describe('GraphService', () => {
     service.removeNodeById('super-1');
     service.addNode(node('super-2', SuperServerNode));
     expect(service.nodes().map((n) => n.id)).toContain('super-2');
+  });
+});
+
+describe('GraphService saving', () => {
+  const replaceGraphState = vi.fn();
+  let service: HierflGraphService;
+
+  function node(id: string): StaticNode {
+    return { id, point: { x: 0, y: 0 }, type: ClientNode, data: { type: 'ClientNode', config: {} } } as StaticNode;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    localStorage.clear();
+    replaceGraphState.mockReset().mockResolvedValue({});
+    TestBed.configureTestingModule({
+      providers: [{ provide: GraphApiService, useValue: { replaceGraphState } }],
+    });
+    service = TestBed.inject(HierflGraphService);
+    service.setGraphId(5);
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  it('writes a burst of edits as one state request with editor ids', async () => {
+    service.addNode(node('a'));
+    service.addNode(node('b'));
+    service.removeNodeById('a');
+    await vi.runAllTimersAsync();
+
+    expect(replaceGraphState).toHaveBeenCalledTimes(1);
+    const [graphId, payload] = replaceGraphState.mock.calls[0];
+    expect(graphId).toBe(5);
+    expect(payload.nodes.map((n: { id: string }) => n.id)).toEqual(['b']);
+  });
+
+  it('retries a failed save with the next edit', async () => {
+    replaceGraphState.mockRejectedValueOnce(new Error('offline'));
+    service.addNode(node('a'));
+    await vi.runAllTimersAsync();
+    service.updateNodeConfig('a', { count: 2 });
+    await vi.runAllTimersAsync();
+
+    expect(replaceGraphState).toHaveBeenCalledTimes(2);
+    expect(replaceGraphState.mock.calls[1][1].nodes[0].data.config).toEqual({ count: 2 });
   });
 });
