@@ -9,6 +9,7 @@ import { MessageService } from 'primeng/api';
 import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'selecto';
 import { v4 as uuidv4 } from 'uuid';
 import { GRAPH_FILE_LIMITS, GraphFileError, parseGraphFile } from './graph-file';
+import { createGraphNode } from './nodes/node-factory';
 import { Architecture } from '../domain/topology';
 
 
@@ -420,12 +421,7 @@ export class Shortcuts{
       );
     }
 
-    const nodes: Node[] = graph.nodes.map((node) => ({
-      id: node.id,
-      point: node.point,
-      type: this.nodeTypeMap[node.kind],
-      data: { type: node.kind, config: node.config, environment: architecture, fromJson: true, selected: false },
-    }));
+    const nodes = graph.nodes.map((node) => createGraphNode({ ...node, architecture }));
     const edges: Edge[] = graph.edges.map((edge) => ({
       id: edge.id,
       source: edge.source,

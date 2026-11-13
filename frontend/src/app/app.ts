@@ -5,9 +5,6 @@ import { FlowRenderer } from './editor/flow-renderer';
 import { NgxSelectoModule } from 'ngx-selecto';
 import { Shortcuts } from './editor/shortcuts.directive';
 import { SidebarComponent } from './shell/sidebar/sidebar';
-import { ClientNode } from './editor/nodes/client-node/client-node';
-import { ServerNode } from './editor/nodes/server-node/server-node';
-import { SuperServerNode } from './editor/nodes/super-server-node/super-server-node';
 import { EdgeMetricsBoxComponent } from './editor/edges/edge-metrics-box/edge-metrics-box';
 import { SpykerGraphService } from './editor/topologies/spyker-graph.service';
 import { HierflGraphService } from './editor/topologies/hierfl-graph.service';
@@ -18,7 +15,8 @@ import { DashboardViewComponent } from './runs/dashboard-view/dashboard-view';
 import { SimulationRunner } from './runs/simulation-runner.service';
 import { SimulationRequest } from './runs/simulation-request';
 import { v4 as uuidv4 } from 'uuid';
-import { Architecture } from './domain/topology';
+import { Architecture, isNodeKind, NodeKind } from './domain/topology';
+import { createGraphNode } from './editor/nodes/node-factory';
 import { canConnect, normalizeConnection, orientServerLinks } from './editor/connection-policy';
 
 export type workspaceView = 'editor' | 'dashboard';
@@ -110,63 +108,44 @@ export class App implements OnInit{
     }
   }
 
-  public onDrop(event: DragEvent) {
+  public onDrop(event: DragEvent): void {
     event.preventDefault();
-    const rawData = event.dataTransfer?.getData('application/json');
-    if (!rawData) return;
-    try {
-      const payload = JSON.parse(rawData);
-      const payloadType = payload?.type?.toString();
-      if (this.activeMode() === 'spyker' && payloadType === 'SuperServerNode') {
-        this.messageService.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: 'No super server is allowed to exist in the Spyker Environment',
-        });
-        return;
-      }
-      const isFromJson = payload?.origin === 'json' || payload?.fromJson === true;
-      const flowPoint = this.flow?.documentPointToFlowPoint({
-        x: event.clientX,
-        y: event.clientY,
+    const payload = this.readDropPayload(event);
+    if (!payload) {
+      return;
+    }
+    if (this.activeMode() === 'spyker' && payload.kind === 'SuperServerNode') {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'No super server is allowed to exist in the Spyker Environment',
       });
-      const mousePosition = flowPoint ?? {
-        x: event.clientX,
-        y: event.clientY,
-      };
-      let nodeType;
-      switch (payloadType) {
-        case 'ClientNode':
-          nodeType = ClientNode;
-          break;
-        case 'ServerNode':
-          nodeType = ServerNode;
-          break;
-        case 'SuperServerNode':
-          nodeType = SuperServerNode;
-          break;
-        default:
-          console.log('this is the default case');
-          return;
+      return;
+    }
+    const pointer = { x: event.clientX, y: event.clientY };
+    this.activeGraph().addNode(createGraphNode({
+      id: uuidv4(),
+      kind: payload.kind,
+      architecture: this.activeMode(),
+      point: this.flow?.documentPointToFlowPoint(pointer) ?? pointer,
+      config: payload.config,
+    }));
+  }
+
+  /** Reads the node template the sidebar put on the drag, ignoring foreign drops. */
+  private readDropPayload(event: DragEvent): { kind: NodeKind; config: Record<string, unknown> } | null {
+    try {
+      const payload = JSON.parse(event.dataTransfer?.getData('application/json') || 'null');
+      if (!isNodeKind(payload?.type)) {
+        return null;
       }
-      const newNode: Node = {
-        id: uuidv4(),
-        point: mousePosition,
-        type: nodeType,
-        data: {
-          type: payload.type,
-          config: payload.config,
-          environment: this.activeMode(),
-          fromJson: isFromJson,
-          selected: false,
-        },
-      };
-      this.activeGraph().addNode(newNode);
-      console.log('added new node:', newNode);
-    } catch (e) {
-      console.log('Catched', e);
+      const config = typeof payload.config === 'object' && payload.config !== null ? payload.config : {};
+      return { kind: payload.type, config };
+    } catch {
+      return null;
     }
   }
+
 
  public changeMode(mode: Architecture): void {
     if (this.activeMode() === mode) return;
