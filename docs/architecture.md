@@ -112,9 +112,20 @@ outside FedSim bypass it.
 
 Coordination, dataset, and evaluator actors explicitly request zero logical
 CPUs. Clients are logical addresses, not separate Ray processes. Each CPU
-worker owns persistent client instances, including each client's model, data
-loaders, shuffle generator and independent timing streams. Models and loaders
-are never shared between clients, even when two runs use the same client ID.
+worker owns persistent client instances, including each client's data loaders,
+shuffle generator and independent timing streams. A worker resolves each
+execution's immutable context once instead of deserializing the complete client
+registry separately for every client. Execution identities separate concurrent
+runs even when their client IDs match.
+
+The worker reuses one CNN across its serialized training calls. Every call
+loads all server-supplied parameters and creates a fresh SGD optimizer, so
+neither model parameters nor optimizer momentum persist as client-local state
+in the current protocol. Loader and timing states remain private to each
+client. Tests compare interleaved runs against independently instantiated
+models with exact weight and loss equality. A future algorithm requiring
+persistent local model or optimizer state must extend this contract before
+using the shared-model path.
 
 Both engines submit `START_FIT` and periodic `EVALUATE` callbacks through one
 named CPU execution pool per Ray namespace. The pool creates one worker per
@@ -135,8 +146,9 @@ and rejects queued or future work from that execution. Direct engine users
 must call `close()` in a `finally` block before discarding the simulation.
 
 Physical client execution processes therefore scale with available CPUs,
-while model and loader state still grows with the number of clients. This
-removes per-client interpreter/import overhead; it does not make memory use
+while loader state still grows with the number of clients. Model storage is
+per worker and context storage per worker/execution. This removes per-client
+interpreter/import and model-copy overhead; it does not make memory use
 constant or guarantee a particular supported client count. Fixed client
 affinity can leave a worker busier than another in heterogeneous workloads.
 

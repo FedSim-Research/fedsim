@@ -81,8 +81,11 @@ stochastic model or augmentation operations need separate controls and validatio
 
 ## Data assignments
 
-Logical clients now retain their private model and loader state inside a
-bounded set of CPU workers, rather than allocating a Ray process per client.
+Logical clients retain private loader and RNG state inside a bounded set of
+CPU workers, rather than allocating a Ray process per client. Workers reuse
+one CNN because each call loads complete incoming parameters and recreates
+the optimizer. They also resolve an execution context once per worker,
+avoiding a separate copy of the complete client registry for every client.
 Tests compare interleaved clients against independent client instances using
 actual SGD, exact weight equality, noisy timing and loader-generator states.
 This checks client semantics within the same software environment; it does

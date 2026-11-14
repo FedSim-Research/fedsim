@@ -21,6 +21,8 @@ class CpuExecutionWorker:
 
     def __init__(self):
         self._clients = {}
+        self._contexts = {}
+        self._model = None
 
     def ready(self):
         return True
@@ -33,10 +35,19 @@ class CpuExecutionWorker:
                 raise ValueError("Unsupported logical client method")
             key = (actor.execution_id, actor.client_id)
             if key not in self._clients:
-                context = ray.get(actor.context_ref)
-                if context.execution_id != actor.execution_id:
-                    raise ValueError("Client execution identity does not match its context")
-                self._clients[key] = VirtualClient(actor.client_id, actor.client_config, context)
+                if actor.execution_id not in self._contexts:
+                    context = ray.get(actor.context_ref)
+                    if context.execution_id != actor.execution_id:
+                        raise ValueError("Client execution identity does not match its context")
+                    self._contexts[actor.execution_id] = context
+                client = VirtualClient(
+                    actor.client_id,
+                    actor.client_config,
+                    self._contexts[actor.execution_id],
+                    model=self._model,
+                )
+                self._model = client.inner_client.net
+                self._clients[key] = client
             kwargs = dict(kwargs)
             if isinstance(kwargs.get("direct_refs"), ray.ObjectRef):
                 kwargs["direct_refs"] = ray.get(kwargs["direct_refs"])
@@ -47,6 +58,7 @@ class CpuExecutionWorker:
         self._clients = {
             key: client for key, client in self._clients.items() if key[0] != execution_id
         }
+        self._contexts.pop(execution_id, None)
 
 
 @ray.remote(num_cpus=0, num_gpus=0)

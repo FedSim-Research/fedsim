@@ -1,5 +1,6 @@
 import asyncio
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -44,7 +45,8 @@ def make_handle(context, partition=0):
 def test_interleaved_worker_clients_match_independent_clients_exactly(monkeypatch):
     """Actual SGD, loader-generator advancement and noisy timing survive reuse."""
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    monkeypatch.setattr(ray, "get", lambda value: value)
+    get = Mock(side_effect=lambda value: value)
+    monkeypatch.setattr(ray, "get", get)
     monkeypatch.setattr(ray, "put", lambda arrays: [array.copy() for array in arrays])
 
     def load_data(partition_id, num_partitions, seed=None, **kwargs):
@@ -62,7 +64,13 @@ def test_interleaved_worker_clients_match_independent_clients_exactly(monkeypatc
     handles = [make_handle(context, partition) for context in contexts for partition in range(2)]
     standalone = [VirtualClient(h.client_id, h.client_config, h.context_ref) for h in handles]
     worker = CpuExecutionWorker.__ray_metadata__.modified_class()
-    initial = [array.copy() for array in standalone[0].inner_client.get_parameters()]
+    initial = {
+        handle.execution_id: [array.copy() for array in client.inner_client.get_parameters()]
+        for handle, client in zip(handles, standalone, strict=True)
+        if handle.client_config["dataset_partition_id"] == 0
+    }
+    create_model = Mock(wraps=training.Net)
+    monkeypatch.setattr(training, "Net", create_model)
     for sequence, index in enumerate([0, 1, 2, 0, 3, 1, 2, 0]):
         payload = {
             "event_type": "START_FIT",
@@ -73,14 +81,18 @@ def test_interleaved_worker_clients_match_independent_clients_exactly(monkeypatc
                 "config": {"epochs": 1, "lr": 0.01, "batch_size": 3, "model_age": sequence},
             },
         }
-        expected = standalone[index].handle_event(payload, direct_refs=initial)[0]
-        actual = worker.call(handles[index], "handle_event", (payload,), {"direct_refs": initial})[
-            0
-        ]
+        parameters = initial[handles[index].execution_id]
+        expected = standalone[index].handle_event(payload, direct_refs=parameters)[0]
+        actual = worker.call(
+            handles[index], "handle_event", (payload,), {"direct_refs": parameters}
+        )[0]
         assert actual[:4] == expected[:4]
         for observed, reference in zip(actual[4], expected[4], strict=True):
             np.testing.assert_array_equal(observed, reference)
     assert len(worker._clients) == 4
+    assert get.call_count == 2
+    assert create_model.call_count == 1
+    assert len({id(client.inner_client.net) for client in worker._clients.values()}) == 1
     for handle, reference in zip(handles, standalone, strict=True):
         client = worker._clients[(handle.execution_id, handle.client_id)]
         assert torch.equal(
@@ -89,6 +101,7 @@ def test_interleaved_worker_clients_match_independent_clients_exactly(monkeypatc
         )
     worker.release_clients(contexts[0].execution_id)
     assert {key[0] for key in worker._clients} == {contexts[1].execution_id}
+    assert set(worker._contexts) == {contexts[1].execution_id}
 
 
 def test_worker_rejects_a_mismatched_client_context(monkeypatch):

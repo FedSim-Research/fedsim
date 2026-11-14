@@ -18,6 +18,7 @@ class TrainingClient:
         *,
         partition_seed: int | None = None,
         dataset_provider=None,
+        model: Net | None = None,
     ):
         self.partition_id = partition_id
         self.num_partitions = num_partitions
@@ -26,7 +27,9 @@ class TrainingClient:
         self.dataset_provider = dataset_provider
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.dataset_id = dataset_id
-        self.net = Net(seed=seed).to(self.device)
+        # A serialized worker can reuse its model: every fit/evaluate loads all
+        # incoming parameters, and fit creates a fresh optimizer on every call.
+        self.net = (Net(seed=seed) if model is None else model).to(self.device)
 
     def _ensure_data_loaded(self):
         if not hasattr(self, "trainloader"):

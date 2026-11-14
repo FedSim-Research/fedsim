@@ -12,7 +12,9 @@ from fedsim.simulation.randomness import RandomStreams
 class VirtualClient:
     """State of one logical client, owned by a serialized CPU worker."""
 
-    def __init__(self, client_id: str, client_config: dict, context: SimulationContext):
+    def __init__(
+        self, client_id: str, client_config: dict, context: SimulationContext, *, model=None
+    ):
         self.client_id = client_id
         self.random_streams = RandomStreams(client_config.get("seed"), "client")
         self.context = context
@@ -26,6 +28,7 @@ class VirtualClient:
             seed=client_config.get("seed"),
             partition_seed=context.seed,
             dataset_provider=context.dataset_provider,
+            model=model,
         )
         self.current_virtual_time = 0.0
 
