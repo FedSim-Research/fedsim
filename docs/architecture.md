@@ -110,25 +110,42 @@ outside FedSim bypass it.
 
 ## CPU execution
 
-Coordination, dataset, evaluator, and client actors explicitly request zero
-logical CPUs. Keeping these actors alive therefore cannot consume the CPU
-reservations needed to start training. Each client retains its model, data
-loaders, and random generator between callbacks.
+Coordination, dataset, and evaluator actors explicitly request zero logical
+CPUs. Clients are logical addresses, not separate Ray processes. Each CPU
+worker owns persistent client instances, including each client's model, data
+loaders, shuffle generator and independent timing streams. Models and loaders
+are never shared between clients, even when two runs use the same client ID.
 
 Both engines submit `START_FIT` and periodic `EVALUATE` callbacks through one
 named CPU execution pool per Ray namespace. The pool creates one worker per
 whole CPU available when it is first built. Each worker reserves one logical
-CPU for its lifetime and waits for one compute callback to finish before
-accepting another. Initial periodic evaluation also uses the pool. Concurrent
-engine controllers share the same capacity, including in Both mode. Client
+CPU for its lifetime and executes one compute callback at a time. Logical
+clients are assigned by partition index modulo the worker count, preserving
+their state between calls without serialization of PyTorch data loaders.
+Initial and periodic evaluation use the same worker locks, so concurrent
+engine controllers share the same capacity, including in Both mode. Clients
 and periodic evaluator actors set PyTorch's intra-op thread count to one.
 
-This bounds active training and periodic evaluation callbacks, not total
-process count, memory, or operating-system CPU usage. Client initialization,
-server aggregation, data preparation, and the controller's final evaluation
-run outside this admission pool. Idle clients still retain their own processes
-and training state. CPU reservations last for the pool's lifetime; shutting
-down its owning Ray job releases the pool.
+Each build receives a unique execution identity for worker-cache ownership;
+this identity is not used in scientific seeds. Contexts are object-store
+references, resolved once per logical client and retained as instance state.
+The controller releases clients after execution, including failure paths,
+without releasing another controller's clients. Release drains active work
+and rejects queued or future work from that execution. Direct engine users
+must call `close()` in a `finally` block before discarding the simulation.
+
+Physical client execution processes therefore scale with available CPUs,
+while model and loader state still grows with the number of clients. This
+removes per-client interpreter/import overhead; it does not make memory use
+constant or guarantee a particular supported client count. Fixed client
+affinity can leave a worker busier than another in heterogeneous workloads.
+
+This bounds active client initialization, training and periodic evaluation,
+not total memory or operating-system CPU usage. Coordination actors still
+allocate processes, and server aggregation, dataset-provider preparation and
+the controller's final evaluation run outside this pool. Idle clients retain
+training state inside their worker. CPU reservations last for the pool's
+lifetime; shutting down its owning Ray job releases the pool.
 
 Changing execution concurrency can change callback completion order and thus
 event tie-breaking. Virtual delay formulas are unchanged; bitwise equivalence
@@ -148,10 +165,10 @@ left uninitialized. Extensions with additional state fail until their
 initialization is defined.
 
 Server actors receive the run seed through their simulation context. Their
-network streams are scoped by server ID and destination ID. Client actors use
+network streams are scoped by server ID and destination ID. Logical clients use
 their existing per-client seed (run seed plus partition index), with separate
 streams for training duration, downloads, and uploads per server. Streams
-advance independently and remain owned by the actor between callbacks. The
+advance independently and remain owned by their client between callbacks. The
 `fedsim-rng-v1` scheme derives 64-bit seeds from canonical JSON using SHA-256,
 independently of Python's randomized hash. Unseeded runs use private generators
 initialized from system entropy.

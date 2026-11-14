@@ -214,7 +214,7 @@ def test_client_timing_is_seeded_without_global_draws(monkeypatch, local_actor, 
 
     def timings(seed):
         actor = local_actor(
-            client_actor.VirtualClientActor,
+            client_actor.VirtualClient,
             "client",
             {"dataset_partition_id": 0, "total_partitions": 1, "seed": seed},
             context,

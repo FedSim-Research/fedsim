@@ -270,6 +270,15 @@ def replace_graph_state(graph_id: int, payload: VflowGraph) -> Graph | None:
         if graph is None:
             return None
 
+        requested_ids = [node.id for node in payload.nodes]
+        if len(set(requested_ids)) != len(requested_ids):
+            raise ValueError("duplicate_node_id")
+        conflicting_node = session.execute(
+            select(Node.id).where(Node.id.in_(requested_ids), Node.graph_id != graph_id).limit(1)
+        ).first()
+        if conflicting_node is not None:
+            raise ValueError("node_graph_mismatch")
+
         session.execute(delete(Edge).where(Edge.graph_id == graph_id))
         session.execute(delete(Node).where(Node.graph_id == graph_id))
 

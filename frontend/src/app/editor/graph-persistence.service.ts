@@ -52,6 +52,7 @@ export class GraphPersistenceService {
     const previousGraphId = service.getGraphId();
     this.loadGenerations.set(service, generation);
     await service.flushSave();
+    const editRevision = service.getEditRevision();
     const graph = await this.api.getGraph(graphId);
     if (this.loadGenerations.get(service) !== generation || service.getGraphId() !== previousGraphId) return;
     if (graph.architecture !== architecture) {
@@ -60,6 +61,9 @@ export class GraphPersistenceService {
     // Edits may also have arrived while the requested graph was being fetched.
     await service.flushSave();
     if (this.loadGenerations.get(service) !== generation || service.getGraphId() !== previousGraphId) return;
+    // A reload response predates edits just flushed to the same graph. Keep
+    // those local contents instead of replacing them with the stale response.
+    if (graphId === previousGraphId && service.getEditRevision() !== editRevision) return;
     this.applyGraph(service, architecture, graph);
     service.setGraphId(graphId);
   }

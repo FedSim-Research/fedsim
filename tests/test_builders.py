@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from fedsim.clients import training
-from fedsim.clients.actor import VirtualClientActor
+from fedsim.clients.actor import VirtualClient
 from fedsim.engines.hierarchical import edge as hierarchical_edge
 from fedsim.engines.spyker import server as spyker_server
 from fedsim.persistence.models import Edge, Graph, Node
@@ -141,16 +141,13 @@ def test_selected_dataset_and_batch_size_reach_training(monkeypatch, local_actor
     monkeypatch.setattr(training, "load_data", load_data)
     monkeypatch.setattr(training, "train", observe_training)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    client = local_actor(VirtualClientActor, client_id, client_config, context)
+    client = local_actor(VirtualClient, client_id, client_config, context)
     initial_weights = client.inner_client.get_parameters()
-    actor_factory = Mock()
     if architecture == "spyker":
-        monkeypatch.setattr(spyker_server, "VirtualClientActor", actor_factory)
         server = local_actor(spyker_server.SpykerServer, "server", simulation.config, context)
         server.set_initial_weights(initial_weights)
         server.set_topology({}, "server", [client_id])
     else:
-        monkeypatch.setattr(hierarchical_edge, "VirtualClientActor", actor_factory)
         server = local_actor(
             hierarchical_edge.EdgeServer, "server", "coordinator", object(), 1, context
         )

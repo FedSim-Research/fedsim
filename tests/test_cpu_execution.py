@@ -5,7 +5,6 @@ from unittest.mock import Mock
 import pytest
 import ray
 
-from fedsim.clients.actor import VirtualClientActor
 from fedsim.engines.hierarchical.coordinator import SuperServer
 from fedsim.engines.hierarchical.edge import EdgeServer
 from fedsim.engines.spyker.server import SpykerServer
@@ -18,7 +17,6 @@ from fedsim.telemetry.evaluator import PeriodicEvaluator
 @pytest.mark.parametrize(
     "actor",
     [
-        VirtualClientActor,
         SuperServer,
         EdgeServer,
         SpykerServer,

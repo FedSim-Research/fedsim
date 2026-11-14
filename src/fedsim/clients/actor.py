@@ -4,21 +4,21 @@ import torch
 
 from fedsim.clients.training import TrainingClient
 from fedsim.simulation.compute_model import estimate_training_time
-from fedsim.simulation.context import SimulationContext, get_global_context, set_global_context
+from fedsim.simulation.context import SimulationContext
 from fedsim.simulation.network_model import estimate_transmission_time
 from fedsim.simulation.randomness import RandomStreams
 
 
-@ray.remote(num_cpus=0, num_gpus=0)
-class VirtualClientActor:
+class VirtualClient:
+    """State of one logical client, owned by a serialized CPU worker."""
+
     def __init__(self, client_id: str, client_config: dict, context: SimulationContext):
         self.client_id = client_id
         self.random_streams = RandomStreams(client_config.get("seed"), "client")
-        set_global_context(context)
+        self.context = context
         torch.set_num_threads(1)
 
-        # Instantiate inner client locally to this actor's process
-        # (Prevents serializing un-pickleable PyTorch DataLoaders)
+        # Loaders and their generators stay local to the owning CPU worker.
         self.inner_client = TrainingClient(
             partition_id=client_config["dataset_partition_id"],
             num_partitions=client_config["total_partitions"],
@@ -28,10 +28,6 @@ class VirtualClientActor:
             dataset_provider=context.dataset_provider,
         )
         self.current_virtual_time = 0.0
-        self.orchestrator_ref = None
-
-    def set_orchestrator(self, orchestrator_ref):
-        self.orchestrator_ref = orchestrator_ref
 
     def handle_event(self, payload: dict, direct_refs=None):
         event_type = payload.get("event_type")
@@ -42,18 +38,15 @@ class VirtualClientActor:
 
         if event_type == "START_FIT":
             return self.fit(data, direct_refs)
-        elif event_type == "START_EVALUATE":
-            return self.evaluate(data, direct_refs)
         else:
-            print(f"[VirtualClient {self.client_id}] Unknown event: {event_type}")
-            return []
+            raise ValueError(f"Unsupported logical client event: {event_type}")
 
     def fit(self, data: dict, direct_refs: list[np.ndarray]):
         server_id = data["server_id"]
         server_ref = data["server_ref"]
         config = data["config"]
 
-        ctx = get_global_context()
+        ctx = self.context
         client_spec = ctx.get_client_spec(self.client_id)
         server_spec = ctx.get_server_spec(server_id)
 

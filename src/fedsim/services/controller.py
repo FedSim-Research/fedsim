@@ -1,4 +1,5 @@
 import logging
+import sys
 from typing import Any, Callable
 
 from fedsim.runtime import managed_ray_runtime
@@ -99,9 +100,20 @@ class SimulationController:
         seed = self.simulation_settings.get("seed")
         simulation = builder()
         logger.debug("simulation_build_start architecture=%s", self.architecture)
-        simulation.build()
-        logger.debug("simulation_run_start architecture=%s", self.architecture)
-        simulation.run()
+        try:
+            simulation.build()
+            logger.debug("simulation_run_start architecture=%s", self.architecture)
+            simulation.run()
+        finally:
+            original_error = sys.exception()
+            close = getattr(simulation, "close", None)
+            if close is not None:
+                try:
+                    close()
+                except Exception:
+                    if original_error is None:
+                        raise
+                    logger.exception("Could not release clients after a failed simulation")
         logger.debug("simulation_run_finished architecture=%s", self.architecture)
 
         output_filename = self.simulation_settings.get("output_filename")

@@ -249,6 +249,11 @@ class HierarchicalSimulation:
         self._spawn_actors()
         self._configure_network()
 
+    def close(self):
+        """Release this run's logical client state from the shared CPU workers."""
+        if self._cpu_pool is not None and self.context is not None:
+            ray.get(self._cpu_pool.release_clients.remote(self.context.execution_id))
+
     def run(self):
         """Runs the simulation loop."""
         if not self.orchestrator or not self.super_actor:

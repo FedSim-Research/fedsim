@@ -125,4 +125,22 @@ describe('GraphPersistenceService', () => {
     expect(service.getGraphId()).toBeNull();
     expect(service.nodes()).toEqual([]);
   });
+
+  it('preserves edits made while reloading the same graph', async () => {
+    let finish!: (graph: GraphDetail) => void;
+    const api = TestBed.inject(GraphApiService);
+    vi.spyOn(api, 'getGraph').mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const service = TestBed.inject(HierflGraphService);
+    service.setGraphId(7);
+    service.loadContents([{ id: 's', point: { x: 0, y: 0 }, data: { type: 'ServerNode', config: {} } } as never], []);
+    const pending = TestBed.inject(GraphPersistenceService).loadGraph(service, 'hierfl', 7);
+    await vi.waitFor(() => expect(api.getGraph).toHaveBeenCalled());
+    service.updateNodeConfig('s', { name: 'latest edit' });
+    finish(detail);
+    await pending;
+    expect((service.nodes()[0] as unknown as { data: { config: { name: string } } }).data.config.name).toBe('latest edit');
+    expect(replaceGraphState).toHaveBeenCalledWith(7, expect.objectContaining({
+      nodes: [expect.objectContaining({ data: expect.objectContaining({ config: { name: 'latest edit' } }) })],
+    }));
+  });
 });

@@ -24,7 +24,7 @@ def test_client_upload_uses_client_upload_and_server_download(monkeypatch, local
     inner.fit.return_value = {"parameters": weights, "num_examples": 10, "metrics": {}}
     monkeypatch.setattr(client_actor, "TrainingClient", Mock(return_value=inner))
     actor = local_actor(
-        client_actor.VirtualClientActor,
+        client_actor.VirtualClient,
         "client",
         {"dataset_partition_id": 0, "total_partitions": 1},
         context,

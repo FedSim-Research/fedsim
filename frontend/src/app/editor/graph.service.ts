@@ -30,12 +30,17 @@ export abstract class GraphService {
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private saveQueue: Promise<void> = Promise.resolve();
   private hasUnsavedChanges = false;
+  private editRevision = 0;
   protected readonly graphHistory = new GraphHistory();
 
   protected constructor(public readonly architecture: Architecture) {}
 
   public getGraphId(): number | null {
     return this.graphId;
+  }
+
+  public getEditRevision(): number {
+    return this.editRevision;
   }
 
   public setGraphId(graphId: number | null): void {
@@ -238,6 +243,7 @@ export abstract class GraphService {
 
   /** Persists the current state shortly; bursts of edits are coalesced into one request. */
   protected scheduleSave(): void {
+    this.editRevision += 1;
     this.hasUnsavedChanges = true;
     if (this.saveTimer !== null) {
       clearTimeout(this.saveTimer);

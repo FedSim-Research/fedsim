@@ -1,6 +1,7 @@
 import json
 
 from fastapi import APIRouter, HTTPException
+from sqlalchemy.exc import IntegrityError
 
 from fedsim.api.schemas import (
     EdgeCreate,
@@ -170,7 +171,18 @@ def replace_graph_state(graph_id: int, payload: VflowGraph):
     except ValueError as exc:
         if str(exc) == "edge_payload_incomplete":
             raise HTTPException(status_code=400, detail="Edge references missing nodes")
+        if str(exc) == "duplicate_node_id":
+            raise HTTPException(status_code=400, detail="Node IDs must be unique within a graph")
+        if str(exc) == "node_graph_mismatch":
+            raise HTTPException(
+                status_code=409, detail="Node IDs are already used by another graph"
+            )
         raise
+    except IntegrityError as exc:
+        # A concurrent writer can invalidate the identity check before commit.
+        raise HTTPException(
+            status_code=409, detail="Graph state conflicts with another update"
+        ) from exc
     if graph is None:
         raise HTTPException(status_code=404, detail="Graph not found")
 

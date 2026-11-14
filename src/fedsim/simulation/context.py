@@ -1,5 +1,6 @@
 from contextvars import ContextVar
 from typing import Any, Dict
+from uuid import uuid4
 
 import ray
 
@@ -26,6 +27,8 @@ class SimulationContext:
         self.server_registry = server_registry
         self.seed = seed
         self.dataset_provider = dataset_provider
+        # Execution identity isolates physical-worker caches; it never seeds RNGs.
+        self.execution_id = uuid4().hex
 
         self.server_actor_handles = None
 

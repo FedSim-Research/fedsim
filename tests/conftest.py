@@ -46,6 +46,8 @@ def local_actor(monkeypatch):
     monkeypatch.setattr(ray, "put", lambda value: value)
 
     def create(actor_type, *args, **kwargs):
-        return actor_type.__ray_metadata__.modified_class(*args, **kwargs)
+        metadata = getattr(actor_type, "__ray_metadata__", None)
+        implementation = actor_type if metadata is None else metadata.modified_class
+        return implementation(*args, **kwargs)
 
     return create

@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import ray
 
-from fedsim.clients.actor import VirtualClientActor
+from fedsim.clients.handle import ClientHandle
 from fedsim.engines.base import BaseAsyncServer
 from fedsim.simulation.context import SimulationContext, set_global_context
 from fedsim.simulation.network_model import estimate_transmission_time
@@ -38,7 +38,7 @@ class SpykerServer(BaseAsyncServer):
         # --- Topology State ---
         self.peer_connections: Dict[str, Network] = {}
         self.next_token_peer: Optional[str] = None
-        self.assigned_client_instances: Dict[str, VirtualClientActor] = {}
+        self.assigned_client_instances: Dict[str, ClientHandle] = {}
 
         # --- Spyker Protocol State ---
         self.model_age: int = 0
@@ -101,18 +101,19 @@ class SpykerServer(BaseAsyncServer):
         self.server_ages[self.server_id] = 0
 
     def register_clients(self, client_configs: Dict[str, Any]):
-        """Spawns Client Actors dynamically to process tasks concurrently."""
+        """Register logical clients without creating one process per client."""
+        context_ref = ray.put(self.context)
         for c_id, config in client_configs.items():
-            actor = VirtualClientActor.remote(
-                client_id=c_id, client_config=config, context=self.context
+            actor = ClientHandle(
+                execution_id=self.context.execution_id,
+                client_id=c_id,
+                client_config=dict(config),
+                context_ref=context_ref,
             )
             self.assigned_client_instances[c_id] = actor
 
     def set_orchestrator(self, orchestrator_ref):
         super().set_orchestrator(orchestrator_ref)
-        # Link clients to orchestrator
-        for client_actor in self.assigned_client_instances.values():
-            client_actor.set_orchestrator.remote(orchestrator_ref)
 
     def set_token_holder(self, is_holder: bool):
         self.has_token = is_holder

@@ -118,7 +118,7 @@ def test_client_download_and_upload_use_their_respective_payload_sizes(monkeypat
         ),
     )
     actor = local_actor(
-        client_actor.VirtualClientActor,
+        client_actor.VirtualClient,
         "client",
         {"dataset_partition_id": 0, "total_partitions": 1, "seed": 42},
         context,

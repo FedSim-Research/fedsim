@@ -7,6 +7,8 @@ import threading
 
 import ray
 
+from fedsim.clients.handle import ClientHandle
+
 CPU_POOL_NAME = "fedsim-cpu-execution-v1"
 _pool_lock = threading.Lock()
 _STARTUP_TIMEOUT = 30
@@ -15,13 +17,36 @@ _logger = logging.getLogger(__name__)
 
 @ray.remote(num_cpus=1, num_gpus=0)
 class CpuExecutionWorker:
-    """Hold one logical CPU while a stateful compute actor handles a callback."""
+    """Execute persistent logical clients within one CPU-reserving process."""
+
+    def __init__(self):
+        self._clients = {}
 
     def ready(self):
         return True
 
     def call(self, actor, method, args, kwargs):
+        if isinstance(actor, ClientHandle):
+            from fedsim.clients.actor import VirtualClient
+
+            if method != "handle_event":
+                raise ValueError("Unsupported logical client method")
+            key = (actor.execution_id, actor.client_id)
+            if key not in self._clients:
+                context = ray.get(actor.context_ref)
+                if context.execution_id != actor.execution_id:
+                    raise ValueError("Client execution identity does not match its context")
+                self._clients[key] = VirtualClient(actor.client_id, actor.client_config, context)
+            kwargs = dict(kwargs)
+            if isinstance(kwargs.get("direct_refs"), ray.ObjectRef):
+                kwargs["direct_refs"] = ray.get(kwargs["direct_refs"])
+            return self._clients[key].handle_event(*args, **kwargs)
         return ray.get(getattr(actor, method).remote(*args, **kwargs))
+
+    def release_clients(self, execution_id):
+        self._clients = {
+            key: client for key, client in self._clients.items() if key[0] != execution_id
+        }
 
 
 @ray.remote(num_cpus=0, num_gpus=0)
@@ -31,8 +56,10 @@ class CpuExecutionPool:
             raise ValueError("CPU execution capacity must be positive")
         self._workers = [CpuExecutionWorker.remote() for _ in range(capacity)]
         self._available = asyncio.Queue()
-        for worker in self._workers:
-            self._available.put_nowait(worker)
+        for index in range(capacity):
+            self._available.put_nowait(index)
+        self._worker_locks = [asyncio.Lock() for _ in range(capacity)]
+        self._closed_executions = set()
         self._ready = False
         self._startup_lock = asyncio.Lock()
 
@@ -44,11 +71,29 @@ class CpuExecutionPool:
         return len(self._workers)
 
     async def call(self, actor, method, args, kwargs):
-        worker = await self._available.get()
+        if isinstance(actor, ClientHandle):
+            # Fixed ownership preserves loader-generator and timing stream state.
+            index = actor.client_config["dataset_partition_id"] % len(self._workers)
+            async with self._worker_locks[index]:
+                if actor.execution_id in self._closed_executions:
+                    raise RuntimeError("Client execution has already been released")
+                return await self._workers[index].call.remote(actor, method, args, kwargs)
+        index = await self._available.get()
         try:
-            return await worker.call.remote(actor, method, args, kwargs)
+            async with self._worker_locks[index]:
+                return await self._workers[index].call.remote(actor, method, args, kwargs)
         finally:
-            self._available.put_nowait(worker)
+            self._available.put_nowait(index)
+
+    async def release_clients(self, execution_id):
+        """Drain active callbacks and reject queued/future work for a finished run."""
+        self._closed_executions.add(execution_id)
+
+        async def release(index):
+            async with self._worker_locks[index]:
+                await self._workers[index].release_clients.remote(execution_id)
+
+        await asyncio.gather(*(release(index) for index in range(len(self._workers))))
 
     def close(self):
         for worker in self._workers:

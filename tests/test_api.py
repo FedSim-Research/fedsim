@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 import ray
 from fastapi.testclient import TestClient
@@ -43,6 +45,39 @@ def test_startup_seeds_default_topologies_and_serves_openapi(api):
     assert all(graph["architecture"] in {"hierfl", "spyker"} for graph in response.json())
     assert "/graphs/" in api.get("/openapi.json").json()["paths"]
     assert not ray.is_initialized()
+
+
+@pytest.mark.parametrize("invalid", ["duplicate", "foreign", "missing_endpoint"])
+def test_state_replacement_rejects_invalid_ids_without_changing_either_graph(api, invalid):
+    graphs = [
+        api.post("/graphs/", json={"name": name, "architecture": "hierfl"}).json()["graph_id"]
+        for name in ["Source", "Destination"]
+    ]
+    nodes = []
+    for graph_id in graphs:
+        node = api.post(
+            f"/graphs/{graph_id}/nodes",
+            json={
+                "type": "ClientNode",
+                "config": {"count": 2},
+                "position": {"x": 1, "y": 2},
+            },
+        ).json()
+        nodes.append(node)
+    before = [api.get(f"/graphs/{graph_id}").json() for graph_id in graphs]
+    node_id = nodes[0]["node_id"] if invalid == "foreign" else str(uuid4())
+    node = {
+        "id": node_id,
+        "point": {"x": 3, "y": 4},
+        "type": "default",
+        "data": {"type": "ClientNode", "config": {"count": 9}},
+    }
+    payload = {"nodes": [node, node] if invalid == "duplicate" else [node], "edges": []}
+    if invalid == "missing_endpoint":
+        payload["edges"] = [{"id": "edge", "source": node_id, "target": "absent"}]
+    response = api.put(f"/graphs/{graphs[1]}/state", json=payload)
+    assert response.status_code == (409 if invalid == "foreign" else 400)
+    assert [api.get(f"/graphs/{graph_id}").json() for graph_id in graphs] == before
 
 
 @pytest.mark.parametrize("root_path", ["", "/api"])

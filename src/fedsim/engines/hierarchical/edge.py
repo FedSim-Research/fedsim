@@ -4,7 +4,7 @@ import numpy as np
 import ray
 
 import fedsim.simulation.context
-from fedsim.clients.actor import VirtualClientActor
+from fedsim.clients.handle import ClientHandle
 from fedsim.engines.base import BaseAsyncServer
 from fedsim.simulation.context import SimulationContext, set_global_context
 from fedsim.simulation.network_model import estimate_transmission_time
@@ -34,7 +34,7 @@ class EdgeServer(BaseAsyncServer):
         self.super_server_ref = super_server_ref
         self.min_clients_per_round = min_clients_per_round
 
-        self.assigned_client_instances: Dict[str, VirtualClientActor] = {}
+        self.assigned_client_instances: Dict[str, ClientHandle] = {}
 
         # Buffer stores: {client_id: (weights, num_examples)}
         self.client_updates_buffer: Dict[str, Tuple[List[np.ndarray], int]] = {}
@@ -53,17 +53,19 @@ class EdgeServer(BaseAsyncServer):
         self.context = context
 
     def register_clients(self, client_configs: Dict[str, Dict[str, Any]]):
-        """Instantiates PyTorch DataLoaders safely inside the Ray worker."""
+        """Register logical clients without creating one process per client."""
+        context_ref = ray.put(self.context)
         for c_id, config in client_configs.items():
-            actor = VirtualClientActor.remote(
-                client_id=c_id, client_config=config, context=self.context
+            actor = ClientHandle(
+                execution_id=self.context.execution_id,
+                client_id=c_id,
+                client_config=dict(config),
+                context_ref=context_ref,
             )
             self.assigned_client_instances[c_id] = actor
 
     def set_orchestrator(self, orchestrator_ref):
         super().set_orchestrator(orchestrator_ref)
-        for client_actor in self.assigned_client_instances.values():
-            client_actor.set_orchestrator.remote(orchestrator_ref)
 
     def start_simulation(self):
         raise NotImplementedError(

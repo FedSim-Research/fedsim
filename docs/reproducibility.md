@@ -81,6 +81,16 @@ stochastic model or augmentation operations need separate controls and validatio
 
 ## Data assignments
 
+Logical clients now retain their private model and loader state inside a
+bounded set of CPU workers, rather than allocating a Ray process per client.
+Tests compare interleaved clients against independent client instances using
+actual SGD, exact weight equality, noisy timing and loader-generator states.
+This checks client semantics within the same software environment; it does
+not establish identical whole-run event order. Physical scheduling and wall
+clock measurements change, so record the new revision and rerun performance
+comparisons. Client state still grows with population; measure actual memory
+and supported client counts rather than extrapolating from worker count.
+
 The `fedsim-iid-v1` definition uses the normalized dataset ID, total partition
 count, and common run seed (42 when omitted). Flower Datasets now receives this
 seed explicitly for source-data shuffling. Each IID partition receives a

@@ -42,6 +42,7 @@ def test_controller_routes_runs_and_checkpoints_through_installed_package(
     assert builder.call_args.kwargs["run_id"] == "test-run"
     simulation.build.assert_called_once()
     simulation.run.assert_called_once()
+    simulation.close.assert_called_once()
     expected = data_dir() / "models/synthetic.pth"
     simulation.save_model.assert_called_once_with(str(expected))
     evaluator.assert_called_once_with(str(expected), "uoft-cs/cifar10")
@@ -80,7 +81,25 @@ def test_controller_releases_runtime_after_each_failure(monkeypatch, architectur
     with pytest.raises((ValueError, RuntimeError), match="deliberate failure"):
         instance.start()
     shutdown.assert_called_once()
+    if failure != "preload":
+        simulation.close.assert_called_once()
+    else:
+        simulation.close.assert_not_called()
     assert runtime._active_users == 0
+
+
+@pytest.mark.parametrize("run_fails", [False, True])
+def test_client_cleanup_preserves_the_original_run_failure(run_fails):
+    simulation = Mock()
+    simulation.close.side_effect = RuntimeError("cleanup failed")
+    if run_fails:
+        simulation.run.side_effect = ValueError("original run failure")
+    instance = controller.SimulationController("hierfl")
+    expected = ValueError if run_fails else RuntimeError
+    message = "original run failure" if run_fails else "cleanup failed"
+    with pytest.raises(expected, match=message):
+        instance._run_simulation(lambda: simulation, Mock())
+    simulation.close.assert_called_once()
 
 
 @pytest.mark.parametrize("preload_fails", [False, True])
