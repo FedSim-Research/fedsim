@@ -1,15 +1,25 @@
-import { Directive, HostListener, inject, ElementRef, input, ChangeDetectorRef} from '@angular/core';
-import { HierflGraphService } from './topologies/hierfl-graph.service';
-import { SpykerGraphService } from './topologies/spyker-graph.service';
-import { StaticNode as Node } from 'ngx-vflow';
-import { ClientNode } from './nodes/client-node/client-node';
-import { ServerNode } from './nodes/server-node/server-node';
-import { SuperServerNode } from './nodes/super-server-node/super-server-node';
+import { Directive, HostListener, inject, ElementRef, input, effect, untracked } from '@angular/core';
+import { ArchitectureGraph } from './graph-workspace.service';
+import { StaticEdge as Edge } from 'ngx-vflow';
 import { MessageService } from 'primeng/api';
 import type { OnSelect, OnSelectEnd, OnDragStart as SelectoDragStart } from 'selecto';
-import { GraphPersistenceService } from './graph-persistence.service';
 import { v4 as uuidv4 } from 'uuid';
+import { GRAPH_FILE_LIMITS, GraphFileError, parseGraphFile } from './graph-file';
+import { createGraphNode } from './nodes/node-factory';
+import { NodeEvents } from './nodes/node-events.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NodeKind } from '../domain/topology';
+import { nodeLimitViolation } from '../domain/node-limits';
 
+
+/** Offset of pasted nodes from their originals, in canvas units. */
+const PASTE_OFFSET = 50;
+
+interface CopiedNode {
+  kind: NodeKind;
+  point: { x: number; y: number };
+  config: Record<string, unknown>;
+}
 
 @Directive({
   selector: '[appShortcuts]',
@@ -17,23 +27,31 @@ import { v4 as uuidv4 } from 'uuid';
   exportAs: 'appShortcuts',
 })
 export class Shortcuts{
-  protected graphServiceSpyker = inject(SpykerGraphService);
-  protected graphServiceHierfl = inject(HierflGraphService);
-  protected graphPersistence = inject(GraphPersistenceService);
   protected messageService = inject(MessageService);
   protected elRef = inject(ElementRef) as ElementRef<HTMLElement>;
-  public activeService = input.required<SpykerGraphService | HierflGraphService>();
-  private readonly nodeTypeMap = {
-    ClientNode,
-    ServerNode,
-    SuperServerNode,
-  } as const;
-  private clipboard: Node[] = [];
+  public activeService = input.required<ArchitectureGraph>();
+  private clipboard: CopiedNode[] = [];
   public selectedNodeIds: Set<string> = new Set();
   public selectedEdgeIds: Set<string> = new Set();
   public shiftDown = false;
   private selecting = false;
   private lastSelectElements: Array<HTMLElement | SVGElement> = [];
+
+  constructor() {
+    inject(NodeEvents)
+      .selectionToggled$.pipe(takeUntilDestroyed())
+      .subscribe((id) => this.toggleNodeSelection(id));
+    // A selection only makes sense inside the graph it was made in.
+    let previous: ArchitectureGraph | null = null;
+    effect(() => {
+      const current = this.activeService();
+      untracked(() => {
+        previous?.setSelection(new Set(), new Set());
+        this.clearSelectionState();
+        previous = current;
+      });
+    });
+  }
 
   @HostListener('window:keydown', ['$event'])
   public onKeyDown(event: KeyboardEvent): void {
@@ -51,12 +69,12 @@ export class Shortcuts{
       const key = event.key.toLowerCase();
       if (key === 'z') {
         event.preventDefault();
-        void this.applyHistoryAction('undo');
+        this.applyHistoryAction('undo');
         return;
       }
       if (key === 'y') {
         event.preventDefault();
-        void this.applyHistoryAction('redo');
+        this.applyHistoryAction('redo');
         return;
       }
       if (key === 'c') {
@@ -76,24 +94,9 @@ export class Shortcuts{
     if (event.key === 'Delete' || event.key === 'Backspace') {
       if (!this.selectedEdgeIds.size && !this.selectedNodeIds.size) return;
       event.preventDefault();
-      const edgeIds = Array.from(this.selectedEdgeIds);
-      for (const edgeId of edgeIds) {
-        if (this.graphServiceSpyker.edges().some((e) => e.id === edgeId)) {
-          this.graphServiceSpyker.removeEdgeById(edgeId);
-        } else if (this.graphServiceHierfl.edges().some((e) => e.id === edgeId)) {
-          this.graphServiceHierfl.removeEdgeById(edgeId);
-        }
-      }
-      this.selectedEdgeIds.clear();
-      const nodeIds = Array.from(this.selectedNodeIds);
-      for (const nodeId of nodeIds) {
-        if (this.graphServiceSpyker.nodes().some((node) => node.id === nodeId)) {
-          this.graphServiceSpyker.removeNodeById(nodeId);
-        } else if (this.graphServiceHierfl.nodes().some((node) => node.id === nodeId)) {
-          this.graphServiceHierfl.removeNodeById(nodeId);
-        }
-      }
+      this.activeService().removeEntities(this.selectedNodeIds, this.selectedEdgeIds);
       this.selectedNodeIds.clear();
+      this.selectedEdgeIds.clear();
     }
   }
 
@@ -134,21 +137,10 @@ export class Shortcuts{
     this.clearNodeSelection();
   }
 
-  @HostListener('document:pointermove', ['$event'])
-  public onPointerMove(event: PointerEvent) {
-    if (!this.shiftDown || event.buttons !== 1) return;
-  }
-
-  @HostListener('document:pointerup', ['$event'])
-  public onPointerUp(event: PointerEvent) {
-    if (this.shiftDown && event.button === 0) {
-    }
-  }
-
   public onSelectoDragStart(event: SelectoDragStart) {
     const input = event.inputEvent as PointerEvent | MouseEvent | TouchEvent | undefined;
 
-    const targetEl = (input && 'target' in input) ? (input as any).target as Element | null : null;
+    const targetEl = input?.target instanceof Element ? input.target : null;
     if (targetEl && targetEl.closest('app-sidebar')) {
       event.stop();
       return;
@@ -173,34 +165,25 @@ export class Shortcuts{
     this.resetBoxSelectionState();
   }
 
-  @HostListener('window:node-ctrl-click', ['$event'])
-  public onNodeCtrlClick(event: Event): void {
-    const custom = event as CustomEvent<any>;
-    const id = custom?.detail?.id as string | undefined;
-    if (!id) return;
+  private toggleNodeSelection(id: string): void {
     const selected = new Set(this.selectedNodeIds);
     if (selected.has(id)) selected.delete(id);
     else selected.add(id);
     this.applySelection(selected);
   }
 
-  private applySelection(selected: Set<string>) {
-    this.selectedNodeIds = new Set(selected);
-    const spykerNodes = this.graphServiceSpyker.nodes().map((n) => {
-      const data = ((n as any).data as any) || {};
-      const selectedFlag = selected.has(n.id);
-      return { ...n, data: { ...data, selected: selectedFlag } } as Node;
-    });
-    this.graphServiceSpyker.nodes.set(spykerNodes);
 
-    const hierNodes = this.graphServiceHierfl.nodes().map((n) => {
-      const data = ((n as any).data as any) || {};
-      const selectedFlag = selected.has(n.id);
-      return { ...n, data: { ...data, selected: selectedFlag } } as Node;
-    });
-    this.graphServiceHierfl.nodes.set(hierNodes);
-    this.applyEdgeSelection(this.collectSelectedEdges(selected));
+  private applySelection(selected: Set<string>): void {
+    this.selectedNodeIds = new Set(selected);
+    this.selectedEdgeIds = new Set(
+      this.activeService()
+        .edges()
+        .filter((edge) => selected.has(edge.source) && selected.has(edge.target))
+        .map((edge) => edge.id),
+    );
+    this.activeService().setSelection(this.selectedNodeIds, this.selectedEdgeIds);
   }
+
 
   private applySelectionFromElements(elements: Array<HTMLElement | SVGElement>) {
     const nodeIds = this.extractNodeIds(elements);
@@ -236,143 +219,52 @@ export class Shortcuts{
     this.lastSelectElements = [];
   }
 
-  private collectSelectedEdges(selectedNodes: Set<string>): Set<string> {
-    const ids = new Set<string>();
-
-    const addEdges = (edges: any[]) => {
-      edges.forEach((e) => {
-        if (selectedNodes.has(e.source) && selectedNodes.has(e.target)) {
-          ids.add(e.id);
-        }
-      });
-    };
-
-    addEdges(this.graphServiceSpyker.edges());
-    addEdges(this.graphServiceHierfl.edges());
-
-    return ids;
+  private clearNodeSelection(): void {
+    this.selectedNodeIds = new Set();
+    this.selectedEdgeIds = new Set();
+    this.activeService().setSelection(this.selectedNodeIds, this.selectedEdgeIds);
   }
 
-  private clearNodeSelection() {
-    this.selectedNodeIds.clear();
-    const spykerCleared = this.graphServiceSpyker.nodes().map((n) => {
-      const data = ((n as any).data as any) || {};
-      if (data.selected) return { ...n, data: { ...data, selected: false } } as Node;
-      return n;
-    });
-    this.graphServiceSpyker.nodes.set(spykerCleared);
-
-    const hierCleared = this.graphServiceHierfl.nodes().map((n) => {
-      const data = ((n as any).data as any) || {};
-      if (data.selected) return { ...n, data: { ...data, selected: false } } as Node;
-      return n;
-    });
-    this.graphServiceHierfl.nodes.set(hierCleared);
-    this.applyEdgeSelection(new Set());
-  }
 
   public clearSelectionState(): void {
     this.clearNodeSelection();
     this.resetBoxSelectionState();
   }
 
-  public copySelectedNodes() {
-    const ids = Array.from(this.selectedNodeIds);
-    const copied: any[] = [];
-    for (const id of ids) {
-      const n1 = this.graphServiceSpyker.nodes().find((n) => n.id === id);
-      const n2 = this.graphServiceHierfl.nodes().find((n) => n.id === id);
-      const src = n1 ?? n2;
-      if (src) {
-        const { id, ...rest } = src;
-        copied.push(JSON.parse(JSON.stringify(rest)));
-      }
-    }
-    this.clipboard = copied;
+  public copySelectedNodes(): void {
+    this.clipboard = this.activeService()
+      .nodes()
+      .filter((node) => this.selectedNodeIds.has(node.id))
+      .map((node) => {
+        const data = (node as { data?: { type?: NodeKind; config?: Record<string, unknown> } }).data ?? {};
+        return { kind: data.type!, point: { x: node.point.x, y: node.point.y }, config: { ...(data.config ?? {}) } };
+      });
   }
 
-  public pasteCopiedNodes() {
+  /** Pastes the copied nodes slightly offset, as one undoable step. */
+  public pasteCopiedNodes(): void {
     if (!this.clipboard.length) return;
-    const targetArchitecture = this.activeService() instanceof HierflGraphService ? 'hierfl' : 'spyker';
-    let blockedSuperServer = false;
-
-    const newNodeIds = this.clipboard.flatMap((node) => {
-      const typeString = ((node as any).data as any)?.type as keyof typeof this.nodeTypeMap | undefined;
-      if (targetArchitecture === 'spyker' && typeString === 'SuperServerNode') {
-        blockedSuperServer = true;
-        return [];
-      }
-      const newNode = this.buildPastedNode(node, targetArchitecture, typeString);
-      this.activeService().addNode(newNode);
-      return [newNode.id];
-    });
-
-    if (blockedSuperServer) {
-      this.messageService.add({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'No super server is allowed to exist in the Spyker Environment',
-      });
-    }
-
-    if (newNodeIds.length) {
-      this.applySelection(new Set(newNodeIds));
-    }
-  }
-
-  private buildPastedNode(
-    sourceNode: Node,
-    targetArchitecture: 'spyker' | 'hierfl',
-    typeString?: keyof typeof this.nodeTypeMap
-  ): Node {
-    const clone = JSON.parse(JSON.stringify(sourceNode));
-    const data = ((clone as any).data as any) ?? {};
-    const config = (data.config as Record<string, unknown> | undefined) ?? {};
-    const nextData = {
-      ...data,
-      selected: false,
-      fromJson: false,
-      environment: targetArchitecture,
-      config: {
-        ...config,
-        environment: targetArchitecture,
-      },
-    } as Record<string, unknown>;
-    delete nextData['backendId'];
-
-    return {
-      ...clone,
-      id: uuidv4(),
-      type: typeString ? this.nodeTypeMap[typeString] : undefined,
-      point: { x: (sourceNode.point?.x ?? 0) + 50, y: (sourceNode.point?.y ?? 0) + 50 },
-      data: nextData,
-    };
-  }
-
-  private async applyHistoryAction(action: 'undo' | 'redo'): Promise<void> {
     const service = this.activeService();
-    if (!service) return;
-    const history = service.getGraphHistory();
-    const before = history.getState();
-    if (action === 'undo') {
-      history.undo();
-    } else {
-      history.redo();
+    const nodes = this.clipboard.map((entry) => createGraphNode({
+      id: uuidv4(),
+      kind: entry.kind,
+      architecture: service.architecture,
+      point: { x: entry.point.x + PASTE_OFFSET, y: entry.point.y + PASTE_OFFSET },
+      config: { ...entry.config, environment: service.architecture },
+    }));
+    const rejection = service.addEntities(nodes, []);
+    if (rejection) {
+      this.messageService.add({ severity: 'error', summary: 'Error', detail: rejection });
+      return;
     }
-    const snapshot = history.getState();
-    if (before === snapshot) return;
-    service.applyHistoryState(snapshot);
-    this.clearSelectionState();
-    const architecture = service instanceof HierflGraphService ? 'hierfl' : 'spyker';
-    try {
-      await this.graphPersistence.syncGraphState(service, architecture, false);
-    } catch (error) {
-      this.messageService.add({
-        severity: 'error',
-        summary: 'Sync failed',
-        detail: 'Undo/redo could not be saved to the backend.',
-      });
-      console.warn('Undo/redo sync failed', error);
+    this.applySelection(new Set(nodes.map((node) => node.id)));
+  }
+
+  private applyHistoryAction(action: 'undo' | 'redo'): void {
+    const service = this.activeService();
+    const changed = action === 'undo' ? service.undo() : service.redo();
+    if (changed) {
+      this.clearSelectionState();
     }
   }
 
@@ -391,60 +283,9 @@ export class Shortcuts{
 
   private applyEdgeSelection(selectedEdges: Set<string>): void {
     this.selectedEdgeIds = new Set(selectedEdges);
-
-    const spykerEdges = this.graphServiceSpyker.edges().map((e) => {
-      const data = ((e as any).data as any) || {};
-      const selectedFlag = selectedEdges.has(e.id);
-      return { ...e, data: { ...data, selected: selectedFlag } } as any;
-    });
-    this.graphServiceSpyker.edges.set(spykerEdges);
-
-    const hierEdges = this.graphServiceHierfl.edges().map((e) => {
-      const data = ((e as any).data as any) || {};
-      const selectedFlag = selectedEdges.has(e.id);
-      return { ...e, data: { ...data, selected: selectedFlag } } as any;
-    });
-    this.graphServiceHierfl.edges.set(hierEdges);
+    this.activeService().setSelection(this.selectedNodeIds, this.selectedEdgeIds);
   }
 
-  public exportGraph(options?: {
-    graphId?: number | null;
-    graphName?: string | null;
-    architecture?: 'spyker' | 'hierfl';
-  }) {
-    const serializedNodes = this.activeService().nodes().map((node) => {
-      const { type, ...rest } = node as any;
-      return rest;
-    });
-    const serializedEdges = this.activeService().edges().map((edge) => ({
-      ...edge
-    }));
-    const data = {
-      nodes: serializedNodes,
-      edges: serializedEdges,
-      nodeCount: serializedNodes.length,
-      edgeCount: serializedEdges.length
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const storedId = this.activeService().loadGraphIdFromStorage();
-    const graphId = options?.graphId ?? storedId ?? 'graph';
-    const rawName = options?.graphName ?? 'graph';
-    const safeName = rawName
-      .toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-_]+/g, '')
-      .slice(0, 48) || 'graph';
-    const architecture =
-      options?.architecture ??
-      (this.activeService() instanceof HierflGraphService ? 'hierfl' : 'spyker');
-    const filename = `${graphId}_${safeName}_${architecture}.json`;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
 
   public async importGraph(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -458,36 +299,42 @@ export class Shortcuts{
           return;
         }
         try {
-          const text = await file.text();
-          const data = JSON.parse(text);
-          if (!data.nodes || !Array.isArray(data.nodes)) {
-            throw new Error('No nodes!');
-          }
-          const NODE_TYPE_MAP = {
-            ClientNode, ServerNode, SuperServerNode
-          } as const;
-          await this.activeService().resetGraph();
-          for (const nodeData of data.nodes) {
-            const typeString = nodeData.data?.type;
-            const node: Node = {
-              ...nodeData,
-              id: nodeData.id,
-              type: typeString ? NODE_TYPE_MAP[typeString as keyof typeof NODE_TYPE_MAP] : undefined,
-            };
-            this.activeService().addNode(node);
-          }
-          if (data.edges && Array.isArray(data.edges)) {
-            for (const edgeData of data.edges) {
-              this.activeService().addEdge(edgeData);
-            }
-          }
+          await this.importGraphFile(file);
           resolve();
         } catch (error) {
-          console.log("import error:", error)
+          const detail = error instanceof GraphFileError ? error.message : 'The file is not a valid graph export.';
+          this.messageService.add({ severity: 'error', summary: 'Import failed', detail });
           reject(error);
         }
       };
       input.click();
     });
+  }
+
+  private async importGraphFile(file: File): Promise<void> {
+    const service = this.activeService();
+    const architecture = service.architecture;
+    if (file.size > GRAPH_FILE_LIMITS.bytes) {
+      throw new GraphFileError('The file is too large for a graph export.');
+    }
+    const graph = parseGraphFile(JSON.parse(await file.text()), uuidv4);
+    const violation = nodeLimitViolation(architecture, [], graph.nodes.map((node) => node.kind));
+    if (violation) {
+      throw new GraphFileError(violation);
+    }
+
+    const nodes = graph.nodes.map((node) => createGraphNode({ ...node, architecture }));
+    const edges: Edge[] = graph.edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle ?? undefined,
+      targetHandle: edge.targetHandle ?? undefined,
+      reconnectable: true,
+      floating: false,
+      data: { metrics: edge.metrics },
+    }));
+
+    service.replaceContents(nodes, edges);
   }
 }

@@ -1,41 +1,31 @@
 import { Injectable } from '@angular/core';
-import { GraphService } from '../graph.service';
-import { SpykerGraphHistoryService } from './spyker-graph-history.service';
-import { StaticNode as Node } from 'ngx-vflow';
-import { ServerNode } from '../nodes/server-node/server-node';
+import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
 import { v4 as uuidv4 } from 'uuid';
+import { GraphService } from '../graph.service';
+import { orientServerLinks } from '../connection-policy';
 
 @Injectable({
   providedIn: 'root',
 })
-export class SpykerGraphService extends GraphService<SpykerGraphHistoryService> {
-  constructor(graphHistory: SpykerGraphHistoryService) {
-    super(graphHistory, 'spyker');
+export class SpykerGraphService extends GraphService {
+  constructor() {
+    super('spyker');
   }
 
-  public override addNode(newNode: Node): void {
-    super.addNode(newNode);
-    if (newNode.type !== ServerNode) {
-      this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
-      return;
-    }
-
-    const servers = this.nodes().filter((n) => n.id !== newNode.id && n.type === ServerNode);
-    for (const s of servers) {
-      const exists = this.edges().some(
-        (e) =>
-          (e.source === s.id && e.target === newNode.id) ||
-          (e.source === newNode.id && e.target === s.id)
-      );
-      if (!exists){
-      super.addEdge({id: uuidv4(),
-            source: s.id,
-            target: newNode.id,
-            reconnectable: true,
-            floating: false,})}
-      }
-
-    this.graphHistory.saveState({ nodes: this.nodes(), edges: this.edges() });
+  /** Peer links run from the left to the right server. */
+  protected override linksAfterMove(nodes: Node[], edges: Edge[]): Edge[] {
+    return orientServerLinks(nodes, edges);
   }
 
+  /** Spyker servers form a full mesh, so every new server is linked to every other one. */
+  protected override linksForNewNodes(newNodes: Node[]): Edge[] {
+    const isServer = (node: Node) => (node as { data?: { type?: string } }).data?.type === 'ServerNode';
+    const newServers = newNodes.filter(isServer);
+    const peers = [...this.nodes().filter(isServer), ...newServers];
+    return newServers.flatMap((server) =>
+      peers
+        .slice(0, peers.indexOf(server))
+        .map((peer) => ({ id: uuidv4(), source: peer.id, target: server.id, reconnectable: true, floating: false })),
+    );
+  }
 }

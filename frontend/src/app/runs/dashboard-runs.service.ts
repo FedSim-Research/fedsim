@@ -1,11 +1,14 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { GraphApiService, SimulationRunResponse } from '../api/graph-api.service';
+import { Architecture } from '../domain/topology';
 
 @Injectable({ providedIn: 'root' })
 export class DashboardRunsService {
   private graphApi = inject(GraphApiService);
   private pollHandle: ReturnType<typeof setInterval> | null = null;
+  private pollConsumers = 0;
+  private refreshInFlight: Promise<void> | null = null;
 
   public loading = signal(false);
   public error = signal<string | null>(null);
@@ -15,7 +18,7 @@ export class DashboardRunsService {
   public selectedRunId = signal<string | null>(null);
   public compareRunIds = signal<string[]>([]);
 
-  public filterArchitecture = signal<'all' | 'spyker' | 'hierfl' | 'both'>('all');
+  public filterArchitecture = signal<'all' | Architecture | 'both'>('all');
   public filterStatus = signal<'all' | 'queued' | 'running' | 'completed' | 'failed'>('all');
   public searchText = signal('');
 
@@ -74,7 +77,9 @@ export class DashboardRunsService {
     });
   });
 
+  /** Each consumer that starts polling must call `stopPolling` once when it goes away. */
   public startPolling(): void {
+    this.pollConsumers += 1;
     if (this.pollHandle) {
       return;
     }
@@ -88,13 +93,20 @@ export class DashboardRunsService {
   }
 
   public stopPolling(): void {
-    if (this.pollHandle) {
+    this.pollConsumers = Math.max(0, this.pollConsumers - 1);
+    if (this.pollConsumers === 0 && this.pollHandle) {
       clearInterval(this.pollHandle);
       this.pollHandle = null;
     }
   }
 
-  public async refreshRuns(): Promise<void> {
+  public refreshRuns(): Promise<void> {
+    if (this.refreshInFlight) return this.refreshInFlight;
+    this.refreshInFlight = this.loadRuns().finally(() => { this.refreshInFlight = null; });
+    return this.refreshInFlight;
+  }
+
+  private async loadRuns(): Promise<void> {
     this.loading.set(true);
     if (this.pollingSupported()) {
       this.error.set(null);
@@ -124,6 +136,8 @@ export class DashboardRunsService {
 
   public async deleteRun(runId: string): Promise<void> {
     await this.graphApi.deleteRun(runId);
+    // A request started before deletion can still contain the deleted run.
+    await this.refreshInFlight;
     await this.refreshRuns();
   }
 

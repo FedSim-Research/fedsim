@@ -1,10 +1,16 @@
 import { inject } from '@angular/core';
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
-import { MessageService } from 'primeng/api';
+import { HttpContextToken, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { catchError, throwError } from 'rxjs';
+import { ErrorNotifier } from './error-notifier.service';
+
+/** Marks requests whose failures the caller reports itself, e.g. background polling. */
+export const SILENT_ERRORS = new HttpContextToken<boolean>(() => false);
 
 export const globalErrorInterceptor: HttpInterceptorFn = (req, next) => {
-  const messageService = inject(MessageService);
+  if (req.context.get(SILENT_ERRORS)) {
+    return next(req);
+  }
+  const notifier = inject(ErrorNotifier);
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
       let detail = 'Unexpected error.';
@@ -13,14 +19,20 @@ export const globalErrorInterceptor: HttpInterceptorFn = (req, next) => {
       } else if (error.status >= 500) {
         detail = 'Server error. Please try again.';
       } else if (error.error?.detail) {
-        detail = String(error.error.detail);
+        detail = formatDetail(error.error.detail);
       }
-      messageService.add({
-        severity: 'error',
-        summary: 'Request failed',
-        detail,
-      });
+      notifier.error('Request failed', detail);
       return throwError(() => error);
     })
   );
 };
+
+/** FastAPI sends plain strings for HTTP errors and a list of issues for validation errors. */
+function formatDetail(detail: unknown): string {
+  if (Array.isArray(detail)) {
+    return detail
+      .map((issue) => (typeof issue?.msg === 'string' ? issue.msg : JSON.stringify(issue)))
+      .join('\n');
+  }
+  return String(detail);
+}

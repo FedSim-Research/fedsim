@@ -14,7 +14,7 @@ import { GraphService } from '../../graph.service';
 })
 export class EdgeMetricsBoxComponent implements OnChanges {
   @Input({ required: true }) edge!: Edge;
-  @Input({ required: true }) graphService!: GraphService<any>;
+  @Input({ required: true }) graphService!: GraphService;
 
   public form: EdgeMetrics = { ...EDGE_METRIC_DEFAULTS };
 
@@ -40,7 +40,7 @@ export class EdgeMetricsBoxComponent implements OnChanges {
   }
 
   public get isSelected(): boolean {
-    return Boolean((this.edge as any)?.data?.selected);
+    return Boolean(this.edgeData()?.selected);
   }
 
   public handleInput(event: Event, field: keyof EdgeMetrics, min = 0, max?: number): void {
@@ -86,7 +86,7 @@ export class EdgeMetricsBoxComponent implements OnChanges {
   }
 
   private readMetrics(): EdgeMetrics {
-    const data = (this.edge as any)?.data;
+    const data = this.edgeData();
     return data?.metrics ?? EDGE_METRIC_DEFAULTS;
   }
 
@@ -104,5 +104,9 @@ export class EdgeMetricsBoxComponent implements OnChanges {
     }
     const parts = absolute.toString().split('.');
     return parts.length > 1 ? parts[1].length : 0;
+  }
+
+  private edgeData(): { metrics?: EdgeMetrics; selected?: boolean } | undefined {
+    return (this.edge as { data?: { metrics?: EdgeMetrics; selected?: boolean } } | undefined)?.data;
   }
 }

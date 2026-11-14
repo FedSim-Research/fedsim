@@ -5,47 +5,8 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { StepperModule } from 'primeng/stepper';
 import { GraphApiService } from '../../api/graph-api.service';
-
-type StartMode = 'spyker' | 'hierfl' | 'both';
-
-type CommonTrainingConfig = {
-  epochs: number;
-  lr: number;
-  modelComplexity: number;
-  batchSize?: number;
-};
-
-type CommonSimulationConfig = {
-  runTimeLimit: number;
-  evalInterval: number;
-  gpuBudget: number;
-  dataset: string;
-  seedSet: number[];
-  repetitions: number;
-  outputFilename: string;
-  evaluateModel: boolean;
-};
-
-type RunPayload = {
-  mode: StartMode;
-  hierfl: {
-    trainingConfig: CommonTrainingConfig;
-    simulationSettings: CommonSimulationConfig;
-  };
-  spyker: {
-    trainingConfig: CommonTrainingConfig;
-    simulationSettings: CommonSimulationConfig & { idleTokenDelay: number };
-    spykerConfig: {
-      decayBeta: number;
-      minLearningRate: number;
-      hInter: number;
-      hIntra: number;
-      sigmoidPhi: number;
-      serverLearningRate: number;
-      tcpRtoDelay: number;
-    };
-  };
-};
+import { SimulationMode, SimulationRequest } from '../simulation-request';
+import { Architecture } from '../../domain/topology';
 
 type PersistedStartParams = {
   evaluateAfterRun?: boolean;
@@ -64,10 +25,10 @@ export class StartPopup implements OnInit {
   @Input() hierflGraphId: number | null = null;
   @Input() spykerGraphId: number | null = null;
   @Output() close = new EventEmitter<void>();
-  @Output() run = new EventEmitter<RunPayload>();
+  @Output() run = new EventEmitter<SimulationRequest>();
 
   public activeStep = 1;
-  public selectedMode: StartMode | null = null;
+  public selectedMode: SimulationMode | null = null;
   public evaluateAfterRun = false;
   private evaluateAfterRunByArchitecture: { hierfl: boolean; spyker: boolean } = {
     hierfl: false,
@@ -114,13 +75,13 @@ export class StartPopup implements OnInit {
 
   private lastPersistedSignature: string | null = null;
   private api = inject(GraphApiService);
-  private backendSyncTimers: Partial<Record<'hierfl' | 'spyker', ReturnType<typeof setTimeout>>> = {};
+  private backendSyncTimers: Partial<Record<Architecture, ReturnType<typeof setTimeout>>> = {};
 
   public onClose(): void {
     this.close.emit();
   }
 
-  public selectMode(mode: StartMode): void {
+  public selectMode(mode: SimulationMode): void {
     this.selectedMode = mode;
     this.applyEvaluateFlagForMode(mode);
     this.activeStep = 1;
@@ -251,7 +212,7 @@ export class StartPopup implements OnInit {
     this.persistSettingsIfChanged();
   }
 
-  public updateSeedSet(architecture: 'hierfl' | 'spyker', value: string): void {
+  public updateSeedSet(architecture: Architecture, value: string): void {
     const target = architecture === 'hierfl' ? this.hierflSettings : this.spykerSettings;
     target.seedSetText = value;
     target.repetitions = this.countSeeds(value);
@@ -307,7 +268,7 @@ export class StartPopup implements OnInit {
     void this.reconcileWithBackend('spyker', this.spykerGraphId, params);
   }
 
-  private applyEvaluateFlagForMode(mode: StartMode | null): void {
+  private applyEvaluateFlagForMode(mode: SimulationMode | null): void {
     if (mode === 'hierfl') {
       this.evaluateAfterRun = this.evaluateAfterRunByArchitecture.hierfl;
       return;
@@ -324,7 +285,7 @@ export class StartPopup implements OnInit {
   }
 
   private persistArchitectureParams(
-    architecture: 'hierfl' | 'spyker',
+    architecture: Architecture,
     graphId: number | null,
     settings: Record<string, unknown>,
     evaluateAfterRun: boolean,
@@ -345,7 +306,7 @@ export class StartPopup implements OnInit {
   }
 
   private readSavedParams(
-    architecture: 'hierfl' | 'spyker',
+    architecture: Architecture,
     graphId: number | null
   ): PersistedStartParams | null {
     if (graphId === null || !Number.isFinite(graphId)) {
@@ -366,12 +327,12 @@ export class StartPopup implements OnInit {
     return null;
   }
 
-  private storageKey(architecture: 'hierfl' | 'spyker', graphId: number): string {
+  private storageKey(architecture: Architecture, graphId: number): string {
     return `fedsim.start-params.${architecture}.${graphId}`;
   }
 
   private scheduleBackendSync(
-    architecture: 'hierfl' | 'spyker',
+    architecture: Architecture,
     graphId: number,
     payload: PersistedStartParams,
   ): void {
@@ -413,7 +374,7 @@ export class StartPopup implements OnInit {
     return candidate as PersistedStartParams;
   }
 
-  private applyPersistedParams(architecture: 'hierfl' | 'spyker', params: PersistedStartParams): void {
+  private applyPersistedParams(architecture: Architecture, params: PersistedStartParams): void {
     const currentSettings = architecture === 'hierfl' ? this.hierflSettings : this.spykerSettings;
     const normalizedSettings = this.normalizeSavedSettings(params.settings, currentSettings.seedSetText);
     const mergedSettings = this.mergePersistedSettings(currentSettings, normalizedSettings);
@@ -431,7 +392,7 @@ export class StartPopup implements OnInit {
   }
 
   private async reconcileWithBackend(
-    architecture: 'hierfl' | 'spyker',
+    architecture: Architecture,
     graphId: number | null,
     localParams: PersistedStartParams | null,
   ): Promise<void> {
@@ -479,11 +440,21 @@ export class StartPopup implements OnInit {
     return normalized;
   }
 
+  /** Takes over stored values only for known settings of the same type. */
   private mergePersistedSettings<T extends Record<string, unknown>>(
     currentSettings: T,
     persistedSettings: Record<string, unknown>,
   ): T {
-    return { ...currentSettings, ...persistedSettings } as T;
+    const merged: Record<string, unknown> = { ...currentSettings };
+    for (const [key, current] of Object.entries(currentSettings)) {
+      const stored = persistedSettings[key];
+      const sameType = typeof stored === typeof current
+        && (typeof stored !== 'number' || Number.isFinite(stored));
+      if (sameType) {
+        merged[key] = stored;
+      }
+    }
+    return merged as T;
   }
 
   private extractSeedSetText(

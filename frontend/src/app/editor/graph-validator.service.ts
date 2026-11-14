@@ -1,7 +1,9 @@
 import { Injectable } from '@angular/core';
 import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
+import { Architecture } from '../domain/topology';
+import { canLink } from '../domain/link-rules';
+import { ArchitectureRunConfig } from '../runs/simulation-request';
 
-type SupportedArchitecture = 'spyker' | 'hierfl';
 type FlowNodeData = { type?: string; config?: Record<string, unknown> };
 type FlowEdgeMetrics = {
   pingMs?: number;
@@ -15,32 +17,10 @@ type FlowEdgeMetrics = {
 })
 export class GraphValidatorService {
   public validateSimulationRequest(
-    architecture: SupportedArchitecture,
+    architecture: Architecture,
     nodes: Node[],
     edges: Edge[],
-    config: {
-      trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
-      simulationSettings: {
-        runTimeLimit: number;
-        evalInterval: number;
-        gpuBudget: number;
-        dataset: string;
-        seedSet: number[];
-        repetitions: number;
-        outputFilename: string;
-        evaluateModel: boolean;
-        idleTokenDelay?: number;
-      };
-      spykerConfig?: {
-        decayBeta: number;
-        minLearningRate: number;
-        hInter: number;
-        hIntra: number;
-        sigmoidPhi: number;
-        serverLearningRate: number;
-        tcpRtoDelay: number;
-      };
-    },
+    config: ArchitectureRunConfig,
   ): string[] {
     const errors: string[] = [];
     errors.push(...this.validateTrainingAndSimulationFields(architecture, config));
@@ -49,30 +29,8 @@ export class GraphValidatorService {
   }
 
   private validateTrainingAndSimulationFields(
-    architecture: SupportedArchitecture,
-    config: {
-      trainingConfig: { epochs: number; lr: number; modelComplexity: number; batchSize?: number };
-      simulationSettings: {
-        runTimeLimit: number;
-        evalInterval: number;
-        gpuBudget: number;
-        dataset: string;
-        seedSet: number[];
-        repetitions: number;
-        outputFilename: string;
-        evaluateModel: boolean;
-        idleTokenDelay?: number;
-      };
-      spykerConfig?: {
-        decayBeta: number;
-        minLearningRate: number;
-        hInter: number;
-        hIntra: number;
-        sigmoidPhi: number;
-        serverLearningRate: number;
-        tcpRtoDelay: number;
-      };
-    },
+    architecture: Architecture,
+    config: ArchitectureRunConfig,
   ): string[] {
     const errors: string[] = [];
     if (!Number.isFinite(config.trainingConfig.epochs) || config.trainingConfig.epochs < 1) {
@@ -142,7 +100,7 @@ export class GraphValidatorService {
     return errors;
   }
 
-  private validateGraph(architecture: SupportedArchitecture, nodes: Node[], edges: Edge[]): string[] {
+  private validateGraph(architecture: Architecture, nodes: Node[], edges: Edge[]): string[] {
     const errors: string[] = [];
     const nodeTypeById = new Map<string, string>();
     for (const node of nodes) {
@@ -177,7 +135,7 @@ export class GraphValidatorService {
         errors.push(`${architecture}: edge references missing node`);
         continue;
       }
-      if (!this.isValidEdgePair(architecture, sourceType, targetType)) {
+      if (!canLink(architecture, sourceType, targetType)) {
         errors.push(`${architecture}: invalid edge ${sourceType} -> ${targetType}`);
       }
       if (!adjacency.has(edge.source)) adjacency.set(edge.source, new Set<string>());
@@ -221,7 +179,7 @@ export class GraphValidatorService {
     return errors;
   }
 
-  private validateNodeConfig(architecture: SupportedArchitecture, node: Node): string[] {
+  private validateNodeConfig(architecture: Architecture, node: Node): string[] {
     const errors: string[] = [];
     const data = this.getNodeData(node);
     const config = data.config ?? {};
@@ -255,7 +213,7 @@ export class GraphValidatorService {
     return errors;
   }
 
-  private validateEdgeMetrics(architecture: SupportedArchitecture, edge: Edge): string[] {
+  private validateEdgeMetrics(architecture: Architecture, edge: Edge): string[] {
     const errors: string[] = [];
     const rawMetrics = this.getEdgeMetrics(edge);
     const ping = Number(rawMetrics.pingMs);
@@ -280,22 +238,5 @@ export class GraphValidatorService {
     const data = ((edge as unknown as { data?: Record<string, unknown> }).data ?? {});
     const metrics = data['metrics'] as FlowEdgeMetrics | undefined;
     return metrics ?? (data as FlowEdgeMetrics);
-  }
-
-  private isValidEdgePair(architecture: SupportedArchitecture, sourceType: string, targetType: string): boolean {
-    const pair = `${sourceType}->${targetType}`;
-    if (architecture === 'hierfl') {
-      return (
-        pair === 'SuperServerNode->ServerNode' ||
-        pair === 'ServerNode->SuperServerNode' ||
-        pair === 'ServerNode->ClientNode' ||
-        pair === 'ClientNode->ServerNode'
-      );
-    }
-    return (
-      pair === 'ServerNode->ServerNode' ||
-      pair === 'ServerNode->ClientNode' ||
-      pair === 'ClientNode->ServerNode'
-    );
   }
 }

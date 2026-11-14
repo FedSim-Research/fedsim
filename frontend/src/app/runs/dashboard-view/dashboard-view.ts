@@ -1,9 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, computed, inject } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { SimulationRunResponse, SimulationRunResult } from '../../api/graph-api.service';
+import { GraphApiService, SimulationRunResponse, SimulationRunResult } from '../../api/graph-api.service';
+import { APP_CONFIG } from '../../config/app-config';
 import { FrameworkJobsService } from '../framework-jobs.service';
 import { DashboardRunsService } from '../dashboard-runs.service';
+import { formatRunProgress } from '../run-progress';
 
 type ComparableMetrics = {
   accuracy: number | null;
@@ -33,7 +35,8 @@ export class DashboardViewComponent {
   private frameworkJobsService = inject(FrameworkJobsService);
   private runsService = inject(DashboardRunsService);
 
-  private grafanaBaseUrl = this.resolveGrafanaBaseUrl();
+  private graphApi = inject(GraphApiService);
+  private grafanaBaseUrl = inject(APP_CONFIG).grafanaBaseUrl;
   private grafanaUrlCache = new Map<string, SafeResourceUrl>();
   private readonly defaultRangeMs = 15 * 60 * 1000;
   private readonly iframeRefreshIntervalMs = 30 * 1000;
@@ -158,9 +161,9 @@ export class DashboardViewComponent {
   }
 
   public formatProgress(run: SimulationRunResponse): string {
-    const progress = this.getProgressPercent(run);
-    return progress === null ? '-' : `${progress.toFixed(1)}%`;
+    return formatRunProgress(run);
   }
+
 
   public getRunMetrics(run: SimulationRunResult): ComparableMetrics {
     if (run.evaluation) {
@@ -300,47 +303,22 @@ export class DashboardViewComponent {
   }
 
   public exportRunToCsv(run: SimulationRunResponse): void {
-    const apiBase = (window as any).FEDSIM_API_BASE_URL as string | undefined;
-    const baseUrl = apiBase || '/api';
-    const csvUrl = `${baseUrl}/runs/${encodeURIComponent(run.run_id)}/export/csv`;
-
-    const link = document.createElement('a');
-    link.href = csvUrl;
-    link.download = `run_${run.run_id}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    this.downloadFrom(this.graphApi.runCsvUrl(run.run_id), `run_${run.run_id}.csv`);
   }
+
 
   public downloadRunLogs(run: SimulationRunResponse): void {
-    const apiBase = (window as any).FEDSIM_API_BASE_URL as string | undefined;
-    const baseUrl = apiBase || '/api';
-    const logsUrl = `${baseUrl}/runs/${encodeURIComponent(run.run_id)}/logs`;
+    this.downloadFrom(this.graphApi.runLogsUrl(run.run_id), `run_${run.run_id}.log`);
+  }
 
+
+  private downloadFrom(url: string, filename: string): void {
     const link = document.createElement('a');
-    link.href = logsUrl;
-    link.download = `run_${run.run_id}.log`;
+    link.href = url;
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }
-
-  private getProgressPercent(run: SimulationRunResponse): number | null {
-    const currentRaw = run.current_sim_time;
-    const limitRaw = run.run_time_limit;
-
-    const current = currentRaw === null || currentRaw === undefined ? Number.NaN : Number(currentRaw);
-    const limit = limitRaw === null || limitRaw === undefined ? Number.NaN : Number(limitRaw);
-
-    if (!Number.isFinite(current)) {
-      return null;
-    }
-    if (!Number.isFinite(limit) || limit <= 0) {
-      return null;
-    }
-
-    const percent = (current / limit) * 100;
-    return Math.max(0, Math.min(100, percent));
   }
 
   private runTimeRange(run: SimulationRunResponse | null): { from: number; to: number } {
@@ -417,20 +395,5 @@ export class DashboardViewComponent {
       return Number.NaN;
     }
     return new Date(value).getTime();
-  }
-
-  private resolveGrafanaBaseUrl(): string {
-    const win = window as any;
-    const configured = win.FEDSIM_GRAFANA_BASE_URL as string | undefined;
-    if (typeof configured === 'string' && configured.trim()) {
-      return configured.trim().replace(/\/$/, '');
-    }
-
-    const apiBase = win.FEDSIM_API_BASE_URL as string | undefined;
-    if (apiBase === '/api') {
-      return `${window.location.origin}/grafana`;
-    }
-
-    return 'http://localhost:3000';
   }
 }

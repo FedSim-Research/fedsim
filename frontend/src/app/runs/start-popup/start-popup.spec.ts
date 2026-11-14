@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { StartPopup } from './start-popup';
+import { GraphApiService } from '../../api/graph-api.service';
 
 describe('StartPopup', () => {
   let component: StartPopup;
@@ -60,5 +61,31 @@ describe('StartPopup', () => {
     });
     expect(component.hierflSettings.dataset).toBe('custom-dataset');
     expect(component.hierflSettings.outputFilename).toBe('restored.pth');
+  });
+});
+
+describe('StartPopup stored settings', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      imports: [StartPopup],
+      providers: [{ provide: GraphApiService, useValue: { getGraph: vi.fn().mockRejectedValue(new Error('offline')) } }],
+    });
+  });
+
+  it('ignores stored values of the wrong type and unknown keys', () => {
+    localStorage.setItem('fedsim.start-params.hierfl.3', JSON.stringify({
+      settings: { epochs: 'many', lr: 0.01, batchSize: null, injected: '<b>x</b>' },
+      updatedAt: 1,
+    }));
+    const fixture = TestBed.createComponent(StartPopup);
+    fixture.componentInstance.hierflGraphId = 3;
+    fixture.detectChanges();
+
+    const settings = fixture.componentInstance.hierflSettings as Record<string, unknown>;
+    expect(settings['epochs']).toBe(1);
+    expect(settings['lr']).toBe(0.01);
+    expect(settings['batchSize']).toBe(32);
+    expect(settings['injected']).toBeUndefined();
   });
 });

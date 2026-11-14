@@ -51,9 +51,10 @@
   }
   <app-sidebar
     [shortcuts]="shortcuts"
-    [hierflGraphId]="hierflGraphId()"
-    [spykerGraphId]="spykerGraphId()"
+    [hierflGraphId]="graphIdOf('hierfl')"
+    [spykerGraphId]="graphIdOf('spyker')"
     [activeView]="activeView()"
+    [activeMode]="activeMode()"
     (resetGraph)="handleReset()"
     (undoRequested)="undo()"
     (redoRequested)="redo()"
@@ -61,8 +62,10 @@
     (viewChange)="changeView($event)"
     (sidebarOpenChange)="onSidebarOpenChange($event)"
     (graphSelected)="handleGraphSelected($event)"
+    (graphDeleted)="handleGraphDeleted($event)"
     (simulationRequested)="handleSimulation($event)">
   </app-sidebar>
 
   <app-framework-jobs-popup></app-framework-jobs-popup>
+  <p-toast position="top-right" />
 </div>

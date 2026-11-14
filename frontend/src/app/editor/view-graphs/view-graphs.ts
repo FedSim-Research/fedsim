@@ -7,24 +7,29 @@ import { DialogModule } from 'primeng/dialog';
 import { ButtonModule } from 'primeng/button';
 import { ListboxModule } from 'primeng/listbox';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
-import { MessageService } from 'primeng/api';
+import { ConfirmationService, MessageService } from 'primeng/api';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { Shortcuts } from '../shortcuts.directive';
+import { graphFileFromDetail, graphFileName } from '../graph-file';
+import { downloadJson } from '../../shared/download';
+import { Architecture } from '../../domain/topology';
 
 @Component({
   selector: 'app-view-graphs-dialog',
   standalone: true,
   templateUrl: './view-graphs.html',
   styleUrls: ['./view-graphs.css'],
-  imports: [CommonModule, FormsModule, ToastModule, DialogModule, ButtonModule, ListboxModule, ProgressSpinnerModule],
+  imports: [CommonModule, FormsModule, ToastModule, DialogModule, ButtonModule, ListboxModule, ProgressSpinnerModule, ConfirmDialogModule],
   providers: [MessageService],
 })
 export class ViewGraphsDialog implements OnInit, OnChanges {
   private graphApiService = inject(GraphApiService);
   private messageService = inject(MessageService);
+  private confirmationService = inject(ConfirmationService);
 
   @Input() isDarkMode = true;
   @Input() shortcuts?: Shortcuts;
-  @Input() activeMode: 'spyker' | 'hierfl' = 'hierfl';
+  @Input() activeMode: Architecture = 'hierfl';
   public graphs: GraphResponse[] = [];
   public isLoading = true;
   public selectedGraph: GraphResponse | null = null;
@@ -32,11 +37,12 @@ export class ViewGraphsDialog implements OnInit, OnChanges {
   public editingGraphId: number | null = null;
   public editingName = '';
   public createName = 'New Graph';
-  public selectedMode: 'spyker' | 'hierfl' = 'hierfl';
+  public selectedMode: Architecture = 'hierfl';
 
-  @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: 'spyker' | 'hierfl' }>();
+  @Output() graphSelected = new EventEmitter<{ graphId: number; architecture: Architecture }>();
   @Output() close = new EventEmitter<void>();
-  @Output() modeRequested = new EventEmitter<'spyker' | 'hierfl'>();
+  @Output() modeRequested = new EventEmitter<Architecture>();
+  @Output() graphDeleted = new EventEmitter<{ graphId: number; architecture: Architecture }>();
 
   public ngOnInit(): void {
     this.selectedMode = this.activeMode;
@@ -96,14 +102,17 @@ export class ViewGraphsDialog implements OnInit, OnChanges {
     this.close.emit();
   }
 
-  public onExport(): void {
-    if (this.shortcuts) {
-      const graph = this.selectedGraph;
-      this.shortcuts.exportGraph({
-        graphId: graph?.graph_id ?? null,
-        graphName: graph?.name ?? null,
-        architecture: graph?.architecture,
-      });
+  public async onExport(): Promise<void> {
+    const graph = this.selectedGraph;
+    if (!graph) {
+      this.messageService.add({ severity: 'warn', summary: 'Warning', detail: 'Please select a graph to export' });
+      return;
+    }
+    try {
+      const detail = await this.graphApiService.getGraph(graph.graph_id);
+      downloadJson(graphFileFromDetail(detail), graphFileName(graph.graph_id, graph.name, graph.architecture));
+    } catch {
+      this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to export graph' });
     }
   }
 
@@ -112,21 +121,21 @@ export class ViewGraphsDialog implements OnInit, OnChanges {
       try {
         await this.shortcuts.importGraph();
         this.onClose();
-      } catch (error) {
-        console.log("Error importing:", error);
+      } catch {
+        // The import already reported the problem; keep the dialog open.
       }
     }
   }
 
-  public graphsForMode(mode: 'spyker' | 'hierfl'): GraphResponse[] {
+  public graphsForMode(mode: Architecture): GraphResponse[] {
     return this.graphs.filter((graph) => graph.architecture === mode);
   }
 
-  public hasGraphsForMode(mode: 'spyker' | 'hierfl'): boolean {
+  public hasGraphsForMode(mode: Architecture): boolean {
     return this.graphsForMode(mode).length > 0;
   }
 
-  public currentGraphLabel(mode: 'spyker' | 'hierfl'): string {
+  public currentGraphLabel(mode: Architecture): string {
     const stored = localStorage.getItem(`fedsim.graphId.${mode}`);
     const id = stored ? Number(stored) : null;
     if (!id || !Number.isFinite(id)) return 'None';
@@ -156,7 +165,7 @@ export class ViewGraphsDialog implements OnInit, OnChanges {
     }
   }
 
-  public setMode(mode: 'spyker' | 'hierfl'): void {
+  public setMode(mode: Architecture): void {
     this.selectedMode = mode;
     this.modeRequested.emit(mode);
   }
@@ -199,10 +208,24 @@ export class ViewGraphsDialog implements OnInit, OnChanges {
     this.editingGraphId = null;
   }
 
-  public async deleteGraph(graph: GraphResponse, event?: Event): Promise<void> {
+  public deleteGraph(graph: GraphResponse, event?: Event): void {
     event?.stopPropagation();
+    this.confirmationService.confirm({
+      key: 'graph-delete',
+      header: 'Delete graph',
+      message: `Delete "${graph.name ?? `Graph ${graph.graph_id}`}" with all its nodes and edges? This cannot be undone.`,
+      acceptLabel: 'Delete',
+      rejectLabel: 'Cancel',
+      acceptButtonStyleClass: 'p-button-danger',
+      rejectButtonStyleClass: 'p-button-text',
+      accept: () => void this.confirmDeleteGraph(graph),
+    });
+  }
+
+  private async confirmDeleteGraph(graph: GraphResponse): Promise<void> {
     try {
       await this.graphApiService.deleteGraph(graph.graph_id);
+      this.graphDeleted.emit({ graphId: graph.graph_id, architecture: graph.architecture });
       this.graphs = this.graphs.filter((item) => item.graph_id !== graph.graph_id);
       if (this.selectedGraph?.graph_id === graph.graph_id) {
         this.selectedGraph = null;

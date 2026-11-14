@@ -1,8 +1,10 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { environment } from '../../environments/environment';
+import { APP_CONFIG } from '../config/app-config';
+import { Architecture, NodeKind } from '../domain/topology';
 import { EdgeMetrics } from './edge-metrics';
+import { SILENT_ERRORS } from './global-error.interceptor';
 
 export interface Position {
   x: number;
@@ -12,7 +14,7 @@ export interface Position {
 export interface GraphResponse {
   graph_id: number;
   name: string | null;
-  architecture: 'spyker' | 'hierfl';
+  architecture: Architecture;
   metadata: Record<string, unknown> | null;
 }
 
@@ -39,7 +41,7 @@ export interface GraphDetail extends GraphResponse {
 
 export interface GraphCreate {
   name?: string | null;
-  architecture: 'spyker' | 'hierfl';
+  architecture: Architecture;
   metadata?: Record<string, unknown> | null;
 }
 
@@ -53,13 +55,13 @@ export interface GraphMetadataPatch {
 
 
 export interface NodeCreate {
-  type: 'ClientNode' | 'ServerNode' | 'SuperServerNode';
+  type: NodeKind;
   config: Record<string, unknown>;
   position: Position;
 }
 
 export interface NodeUpdate {
-  type?: 'ClientNode' | 'ServerNode' | 'SuperServerNode';
+  type?: NodeKind;
   config?: Record<string, unknown>;
   position?: Position;
 }
@@ -75,7 +77,7 @@ export interface EdgeUpdate {
 }
 
 export interface VflowNodeData {
-  type: 'ClientNode' | 'ServerNode' | 'SuperServerNode';
+  type: NodeKind;
   config: Record<string, unknown>;
   environment?: string | null;
   fromJson?: boolean;
@@ -150,7 +152,7 @@ export interface SimulationEvaluation {
 }
 
 export interface SimulationRunResult {
-  architecture?: 'spyker' | 'hierfl' | string;
+  architecture?: Architecture | string;
   graph_id?: number | null;
   seed?: number | null;
   seed_set?: number[] | null;
@@ -214,7 +216,7 @@ export interface SimulationRunResult {
 export interface SimulationRunResponse {
   run_id: string;
   status: 'queued' | 'running' | 'completed' | 'failed';
-  architecture?: 'spyker' | 'hierfl' | 'both';
+  architecture?: Architecture | 'both';
   graph_id?: number | null;
   seed?: number | null;
   queued_at?: string | null;
@@ -258,15 +260,15 @@ export interface SimulationRunResponse {
 
 export interface PresetResponse {
   preset_id: number;
-  architecture: 'spyker' | 'hierfl';
-  node_type: 'SuperServerNode' | 'ServerNode' | 'ClientNode';
+  architecture: Architecture;
+  node_type: NodeKind;
   name: string;
   config: Record<string, unknown>;
 }
 
 export interface PresetCreate {
-  architecture: 'spyker' | 'hierfl';
-  node_type: 'SuperServerNode' | 'ServerNode' | 'ClientNode';
+  architecture: Architecture;
+  node_type: NodeKind;
   name: string;
   config: Record<string, unknown>;
 }
@@ -279,11 +281,22 @@ export interface PresetUpdate {
 @Injectable({ providedIn: 'root' })
 export class GraphApiService {
   private http = inject(HttpClient);
-  private baseUrl = (window as any).FEDSIM_API_BASE_URL ?? environment.apiBaseUrl;
+  private baseUrl = inject(APP_CONFIG).apiBaseUrl;
+
+  private readonly silent = { context: new HttpContext().set(SILENT_ERRORS, true) };
 
   private url(path: string): string {
-    const trimmed = this.baseUrl.replace(/\/+$/, '');
-    return `${trimmed}${path}`;
+    return `${this.baseUrl}${path}`;
+  }
+
+  /** Download link for a run's results as CSV. */
+  public runCsvUrl(runId: string): string {
+    return this.url(`/runs/${encodeURIComponent(runId)}/export/csv`);
+  }
+
+  /** Download link for a run's log file. */
+  public runLogsUrl(runId: string): string {
+    return this.url(`/runs/${encodeURIComponent(runId)}/logs`);
   }
 
   public async createGraph(payload: GraphCreate): Promise<GraphResponse> {
@@ -343,11 +356,11 @@ export class GraphApiService {
   }
 
   public async getRunStatus(runId: string): Promise<SimulationRunResponse> {
-    return firstValueFrom(this.http.get<SimulationRunResponse>(this.url(`/runs/${runId}`)));
+    return firstValueFrom(this.http.get<SimulationRunResponse>(this.url(`/runs/${runId}`), this.silent));
   }
 
   public async listRuns(): Promise<SimulationRunResponse[]> {
-    return firstValueFrom(this.http.get<SimulationRunResponse[]>(this.url('/runs')));
+    return firstValueFrom(this.http.get<SimulationRunResponse[]>(this.url('/runs'), this.silent));
   }
 
   public async deleteRun(runId: string): Promise<void> {
@@ -359,8 +372,8 @@ export class GraphApiService {
   }
 
   public async listPresets(
-    architecture: 'spyker' | 'hierfl',
-    nodeType: 'SuperServerNode' | 'ServerNode' | 'ClientNode'
+    architecture: Architecture,
+    nodeType: NodeKind
   ): Promise<PresetResponse[]> {
     return firstValueFrom(
       this.http.get<PresetResponse[]>(

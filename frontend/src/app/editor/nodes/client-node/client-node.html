@@ -91,18 +91,18 @@
     </div>
      <div class="spec-row">
       <span>Client type</span>
-      <span *ngIf="!isEditing()" class="spec-value">{{ client().type || '—' }}</span>
+      <span *ngIf="!isEditing()" class="spec-value">{{ (client().type | titlecase) || '—' }}</span>
       <select
         *ngIf="isEditing()"
         class="spec-input spec-select"
-        [value]="editDraft().type || 'Laptop'"
+        [value]="(editDraft().type || defaultClientType) | lowercase"
         (mousedown)="$event.stopPropagation()"
         (click)="$event.stopPropagation()"
         (change)="updateTextField('type', $event)"
       >
-        <option value="Laptop">Laptop</option>
-        <option value="Workstation">Workstation</option>
-        <option value="Mobile">Mobile</option>
+        <option value="laptop">Laptop</option>
+        <option value="workstation">Workstation</option>
+        <option value="mobile">Mobile</option>
       </select>
     </div>
      <div class="spec-row">
@@ -161,7 +161,7 @@
     </div>
   </div>
     <div class="node-footer">
-      {{ client().environment === 'hierfl' ? 'HIERARCHICAL' : 'SPYKER' }}
+      {{ environment() === 'hierfl' ? 'HIERARCHICAL' : 'SPYKER' }}
     </div>
   </div>
 </div>
