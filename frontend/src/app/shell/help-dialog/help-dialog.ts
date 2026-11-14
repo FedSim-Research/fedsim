@@ -100,7 +100,7 @@ export class HelpDialog {
       appliesTo: ['Super Server', 'Server', 'Client'],
       description: 'Outgoing bandwidth of the node in megabits per second.',
       effect: 'Higher upload means model updates, gradients, and messages leave the node faster.',
-      format: 'Mbps, minimum 0',
+      format: 'Mbps, greater than 0',
     },
     {
       label: 'Download',
@@ -108,7 +108,7 @@ export class HelpDialog {
       appliesTo: ['Super Server', 'Server', 'Client'],
       description: 'Incoming bandwidth of the node in megabits per second.',
       effect: 'Higher download means global weights and incoming updates arrive faster.',
-      format: 'Mbps, minimum 0',
+      format: 'Mbps, greater than 0',
     },
     {
       label: 'Compute factor',

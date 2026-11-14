@@ -5,6 +5,12 @@ from functools import lru_cache
 from typing import Any
 
 from fedsim.persistence.models import Edge, Graph, Node
+from fedsim.services.input_values import (
+    parse_nonnegative_float,
+    parse_positive_float,
+    parse_positive_int,
+    parse_training_config,
+)
 from fedsim.services.node_performance import parse_node_performance
 
 DEFAULT_RUN_TIME_LIMIT = 5000.0
@@ -53,10 +59,14 @@ def _network_for_edge(edge: Edge):
     if "packetlossStddev" not in config or config["packetlossStddev"] is None:
         raise ValueError("hierfl_missing_edge_packetlossStddev")
 
-    latency_avg = int(config["pingMs"])
-    latency_stddev = int(config["jitterMs"])
-    packet_loss_avg = float(config["packetloss"])
-    packet_loss_stddev = float(config["packetlossStddev"])
+    latency_avg = parse_nonnegative_float(config["pingMs"], "hierfl_invalid_edge_latency")
+    latency_stddev = parse_nonnegative_float(config["jitterMs"], "hierfl_invalid_edge_latency")
+    packet_loss_avg = parse_nonnegative_float(
+        config["packetloss"], "hierfl_invalid_edge_packetloss"
+    )
+    packet_loss_stddev = parse_nonnegative_float(
+        config["packetlossStddev"], "hierfl_invalid_edge_packetloss"
+    )
 
     if latency_avg < 0 or latency_stddev < 0:
         raise ValueError("hierfl_invalid_edge_latency")
@@ -128,11 +138,14 @@ def validate_hierfl_graph(graph: Graph) -> None:
             if key not in config or config[key] is None:
                 raise ValueError(f"hierfl_missing_{node.type}_{key}")
         _performance_for(node.type, config)
+        for field in ["uploadMbps", "downloadMbps"]:
+            parse_positive_float(config[field], f"hierfl_invalid_{node.type}_{field}")
 
     for client in client_nodes:
         client_config = _node_config(client)
         if "count" not in client_config or client_config["count"] is None:
             raise ValueError("hierfl_missing_ClientNode_count")
+        parse_positive_int(client_config["count"], "hierfl_client_count_invalid")
         if not client_config.get("type"):
             raise ValueError("hierfl_missing_ClientNode_type")
 
@@ -141,42 +154,7 @@ def validate_hierfl_graph(graph: Graph) -> None:
 
 
 def _require_training_config(training_config: dict[str, Any] | None) -> dict[str, Any]:
-    if training_config is None:
-        raise ValueError("hierfl_missing_training_config")
-    if "epochs" not in training_config or training_config["epochs"] is None:
-        raise ValueError("hierfl_missing_training_epochs")
-    if "lr" not in training_config or training_config["lr"] is None:
-        raise ValueError("hierfl_missing_training_lr")
-    try:
-        epochs = int(training_config["epochs"])
-    except (TypeError, ValueError):
-        raise ValueError("hierfl_invalid_training_epochs")
-    try:
-        lr = float(training_config["lr"])
-    except (TypeError, ValueError):
-        raise ValueError("hierfl_invalid_training_lr")
-    if epochs < 1:
-        raise ValueError("hierfl_invalid_training_epochs")
-    if lr <= 0:
-        raise ValueError("hierfl_invalid_training_lr")
-    result = {"epochs": epochs, "lr": lr}
-    if "batch_size" in training_config and training_config["batch_size"] is not None:
-        try:
-            batch_size = int(training_config["batch_size"])
-        except (TypeError, ValueError):
-            raise ValueError("hierfl_invalid_batch_size")
-        if batch_size < 1:
-            raise ValueError("hierfl_invalid_batch_size")
-        result["batch_size"] = batch_size
-    if "model_complexity" in training_config and training_config["model_complexity"] is not None:
-        try:
-            model_complexity = float(training_config["model_complexity"])
-        except (TypeError, ValueError):
-            raise ValueError("hierfl_invalid_model_complexity")
-        if model_complexity <= 0:
-            raise ValueError("hierfl_invalid_model_complexity")
-        result["model_complexity"] = model_complexity
-    return result
+    return parse_training_config(training_config, prefix="hierfl")
 
 
 def build_hierfl_simulation(

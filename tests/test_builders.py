@@ -222,3 +222,119 @@ def test_builders_reject_invalid_performance_parameters(architecture, field, val
         validate_start_payload(architecture, graph, {"epochs": 1, "lr": 0.01}, None, None)
     with pytest.raises(ValueError, match=f"{architecture}_invalid_.*_{field}"):
         builder(graph, training_config={"epochs": 1, "lr": 0.01})
+
+
+@pytest.mark.parametrize("architecture", ["hierfl", "spyker"])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("uploadMbps", 0),
+        ("downloadMbps", 0),
+        ("uploadMbps", -1),
+        ("downloadMbps", "NaN"),
+        ("uploadMbps", "inf"),
+        ("count", 1.5),
+        ("count", True),
+        ("count", "inf"),
+    ],
+)
+def test_invalid_node_controls_fail_preflight_and_builder(architecture, field, value):
+    builder = build_hierfl_simulation if architecture == "hierfl" else build_spyker_simulation
+    kinds = ["ClientNode"] if field == "count" else ["ClientNode", "ServerNode"]
+    if architecture == "hierfl" and field != "count":
+        kinds.append("SuperServerNode")
+    for kind in kinds:
+        graph = topology(architecture)
+        node = next(node for node in graph.nodes if node.type == kind)
+        config = json.loads(node.config_json)
+        config[field] = value
+        node.config_json = json.dumps(config)
+        with pytest.raises(ValueError):
+            validate_start_payload(architecture, graph, {"epochs": 1, "lr": 0.01}, None, None)
+        with pytest.raises(ValueError):
+            builder(graph, training_config={"epochs": 1, "lr": 0.01})
+    assert not ray.is_initialized()
+
+
+@pytest.mark.parametrize("architecture", ["hierfl", "spyker"])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("epochs", 1.5),
+        ("epochs", "inf"),
+        ("epochs", True),
+        ("lr", "NaN"),
+        ("lr", "inf"),
+        ("batch_size", 1.5),
+        ("model_complexity", "NaN"),
+    ],
+)
+def test_invalid_training_controls_fail_preflight_and_builder(architecture, field, value):
+    config = {"epochs": 1, "lr": 0.01, field: value}
+    graph = topology(architecture)
+    builder = build_hierfl_simulation if architecture == "hierfl" else build_spyker_simulation
+    with pytest.raises(ValueError):
+        validate_start_payload(architecture, graph, config, None, None)
+    with pytest.raises(ValueError):
+        builder(graph, training_config=config)
+    assert not ray.is_initialized()
+
+
+@pytest.mark.parametrize("architecture", ["hierfl", "spyker"])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("run_time_limit", "inf"),
+        ("eval_interval", "NaN"),
+        ("gpu_budget", "inf"),
+        ("seed", 1.5),
+        ("repetitions", 1.5),
+    ],
+)
+def test_invalid_run_controls_fail_preflight(architecture, field, value):
+    with pytest.raises(ValueError):
+        validate_start_payload(
+            architecture, topology(architecture), {"epochs": 1, "lr": 0.01}, {field: value}, None
+        )
+    assert not ray.is_initialized()
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("h_inter", 1.5),
+        ("h_intra", 2.5),
+        ("decay_beta", "NaN"),
+        ("min_learning_rate", "inf"),
+        ("server_learning_rate", "inf"),
+    ],
+)
+def test_invalid_spyker_controls_fail_preflight_and_builder(field, value):
+    graph = topology("spyker")
+    config = {field: value}
+    with pytest.raises(ValueError):
+        validate_start_payload("spyker", graph, {"epochs": 1, "lr": 0.01}, None, config)
+    with pytest.raises(ValueError):
+        build_spyker_simulation(
+            graph, training_config={"epochs": 1, "lr": 0.01}, spyker_config=config
+        )
+    assert not ray.is_initialized()
+
+
+@pytest.mark.parametrize("architecture", ["hierfl", "spyker"])
+def test_builders_preserve_fractional_millisecond_link_parameters(architecture):
+    graph = topology(architecture)
+    for edge in graph.edges:
+        config = json.loads(edge.config_json)
+        config.update(pingMs=0.75, jitterMs=0.125)
+        edge.config_json = json.dumps(config)
+    builder = build_hierfl_simulation if architecture == "hierfl" else build_spyker_simulation
+    simulation = builder(graph, training_config={"epochs": 1, "lr": 0.01})
+    metrics = [
+        net
+        for server in simulation.server_registry.values()
+        for net in (server.network_metrics or {}).values()
+    ]
+    assert metrics
+    assert all(net.latency_avg == 0.75 and net.latency_stddev == 0.125 for net in metrics)
+    assert not ray.is_initialized()

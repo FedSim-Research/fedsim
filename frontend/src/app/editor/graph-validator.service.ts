@@ -33,8 +33,8 @@ export class GraphValidatorService {
     config: ArchitectureRunConfig,
   ): string[] {
     const errors: string[] = [];
-    if (!Number.isFinite(config.trainingConfig.epochs) || config.trainingConfig.epochs < 1) {
-      errors.push(`${architecture}: epochs must be >= 1`);
+    if (!Number.isInteger(config.trainingConfig.epochs) || config.trainingConfig.epochs < 1) {
+      errors.push(`${architecture}: epochs must be an integer >= 1`);
     }
     if (!Number.isFinite(config.trainingConfig.lr) || config.trainingConfig.lr <= 0) {
       errors.push(`${architecture}: learning rate must be > 0`);
@@ -91,8 +91,8 @@ export class GraphValidatorService {
       const s = config.spykerConfig;
       if (!Number.isFinite(s.decayBeta) || s.decayBeta < 0) errors.push('spyker: decay beta must be >= 0');
       if (!Number.isFinite(s.minLearningRate) || s.minLearningRate <= 0) errors.push('spyker: min learning rate must be > 0');
-      if (!Number.isFinite(s.hInter) || s.hInter < 1) errors.push('spyker: hInter must be >= 1');
-      if (!Number.isFinite(s.hIntra) || s.hIntra < 1) errors.push('spyker: hIntra must be >= 1');
+      if (!Number.isInteger(s.hInter) || s.hInter < 1) errors.push('spyker: hInter must be an integer >= 1');
+      if (!Number.isInteger(s.hIntra) || s.hIntra < 1) errors.push('spyker: hIntra must be an integer >= 1');
       if (!Number.isFinite(s.sigmoidPhi) || s.sigmoidPhi <= 0) errors.push('spyker: sigmoid phi must be > 0');
       if (!Number.isFinite(s.serverLearningRate) || s.serverLearningRate <= 0) errors.push('spyker: server learning rate must be > 0');
     }
@@ -183,25 +183,24 @@ export class GraphValidatorService {
     const data = this.getNodeData(node);
     const config = data.config ?? {};
     const nodeType = data.type ?? 'Node';
-    const read = (key: string): number | undefined => {
-      const value = config[key];
-      if (value === null || value === undefined) return undefined;
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : undefined;
-    };
+    const read = (key: string): number | undefined => this.finiteNumber(config[key]);
 
     if (nodeType !== 'SuperServerNode' || architecture === 'hierfl') {
       const computeFactor = read('computeFactor');
       const uploadMbps = read('uploadMbps');
       const downloadMbps = read('downloadMbps');
       if (computeFactor === undefined || computeFactor <= 0) errors.push(`${architecture}: ${nodeType} compute factor must be > 0`);
-      if (uploadMbps === undefined || uploadMbps < 0) errors.push(`${architecture}: ${nodeType} upload must be >= 0`);
-      if (downloadMbps === undefined || downloadMbps < 0) errors.push(`${architecture}: ${nodeType} download must be >= 0`);
+      if (uploadMbps === undefined || uploadMbps <= 0) errors.push(`${architecture}: ${nodeType} upload must be > 0`);
+      if (downloadMbps === undefined || downloadMbps <= 0) errors.push(`${architecture}: ${nodeType} download must be > 0`);
+      if (config['performanceSigma'] !== undefined && config['performanceSigma'] !== null) {
+        const sigma = read('performanceSigma');
+        if (sigma === undefined || sigma < 0) errors.push(`${architecture}: ${nodeType} runtime sigma must be >= 0`);
+      }
     }
 
     if (nodeType === 'ClientNode') {
       const count = read('count');
-      if (count === undefined || count < 1) errors.push(`${architecture}: Client count must be >= 1`);
+      if (count === undefined || !Number.isInteger(count) || count < 1) errors.push(`${architecture}: Client count must be an integer >= 1`);
       if (architecture === 'hierfl') {
         const clientType = config['type'];
         if (typeof clientType !== 'string' || !clientType.trim()) {
@@ -215,18 +214,25 @@ export class GraphValidatorService {
   private validateEdgeMetrics(architecture: Architecture, edge: Edge): string[] {
     const errors: string[] = [];
     const rawMetrics = this.getEdgeMetrics(edge);
-    const ping = Number(rawMetrics.pingMs);
-    const jitter = Number(rawMetrics.jitterMs);
-    const packetloss = Number(rawMetrics.packetloss);
-    const packetlossStddev = Number(rawMetrics.packetlossStddev);
+    const ping = this.finiteNumber(rawMetrics.pingMs);
+    const jitter = this.finiteNumber(rawMetrics.jitterMs);
+    const packetloss = this.finiteNumber(rawMetrics.packetloss);
+    const packetlossStddev = this.finiteNumber(rawMetrics.packetlossStddev);
 
-    if (!Number.isFinite(ping) || ping < 0) errors.push(`${architecture}: edge ping must be >= 0`);
-    if (!Number.isFinite(jitter) || jitter < 0) errors.push(`${architecture}: edge jitter must be >= 0`);
-    if (!Number.isFinite(packetloss) || packetloss < 0 || packetloss > 1) errors.push(`${architecture}: edge packetloss must be in [0, 1]`);
-    if (!Number.isFinite(packetlossStddev) || packetlossStddev < 0 || packetlossStddev > 1) {
+    if (ping === undefined || ping < 0) errors.push(`${architecture}: edge ping must be >= 0`);
+    if (jitter === undefined || jitter < 0) errors.push(`${architecture}: edge jitter must be >= 0`);
+    if (packetloss === undefined || packetloss < 0 || packetloss > 1) errors.push(`${architecture}: edge packetloss must be in [0, 1]`);
+    if (packetlossStddev === undefined || packetlossStddev < 0 || packetlossStddev > 1) {
       errors.push(`${architecture}: edge packetloss stddev must be in [0, 1]`);
     }
     return errors;
+  }
+
+  private finiteNumber(value: unknown): number | undefined {
+    if (typeof value !== 'number' && typeof value !== 'string') return undefined;
+    if (typeof value === 'string' && !value.trim()) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
   }
 
   private getNodeData(node: Node): FlowNodeData {

@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from fedsim.persistence.models import Graph
 from fedsim.services.hierfl_simulation_builder import validate_hierfl_graph
+from fedsim.services.input_values import parse_nonnegative_float as _parse_float_ge_zero
+from fedsim.services.input_values import parse_nonnegative_int as _parse_int_ge_zero
+from fedsim.services.input_values import parse_positive_float as _parse_float_gt_zero
+from fedsim.services.input_values import parse_positive_int as _parse_int_min_one
+from fedsim.services.input_values import parse_training_config
 from fedsim.services.spyker_simulation_builder import validate_spyker_graph
 
 
@@ -27,14 +32,7 @@ def _validate_hierfl_payload(
     training_config: dict | None,
     simulation_settings: dict | None,
 ) -> None:
-    if training_config is None:
-        raise ValueError("hierfl_missing_training_config")
-    batch_size = training_config.get("batch_size")
-    if batch_size is not None:
-        _parse_int_min_one(batch_size, "hierfl_invalid_batch_size")
-    model_complexity = training_config.get("model_complexity")
-    if model_complexity is not None:
-        _parse_float_gt_zero(model_complexity, "hierfl_invalid_model_complexity")
+    parse_training_config(training_config, prefix="hierfl")
     if simulation_settings:
         evaluate_model = bool(simulation_settings.get("evaluate_model"))
         output_filename = simulation_settings.get("output_filename")
@@ -63,14 +61,7 @@ def _validate_spyker_payload(
     simulation_settings: dict | None,
     spyker_config: dict | None,
 ) -> None:
-    if training_config is None:
-        raise ValueError("spyker_missing_training_config")
-    batch_size = training_config.get("batch_size")
-    if batch_size is not None:
-        _parse_int_min_one(batch_size, "spyker_invalid_batch_size")
-    model_complexity = training_config.get("model_complexity")
-    if model_complexity is not None:
-        _parse_float_gt_zero(model_complexity, "spyker_invalid_model_complexity")
+    parse_training_config(training_config, prefix="spyker")
     if simulation_settings:
         evaluate_model = bool(simulation_settings.get("evaluate_model"))
         output_filename = simulation_settings.get("output_filename")
@@ -119,48 +110,6 @@ def _validate_spyker_payload(
         _parse_float_gt_zero(server_learning_rate, "spyker_invalid_server_learning_rate")
     if tcp_rto_delay is not None:
         _parse_float_ge_zero(tcp_rto_delay, "spyker_invalid_tcp_rto_delay")
-
-
-def _parse_float_gt_zero(value: object, error_code: str) -> float:
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
-        raise ValueError(error_code)
-    if parsed <= 0:
-        raise ValueError(error_code)
-    return parsed
-
-
-def _parse_float_ge_zero(value: object, error_code: str) -> float:
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
-        raise ValueError(error_code)
-    if parsed < 0:
-        raise ValueError(error_code)
-    return parsed
-
-
-def _parse_int_min_one(value: object, error_code: str) -> int:
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        raise ValueError(error_code)
-    if parsed < 1:
-        raise ValueError(error_code)
-    return parsed
-
-
-def _parse_int_ge_zero(value: object, error_code: str) -> int:
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        raise ValueError(error_code)
-    if parsed < 0:
-        raise ValueError(error_code)
-    if isinstance(value, float) and not value.is_integer():
-        raise ValueError(error_code)
-    return parsed
 
 
 def _validate_seed_controls(simulation_settings: dict, prefix: str) -> None:

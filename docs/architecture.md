@@ -202,6 +202,10 @@ training time, especially when sigma is large relative to that time.
 Model transfer time uses the sender's upload and the receiver's download
 bandwidth. Client uploads therefore use the client as sender and its server as
 receiver. Both directions currently use the same link latency and loss model.
+Node bandwidths must be finite and strictly positive; client counts, local epochs,
+batch sizes and synchronization thresholds must be positive integers. Preflight
+and direct builders share numeric parsing, including rejection of nonfinite
+controls. Fractional latency and jitter values are retained in milliseconds.
 Payload sizes are counted in bytes; bandwidth is decimal Mbps (one million
 bits per second). The serialization term is `8 * payload_bytes / (Mbps * 1_000_000)`,
 using the effective bottleneck throughput after the existing loss adjustment.

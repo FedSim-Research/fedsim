@@ -47,4 +47,47 @@ describe('Spyker topology validation', () => {
       'spyker: each Server must be directly connected to every other Server',
     );
   });
+
+  it.each([
+    ['uploadMbps', 0, 'upload'],
+    ['downloadMbps', 0, 'download'],
+    ['uploadMbps', Number.NaN, 'upload'],
+    ['downloadMbps', Number.POSITIVE_INFINITY, 'download'],
+    ['uploadMbps', true, 'upload'],
+    ['count', 1.5, 'count'],
+    ['count', true, 'count'],
+  ])('rejects invalid node control %s = %s', (field, value, keyword) => {
+    const nodes = [node('A', 'ServerNode'), node('client', 'ClientNode')];
+    (nodes[1] as any).data.config[field as string] = value;
+    const errors = validator.validateSimulationRequest('spyker', nodes, [edge('client', 'A')], config);
+    expect(errors.some((error) => error.toLowerCase().includes(keyword as string))).toBe(true);
+  });
+
+  it.each(['hInter', 'hIntra'])('rejects fractional %s thresholds', (field) => {
+    const spykerConfig = {
+      decayBeta: 0.05, minLearningRate: 1e-6, hInter: 5, hIntra: 350,
+      sigmoidPhi: 1.5, serverLearningRate: 0.6, [field]: 1.5,
+    };
+    const errors = validator.validateSimulationRequest('spyker',
+      [node('A', 'ServerNode'), node('client', 'ClientNode')], [edge('client', 'A')],
+      { ...config, spykerConfig });
+    expect(errors.some((error) => error.toLowerCase().includes(field.toLowerCase()))).toBe(true);
+  });
+
+  it('rejects fractional local epochs', () => {
+    const errors = validator.validateSimulationRequest('spyker',
+      [node('A', 'ServerNode'), node('client', 'ClientNode')], [edge('client', 'A')],
+      { ...config, trainingConfig: { ...config.trainingConfig, epochs: 1.5 } });
+    expect(errors.some((error) => error.includes('epochs'))).toBe(true);
+  });
+
+  it.each([['pingMs', null, 'ping'], ['packetloss', false, 'packetloss']])(
+    'rejects nonnumeric edge control %s', (field, value, keyword) => {
+      const link = edge('client', 'A');
+      (link as any).data.metrics[field as string] = value;
+      const errors = validator.validateSimulationRequest('spyker',
+        [node('A', 'ServerNode'), node('client', 'ClientNode')], [link], config);
+      expect(errors.some((error) => error.includes(keyword as string))).toBe(true);
+    },
+  );
 });

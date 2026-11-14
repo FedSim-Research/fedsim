@@ -330,3 +330,32 @@ def test_nonfinite_inputs_are_not_archived(queue):
     with pytest.raises(ValueError):
         definition(graph)
     assert queue.list_runs() == []
+
+
+@pytest.mark.parametrize("architecture", ["hierfl", "spyker"])
+@pytest.mark.parametrize("defect", ["zero_bandwidth", "fractional_count", "nonfinite_rate"])
+def test_invalid_controls_are_rejected_without_accepting_a_job(
+    api, monkeypatch, queue, architecture, defect
+):
+    graph = topology(architecture)
+    training = {"epochs": 1, "lr": 0.01}
+    if defect == "nonfinite_rate":
+        training["lr"] = "NaN"
+    else:
+        client = next(node for node in graph.nodes if node.type == "ClientNode")
+        config = json.loads(client.config_json)
+        config["uploadMbps" if defect == "zero_bandwidth" else "count"] = (
+            0 if defect == "zero_bandwidth" else 1.5
+        )
+        client.config_json = json.dumps(config)
+    graph_id = persist_graph(graph)
+    enqueue = Mock(side_effect=AssertionError("Invalid controls reached the queue"))
+    monkeypatch.setattr(queue, "enqueue", enqueue)
+    response = api.post(
+        "/start_simulation",
+        json={"graph_id": graph_id, "training_config": training},
+    )
+    assert response.status_code == 400, response.text
+    enqueue.assert_not_called()
+    assert queue.list_runs() == []
+    assert not ray.is_initialized()

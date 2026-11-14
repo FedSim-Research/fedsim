@@ -5,6 +5,12 @@ from functools import lru_cache
 from typing import Any
 
 from fedsim.persistence.models import Edge, Graph, Node
+from fedsim.services.input_values import (
+    parse_nonnegative_float,
+    parse_positive_float,
+    parse_positive_int,
+    parse_training_config,
+)
 from fedsim.services.node_performance import parse_node_performance
 
 DEFAULT_RUN_TIME_LIMIT = 5000.0
@@ -53,10 +59,14 @@ def _network_for_edge(edge: Edge):
     if "packetlossStddev" not in config or config["packetlossStddev"] is None:
         raise ValueError("spyker_missing_edge_packetlossStddev")
 
-    latency_avg = int(config["pingMs"])
-    latency_stddev = int(config["jitterMs"])
-    packet_loss_avg = float(config["packetloss"])
-    packet_loss_stddev = float(config["packetlossStddev"])
+    latency_avg = parse_nonnegative_float(config["pingMs"], "spyker_invalid_edge_latency")
+    latency_stddev = parse_nonnegative_float(config["jitterMs"], "spyker_invalid_edge_latency")
+    packet_loss_avg = parse_nonnegative_float(
+        config["packetloss"], "spyker_invalid_edge_packetloss"
+    )
+    packet_loss_stddev = parse_nonnegative_float(
+        config["packetlossStddev"], "spyker_invalid_edge_packetloss"
+    )
 
     if latency_avg < 0 or latency_stddev < 0:
         raise ValueError("spyker_invalid_edge_latency")
@@ -127,83 +137,41 @@ def validate_spyker_graph(graph: Graph) -> None:
             if key not in config or config[key] is None:
                 raise ValueError(f"spyker_missing_{node.type}_{key}")
         _performance_for(node.type, config)
+        for field in ["uploadMbps", "downloadMbps"]:
+            parse_positive_float(config[field], f"spyker_invalid_{node.type}_{field}")
 
     for client in client_nodes:
         client_config = _node_config(client)
         if "count" not in client_config or client_config["count"] is None:
             raise ValueError("spyker_missing_ClientNode_count")
+        parse_positive_int(client_config["count"], "spyker_client_count_invalid")
 
     for edge in edges:
         _network_for_edge(edge)
 
 
 def _require_training_config(training_config: dict[str, Any] | None) -> dict[str, Any]:
-    if training_config is None:
-        raise ValueError("spyker_missing_training_config")
-    if "epochs" not in training_config or training_config["epochs"] is None:
-        raise ValueError("spyker_missing_training_epochs")
-    if "lr" not in training_config or training_config["lr"] is None:
-        raise ValueError("spyker_missing_training_lr")
-    try:
-        epochs = int(training_config["epochs"])
-    except (TypeError, ValueError):
-        raise ValueError("spyker_invalid_training_epochs")
-    try:
-        lr = float(training_config["lr"])
-    except (TypeError, ValueError):
-        raise ValueError("spyker_invalid_training_lr")
-    if epochs < 1:
-        raise ValueError("spyker_invalid_training_epochs")
-    if lr <= 0:
-        raise ValueError("spyker_invalid_training_lr")
-    result = {"local_epochs": epochs, "learning_rate": lr}
-    if "batch_size" in training_config and training_config["batch_size"] is not None:
-        try:
-            batch_size = int(training_config["batch_size"])
-        except (TypeError, ValueError):
-            raise ValueError("spyker_invalid_batch_size")
-        if batch_size < 1:
-            raise ValueError("spyker_invalid_batch_size")
-        result["batch_size"] = batch_size
-    if "model_complexity" in training_config and training_config["model_complexity"] is not None:
-        try:
-            model_complexity = float(training_config["model_complexity"])
-        except (TypeError, ValueError):
-            raise ValueError("spyker_invalid_model_complexity")
-        if model_complexity <= 0:
-            raise ValueError("spyker_invalid_model_complexity")
-        result["model_complexity"] = model_complexity
-    # TODO: Implement client and server strategy selection here from frontend parse
-    return result
+    parsed = parse_training_config(training_config, prefix="spyker")
+    return {"local_epochs": parsed.pop("epochs"), "learning_rate": parsed.pop("lr"), **parsed}
 
 
 def _require_spyker_config(spyker_config: dict[str, Any] | None) -> dict[str, Any]:
     if not spyker_config:
         return {}
-    result: dict[str, Any] = {}
-    float_positive = {"min_learning_rate", "sigmoid_phi", "server_learning_rate"}
-    float_non_negative = {"decay_beta", "tcp_rto_delay"}
-    int_min_one = {"h_inter", "h_intra"}
-
-    for key, value in spyker_config.items():
-        if value is None:
-            continue
-        if key in float_positive:
-            val = float(value)
-            if val <= 0:
-                raise ValueError(f"spyker_invalid_{key}")
-            result[key] = val
-        elif key in float_non_negative:
-            val = float(value)
-            if val < 0:
-                raise ValueError(f"spyker_invalid_{key}")
-            result[key] = val
-        elif key in int_min_one:
-            val = int(value)
-            if val < 1:
-                raise ValueError(f"spyker_invalid_{key}")
-            result[key] = val
-    return result
+    parsers = {
+        "min_learning_rate": parse_positive_float,
+        "sigmoid_phi": parse_positive_float,
+        "server_learning_rate": parse_positive_float,
+        "decay_beta": parse_nonnegative_float,
+        "tcp_rto_delay": parse_nonnegative_float,
+        "h_inter": parse_positive_int,
+        "h_intra": parse_positive_int,
+    }
+    return {
+        key: parsers[key](value, f"spyker_invalid_{key}")
+        for key, value in spyker_config.items()
+        if value is not None and key in parsers
+    }
 
 
 def build_spyker_simulation(
