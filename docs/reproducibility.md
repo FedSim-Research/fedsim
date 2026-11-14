@@ -94,6 +94,12 @@ clock measurements change, so record the new revision and rerun performance
 comparisons. Client state still grows with population; measure actual memory
 and supported client counts rather than extrapolating from worker count.
 
+Pending model versions also consume memory independently of worker replicas.
+Record Ray's object-store allocation and the container's shared-memory mount
+alongside its RAM limit. Provision shared memory for the chosen object store;
+the number of live input and returned-model versions depends on the execution
+policy, so one model per client is not a fixed storage bound.
+
 The `fedsim-iid-v1` definition uses the normalized dataset ID, total partition
 count, and common run seed (42 when omitted). Flower Datasets now receives this
 seed explicitly for source-data shuffling. Each IID partition receives a
@@ -159,3 +165,23 @@ different environments distinguishable and preserve the original outputs.
 
 The [local comparison campaign](experiments.md) supplies paired configurations,
 sequential execution and an archive format for new measurements.
+
+## Failed runs and Ray references
+
+An extended Spyker run at revision `20d5070` with Ray 2.60 encountered a
+`ReferenceCountingAssertionError` during peer-model delivery, without an OOM
+kill. The precise trigger has not been isolated. Separate direct and nested
+reference-transport diagnostics did not reproduce it; they do not establish
+failure-free execution of the full engine.
+
+Runtime exceptions propagate to a failed job, and the campaign runner stops.
+Preserve its frozen definition, error, partial results and original Ray logs.
+Keep previously completed cases only with their full checksum, identity,
+checkpoint and protocol checks. Run any unfinished case again from its initial
+state in a fresh output directory with the same frozen inputs and runtime;
+record the separate execution segments. A partial failed model must not be
+reported as a completed result or substituted into a paired comparison.
+
+For a separate reproduction attempt, set `RAY_record_ref_creation_sites=1`
+before starting Ray to capture object-reference creation sites. This adds
+diagnostic context; restarting or enabling the flag does not establish a fix.

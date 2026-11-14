@@ -44,13 +44,13 @@ class SimulationOrchestrator:
 
                 self.global_virtual_time = self._event_heap[0].trigger_time
 
-            # 2. Dispatch Concurrently (The core bottleneck fix)
-            # Drain the heap of all events that occur at the EXACT SAME virtual time.
-            # These events are guaranteed to be causally independent and can be executed in parallel.
+            # 2. Dispatch events eligible at the current virtual time.
+            # Callbacks can share actor state; actor serialization and CPU admission
+            # constrain concurrency. Completion order affects child-event insertion.
             while self._event_heap:
                 next_event = self._event_heap[0]
 
-                # Epsilon (1e-6) prevents floating-point precision lockups during batching
+                # Allow a small timestamp tolerance for floating-point rounding.
                 if next_event.trigger_time <= self.global_virtual_time + 1e-6:
                     if next_event.trigger_time > target_time:
                         break
