@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import APIRouter, HTTPException, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from fedsim.services import graph_service, simulation_run_store
 from fedsim.services.evaluation_point_store import evaluation_run_ids, export_evaluation_points
@@ -44,7 +44,10 @@ class SpykerAlgorithmConfig(BaseModel):
     h_intra: int | None = None
     sigmoid_phi: float | None = None
     server_learning_rate: float | None = None
-    tcp_rto_delay: float | None = None
+    tcp_rto_delay: float | None = Field(
+        default=None,
+        description="Reserved compatibility field; not applied by either simulation engine.",
+    )
 
 
 class SimulationStartRequest(BaseModel):

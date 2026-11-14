@@ -39,6 +39,11 @@ between engines still need validation before drawing scientific conclusions.
 - [Operations](docs/operations.md): monitoring, configuration, and GPU deployment.
 - [Third-party notices](THIRD_PARTY_NOTICES.md): dependency and source attributions.
 
+## Citation
+
+Use [CITATION.cff](CITATION.cff) to cite the software. Record the source commit
+and dependency lockfile with your experiment results.
+
 ## License
 
 FedSim is licensed under [Apache-2.0](LICENSE). Third-party components retain

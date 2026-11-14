@@ -227,6 +227,9 @@ checkpoint-copy failure, or a 24-hour per-job polling timeout. Interruptions ret
 the execution journal and checksums of available artifacts. There is no automatic
 submission retry, resume, cancellation or graph deletion. Transport failures on
 GET requests are retried at most twice; HTTP error responses are not retried.
+Atomic JSON replacement retries transient permission failures for up to eight
+seconds, accommodating Windows readers and bind mounts. Persistent failures still
+stop collection; this does not retry an HTTP submission.
 A timed-out submission may already
 have been accepted: inspect the backend before starting another campaign. Stopping
 the client does not stop its backend job. Created graphs and backend files remain

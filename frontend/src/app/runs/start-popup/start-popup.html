@@ -69,7 +69,7 @@
                       <p-inputNumber [(ngModel)]="hierflSettings.evalInterval" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
                     </label>
                     <label class="field">
-                      <span class="field-label">GPU budget <span class="help-dot" title="Total GPU share for this run. 0 means CPU only.">?</span></span>
+                      <span class="field-label">GPU budget <span class="help-dot" title="GPU resources for server evaluation. Client training uses CPU. 0 means CPU only.">?</span></span>
                       <p-inputNumber [(ngModel)]="hierflSettings.gpuBudget" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
                     </label>
                     <label class="field">
@@ -140,7 +140,7 @@
                       <p-inputNumber [(ngModel)]="spykerSettings.evalInterval" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
                     </label>
                     <label class="field">
-                      <span class="field-label">GPU budget <span class="help-dot" title="Total GPU share for this run. 0 means CPU only.">?</span></span>
+                      <span class="field-label">GPU budget <span class="help-dot" title="GPU resources for server evaluation. Client training uses CPU. 0 means CPU only.">?</span></span>
                       <p-inputNumber [(ngModel)]="spykerSettings.gpuBudget" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
                     </label>
                     <label class="field">
@@ -186,10 +186,6 @@
                       <label class="field">
                         <span class="field-label">Server learning rate <span class="help-dot" title="Server-side aggregation learning rate.">?</span></span>
                         <p-inputNumber [(ngModel)]="spykerSettings.serverLearningRate" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
-                      </label>
-                      <label class="field">
-                        <span class="field-label">TCP RTO delay <span class="help-dot" title="Simulated TCP retransmission timeout delay.">?</span></span>
-                        <p-inputNumber [(ngModel)]="spykerSettings.tcpRtoDelay" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
                       </label>
                     </div>
                   </div>

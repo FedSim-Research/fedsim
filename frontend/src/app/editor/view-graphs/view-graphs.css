@@ -30,8 +30,8 @@
 
 .dialog-tab {
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgb(var(--fg-rgb) / 0.12);
+  background: rgb(var(--fg-rgb) / 0.04);
   color: inherit;
   padding: 8px 10px;
   font-weight: 700;
@@ -39,7 +39,7 @@
 }
 
 .dialog-tab--active {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgb(var(--fg-rgb) / 0.18);
 }
 
 .dialog-body {
@@ -158,7 +158,7 @@
 }
 
 .graph-item__delete:hover {
-  color: #f87171;
+  color: var(--error-hover);
 }
 
 .graph-item__architecture {

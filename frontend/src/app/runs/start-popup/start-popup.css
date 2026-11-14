@@ -30,15 +30,15 @@
   max-width: 530px;
   max-height: 90vh;
   overflow: auto;
-  background: #0f0f0f;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--panel);
+  border: 1px solid rgb(var(--fg-rgb) / 0.15);
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
   display: flex;
   flex-direction: column;
   gap: 16px;
-  color: #fff;
+  color: var(--text);
   transform: scale(1);
   animation: popIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -47,7 +47,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgb(var(--fg-rgb) / 0.1);
   padding-bottom: 12px;
 }
 
@@ -60,14 +60,14 @@
 .icon-btn-small {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 1.2rem;
   padding: 4px;
 }
 
 .icon-btn-small:hover {
-  color: #fff;
+  color: var(--text);
 }
 
 .popup-body {
@@ -92,7 +92,7 @@
 
 .section-hint {
   margin: 0 0 12px 0;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--text-muted);
   font-size: 0.92rem;
 }
 
@@ -108,27 +108,27 @@
   gap: 12px;
   padding: 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  border: 1px solid rgb(var(--fg-rgb) / 0.12);
+  background: rgb(var(--fg-rgb) / 0.05);
+  color: var(--text);
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
 }
 
 .cta-option:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgb(var(--fg-rgb) / 0.12);
 }
 
 .cta-option.active {
-  border-color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.18);
+  border-color: var(--text-muted);
+  background: rgb(var(--fg-rgb) / 0.18);
 }
 
 .cta-option--hier {
   border-color: rgba(255, 140, 66, 0.28);
   background: var(--start-hier-soft);
-  color: #ffe8d6;
+  color: var(--warning);
 }
 
 .cta-option--hier:hover,
@@ -140,7 +140,7 @@
 .cta-option--spyker {
   border-color: rgba(32, 201, 151, 0.28);
   background: var(--start-spyker-soft);
-  color: #dcfff3;
+  color: var(--success);
 }
 
 .cta-option--spyker:hover,
@@ -152,7 +152,7 @@
 .cta-option--both {
   border-color: rgba(78, 205, 196, 0.28);
   background: var(--start-shared-soft);
-  color: #ddfffc;
+  color: var(--cyan);
 }
 
 .cta-option--both:hover,
@@ -190,9 +190,9 @@
 
 .nav-btn {
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
+  border: 1px solid rgb(var(--fg-rgb) / 0.15);
+  background: rgb(var(--fg-rgb) / 0.06);
+  color: var(--text);
   padding: 10px 14px;
   cursor: pointer;
 }
@@ -205,7 +205,7 @@
 .nav-btn--primary {
   border-color: rgba(16, 185, 129, 0.85);
   background: rgba(16, 185, 129, 0.22);
-  color: #dffdf3;
+  color: var(--success);
 }
 
 .nav-btn--primary:hover {
@@ -219,7 +219,7 @@
 }
 
 .sim-settings-section--separated {
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 1px solid rgb(var(--fg-rgb) / 0.14);
   padding-top: 12px;
   margin-top: 8px;
 }
@@ -227,13 +227,13 @@
 .sim-settings-title {
   font-size: 0.82rem;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.82);
+  color: rgb(var(--fg-rgb) / 0.82);
 }
 
 .sim-settings-subtitle {
   font-size: 0.76rem;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.68);
+  color: var(--text-muted);
 }
 
 .grid {
@@ -247,16 +247,16 @@
   flex-direction: column;
   gap: 5px;
   font-size: 0.88rem;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgb(var(--fg-rgb) / 0.75);
 }
 
 .field input,
 .field select {
   width: 100%;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: #000000;
-  color: #fff;
+  border: 1px solid rgb(var(--fg-rgb) / 0.16);
+  background: var(--panel);
+  color: var(--text);
   padding: 10px;
   font-size: 0.9rem;
 }
@@ -268,9 +268,9 @@
 
 :host ::ng-deep .field p-inputNumber .p-inputnumber .p-inputnumber-input {
   border-radius: 10px !important;
-  border: 1px solid rgba(255, 255, 255, 0.16) !important;
-  background: #000000 !important;
-  color: #fff !important;
+  border: 1px solid rgb(var(--fg-rgb) / 0.16) !important;
+  background: var(--panel) !important;
+  color: var(--text) !important;
   padding: 10px !important;
   font-size: 0.9rem !important;
   min-height: 42px;
@@ -280,9 +280,9 @@
 /* PrimeNG input text directive styling */
 :host ::ng-deep .field input.p-inputtext {
   border-radius: 10px !important;
-  border: 1px solid rgba(255, 255, 255, 0.16) !important;
-  background: #000000 !important;
-  color: #fff !important;
+  border: 1px solid rgb(var(--fg-rgb) / 0.16) !important;
+  background: var(--panel) !important;
+  color: var(--text) !important;
   padding: 10px !important;
   font-size: 0.9rem !important;
 }
@@ -315,8 +315,8 @@
   width: 15px;
   height: 15px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  color: #fff;
+  border: 1px solid rgb(var(--fg-rgb) / 0.35);
+  color: var(--text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -324,7 +324,7 @@
   font-weight: 700;
   line-height: 1;
   cursor: help;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgb(var(--fg-rgb) / 0.06);
   text-align: center;
   transform: translateY(-0.5px);
 }

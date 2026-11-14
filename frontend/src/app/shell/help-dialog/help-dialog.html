@@ -6,7 +6,7 @@
   [resizable]="false"
   [closeOnEscape]="true"
   [dismissableMask]="true"
-  header="FedSim Helper"
+  header="FedSim Help"
   [style]="{ width: '1260px', maxWidth: '96vw' }"
   [contentStyle]="{ padding: '0', overflow: 'hidden' }"
   (onHide)="onClose()"
@@ -17,8 +17,7 @@
         <span class="help-hero__eyebrow">Reference Guide</span>
         <h2>Node, edge, and run parameters</h2>
         <p>
-          This page explains the fields used across the configurator. Shared parameters are listed once,
-          then mapped to the node types that use them, so the same attribute is not repeated in multiple places.
+          Configure a supported topology, its node and link parameters, and the training budget before starting a simulation.
         </p>
       </div>
       <div class="help-hero__badges">
@@ -35,9 +34,6 @@
             <span class="help-kicker">Table of contents</span>
             <h3>Jump to a section</h3>
           </div>
-          <p class="help-panel__intro">
-            Select any item to move directly to that part of the helper.
-          </p>
         </div>
         <div class="help-toc__grid">
           @for (section of tableOfContents; track section.id) {
@@ -57,7 +53,7 @@
         <div class="help-panel__header">
           <div>
             <span class="help-kicker">Quick orientation</span>
-            <h3>What this helper is optimized for</h3>
+            <h3>Topology and parameter units</h3>
           </div>
         </div>
         <div class="fact-grid">
@@ -202,7 +198,7 @@
             <h3>Network behavior between connected nodes</h3>
           </div>
           <p class="help-panel__intro">
-            The edge editor uses two paired inputs: <strong>Latency +/- Jitter</strong> and <strong>Pktloss +/- Stddev</strong>.
+            Each pair shows a mean and Gaussian standard deviation: latency in milliseconds and packet loss as a fraction.
           </p>
         </div>
         <div class="parameter-grid">
@@ -272,48 +268,7 @@
         </div>
       </section>
 
-      <section class="help-panel help-panel--split">
-        <div id="hierarchical-parameter" class="help-panel__column">
-          <div class="help-panel__header">
-            <div>
-              <span class="help-kicker">Hierarchical</span>
-              <h3>Extra Hierarchical parameter</h3>
-            </div>
-          </div>
-          <div class="parameter-grid parameter-grid--single">
-            @for (item of hierarchicalParameters; track item.key) {
-            <article class="parameter-card parameter-card--with-tags">
-              <div class="parameter-card__header">
-                <div>
-                  <h4>{{ item.label }}</h4>
-                  <code>{{ item.key }}</code>
-                </div>
-                <div class="applicability-boxes applicability-boxes--header">
-                  @for (line of item.appliesTo; track line) {
-                  <span
-                    class="applicability-box"
-                    [class.applicability-box--hier]="line === 'Hierarchical'"
-                    [class.applicability-box--spyker]="line === 'Spyker'"
-                    [class.applicability-box--shared]="line !== 'Hierarchical' && line !== 'Spyker'"
-                  >
-                    {{ line }}
-                  </span>
-                  }
-                </div>
-              </div>
-              <p>{{ item.description }}</p>
-              <p class="parameter-card__effect">{{ item.effect }}</p>
-              <div class="parameter-card__meta">
-                @if (item.format) {
-                <span><strong>Format:</strong> {{ item.format }}</span>
-                }
-              </div>
-            </article>
-            }
-          </div>
-        </div>
-
-        <div id="spyker-runtime-parameter" class="help-panel__column">
+      <section id="spyker-runtime-parameter" class="help-panel">
           <div class="help-panel__header">
             <div>
               <span class="help-kicker">Spyker</span>
@@ -351,7 +306,6 @@
             </article>
             }
           </div>
-        </div>
       </section>
 
       <section id="spyker-algorithm" class="help-panel">
@@ -397,8 +351,8 @@
       <section id="implementation-notes" class="help-panel help-panel--notes">
         <div class="help-panel__header">
           <div>
-            <span class="help-kicker">Implementation notes</span>
-            <h3>Small details that help avoid confusion</h3>
+            <span class="help-kicker">Run interpretation</span>
+            <h3>Reading the configured scenario</h3>
           </div>
         </div>
         <ul class="notes-list">

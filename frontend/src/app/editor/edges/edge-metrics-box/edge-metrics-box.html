@@ -11,7 +11,7 @@
       class="delete-button"
       type="button"
       (click)="onDelete($event)"
-      aria-label="Edge entfernen"
+      aria-label="Delete edge"
     >
       <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
         <path
@@ -23,10 +23,11 @@
   </header>
   <div class="edge-card__body comparison__body">
     <div class="comparison__row">
-      <span class="comparison__label">Latency</span>
+      <span class="comparison__label">Latency <small>(ms)</small></span>
       <div class="comparison__inputs">
         <input
           class="comparison__value"
+          aria-label="Mean latency in milliseconds"
           type="text"
           inputmode="decimal"
           pattern="[0-9]*[.,]?[0-9]*"
@@ -39,6 +40,7 @@
         <div class="spinner-field">
           <input
             class="comparison__extra"
+            aria-label="Latency standard deviation in milliseconds"
             type="text"
             inputmode="decimal"
             pattern="[0-9]*[.,]?[0-9]*"
@@ -59,10 +61,11 @@
       </div>
     </div>
     <div class="comparison__row">
-      <span class="comparison__label">Pktloss</span>
+      <span class="comparison__label" title="Packet loss fraction">Loss <small>(0–1)</small></span>
       <div class="comparison__inputs">
         <input
           class="comparison__value"
+          aria-label="Mean packet loss fraction"
           type="text"
           inputmode="decimal"
           pattern="[0-9]*[.,]?[0-9]*"
@@ -75,6 +78,7 @@
         <div class="spinner-field">
           <input
             class="comparison__extra"
+            aria-label="Packet loss standard deviation"
             type="text"
             inputmode="decimal"
             pattern="[0-9]*[.,]?[0-9]*"

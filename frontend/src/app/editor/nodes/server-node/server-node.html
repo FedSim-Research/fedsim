@@ -16,7 +16,7 @@
         [class.action-button--visible]="showDelete()"
         (mousedown)="$event.stopPropagation()"
         (click)="onStartEdit($event)"
-        aria-label="Knoten bearbeiten"
+        aria-label="Edit node"
         title="Edit"
       >
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -43,7 +43,7 @@
         type="button"
         (mousedown)="$event.stopPropagation()"
         (click)="onSaveEdit($event)"
-        aria-label="Knoten speichern"
+        aria-label="Save node"
       >
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
           <path
@@ -58,7 +58,7 @@
         [class.delete-button--visible]="showDelete()"
         (mousedown)="$event.stopPropagation()"
         (click)="onDelete($event)"
-        aria-label="Knoten loeschen"
+        aria-label="Delete node"
         title="Delete"
       >
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">

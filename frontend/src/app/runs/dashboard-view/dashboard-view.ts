@@ -6,6 +6,7 @@ import { APP_CONFIG } from '../../config/app-config';
 import { FrameworkJobsService } from '../framework-jobs.service';
 import { DashboardRunsService } from '../dashboard-runs.service';
 import { formatRunProgress } from '../run-progress';
+import { ThemeService } from '../../shared/theme.service';
 
 type ComparableMetrics = {
   accuracy: number | null;
@@ -34,6 +35,7 @@ export class DashboardViewComponent {
   private sanitizer = inject(DomSanitizer);
   private frameworkJobsService = inject(FrameworkJobsService);
   private runsService = inject(DashboardRunsService);
+  private theme = inject(ThemeService);
 
   private graphApi = inject(GraphApiService);
   private grafanaBaseUrl = inject(APP_CONFIG).grafanaBaseUrl;
@@ -351,7 +353,8 @@ export class DashboardViewComponent {
     runId: string;
     architecture: string;
   }): SafeResourceUrl {
-    const cacheKey = JSON.stringify(args);
+    const theme = this.theme.isDark() ? 'dark' : 'light';
+    const cacheKey = JSON.stringify({ ...args, theme });
     const cached = this.grafanaUrlCache.get(cacheKey);
     if (cached) {
       return cached;
@@ -361,7 +364,7 @@ export class DashboardViewComponent {
     const url =
       `${this.grafanaBaseUrl}/d-solo/${args.uid}/_` +
       `?orgId=1&from=${Math.trunc(args.rangeFrom)}&to=${Math.trunc(args.rangeTo)}&timezone=browser` +
-      `&panelId=${args.panelId}&theme=dark&kiosk` +
+      `&panelId=${args.panelId}&theme=${theme}&kiosk` +
       `&var-run_id=${runId}&var-architecture=${architecture}`;
     const safe = this.sanitizer.bypassSecurityTrustResourceUrl(url);
     this.grafanaUrlCache.set(cacheKey, safe);

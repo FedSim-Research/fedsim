@@ -97,7 +97,26 @@ class CampaignConfig(BaseModel):
 def _write_json(path: Path, value) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n", encoding="utf-8")
-    temporary.replace(path)
+    # Windows readers/antivirus can briefly deny replacement on bind mounts.
+    # Retry only the atomic filesystem operation; HTTP submissions stay single-shot.
+    started, delay, retries = None, 0.05, 0
+    while True:
+        try:
+            temporary.replace(path)
+            if retries:
+                logging.getLogger(__name__).warning(
+                    "Archive replacement recovered after %s retries: %s", retries, path
+                )
+            return
+        except PermissionError:
+            if started is None:
+                started = time.monotonic()
+            remaining = 8 - (time.monotonic() - started)
+            if remaining <= 0:
+                raise
+            time.sleep(min(delay, remaining))
+            delay = min(0.5, delay * 1.5)
+            retries += 1
 
 
 def _topology(

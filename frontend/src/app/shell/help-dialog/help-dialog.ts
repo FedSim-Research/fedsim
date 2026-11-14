@@ -44,25 +44,20 @@ export class HelpDialog {
   public visible = true;
   public showBackToTop = false;
   public readonly tableOfContents: HelpSection[] = [
-    { id: 'quick-orientation', kicker: 'Quick orientation', title: 'What this helper is optimized for' },
+    { id: 'quick-orientation', kicker: 'Quick orientation', title: 'Topology and parameter units' },
     { id: 'node-roles', kicker: 'Node roles', title: 'What each node is for' },
     { id: 'shared-node-parameters', kicker: 'Shared node parameters', title: 'Performance and bandwidth fields' },
     { id: 'node-specific-parameters', kicker: 'Node-specific parameters', title: 'Fields that are not shared by every node' },
     { id: 'edge-parameters', kicker: 'Edge parameters', title: 'Network behavior between connected nodes' },
     { id: 'run-settings', kicker: 'Run settings', title: 'Parameters used in the start simulation dialog' },
-    { id: 'hierarchical-parameter', kicker: 'Hierarchical', title: 'Extra Hierarchical parameter' },
     { id: 'spyker-runtime-parameter', kicker: 'Spyker', title: 'Extra Spyker run parameter' },
     { id: 'spyker-algorithm', kicker: 'Spyker algorithm', title: 'Parameters that shape Spyker synchronization behavior' },
-    { id: 'implementation-notes', kicker: 'Implementation notes', title: 'Small details that help avoid confusion' },
+    { id: 'implementation-notes', kicker: 'Run interpretation', title: 'Reading the configured scenario' },
   ];
   public readonly quickFacts: QuickFact[] = [
     {
-      label: 'Shared fields',
-      value: 'Upload, download, compute factor, and performance sigma are explained once below and then mapped to the node types that use them.',
-    },
-    {
       label: 'Edge formula',
-      value: 'Every edge is described as average plus spread: latency plus jitter, and packet loss plus standard deviation.',
+      value: 'Latency and packet loss use Gaussian mean and standard deviation. Latency is in milliseconds; loss is a fraction.',
     },
     {
       label: 'Architecture rule',
@@ -70,7 +65,7 @@ export class HelpDialog {
     },
     {
       label: 'Validation basics',
-      value: 'Compute factor must be greater than 0, client count must be at least 1, and packet loss values must stay between 0 and 1.',
+      value: 'Compute factor is positive, client count is a positive integer, and configured packet loss fractions are between 0 and 1.',
     },
   ];
 
@@ -175,17 +170,17 @@ export class HelpDialog {
       label: 'Jitter',
       key: 'jitterMs',
       appliesTo: [],
-      description: 'The plus/minus spread around latency.',
+      description: 'Standard deviation of Gaussian variation around the configured latency.',
       effect: 'Higher jitter makes the link less stable because delivery time varies more strongly from message to message.',
       format: 'Milliseconds, minimum 0',
-      note: 'The edge editor shows this as Latency +/- Jitter.',
+      note: 'The edge editor shows mean +/- standard deviation, not fixed minimum and maximum bounds. Negative sampled latency is clamped to zero.',
     },
     {
       label: 'Packet loss',
       key: 'packetloss',
       appliesTo: [],
       description: 'Base fraction of traffic that is dropped on the link.',
-      effect: 'Higher packet loss increases retransmissions, delays, and the chance that communication becomes inefficient.',
+      effect: 'Higher values reduce effective throughput and increase simulated transfer time. Individual packets and retransmissions are not simulated.',
       format: 'Fraction between 0 and 1',
       note: 'Example: 0.001 means 0.1 percent packet loss.',
     },
@@ -193,14 +188,22 @@ export class HelpDialog {
       label: 'Packet loss stddev',
       key: 'packetlossStddev',
       appliesTo: [],
-      description: 'The plus/minus spread around packet loss.',
+      description: 'Standard deviation of Gaussian variation around the configured packet loss fraction.',
       effect: 'Use it when you want a link whose reliability changes over time instead of staying fixed.',
       format: 'Fraction between 0 and 1',
-      note: 'The edge editor shows this as Pktloss +/- Stddev.',
+      note: 'The edge editor shows mean +/- standard deviation. Samples are not clipped to [0, 1]; the effective throughput multiplier has a floor of 0.001.',
     },
   ];
 
   public readonly commonRunParameters: ParameterSpec[] = [
+    {
+      label: 'Batch size',
+      key: 'batch_size',
+      appliesTo: ['Hierarchical', 'Spyker'],
+      description: 'Mini-batch size used for local client training.',
+      effect: 'Larger batches reduce optimizer steps per epoch and increase memory demand per step.',
+      format: 'Integer, minimum 1',
+    },
     {
       label: 'Epochs',
       key: 'epochs',
@@ -222,7 +225,7 @@ export class HelpDialog {
       key: 'model_complexity',
       appliesTo: ['Hierarchical', 'Spyker'],
       description: 'Scaling factor for simulated computational effort during training.',
-      effect: 'Use it to make the same graph behave like a lighter or heavier model without redesigning the topology.',
+      effect: 'Scales the scheduled virtual training duration. The actual CNN architecture remains fixed.',
       format: 'Positive decimal number',
     },
     {
@@ -238,7 +241,7 @@ export class HelpDialog {
       key: 'eval_interval',
       appliesTo: ['Hierarchical', 'Spyker'],
       description: 'How often periodic evaluation is triggered during the run.',
-      effect: 'Lower intervals give more frequent checkpoints, while higher intervals reduce evaluation overhead.',
+      effect: 'Lower intervals provide more metric points and increase physical evaluation overhead; they do not save intermediate model checkpoints.',
       format: 'Seconds, minimum 0',
       note: 'A value of 0 disables periodic evaluation during the run.',
     },
@@ -246,25 +249,25 @@ export class HelpDialog {
       label: 'GPU budget',
       key: 'gpu_budget',
       appliesTo: ['Hierarchical', 'Spyker'],
-      description: 'Total GPU share allocated to the run.',
-      effect: 'Lets you model GPU-enabled execution or force a CPU-only run when set to 0.',
+      description: 'Ray GPU resources reserved for server actors.',
+      effect: 'Server model evaluation can use CUDA. Client training runs on CPU; zero selects CPU-only execution.',
       format: 'Decimal number, minimum 0',
-      note: 'If both architectures run together, the backend may scale the requested budgets down to fit available GPU capacity.',
+      note: 'Budgets are Ray resource fractions. Both mode may scale them down to available GPU capacity.',
     },
     {
       label: 'Dataset',
       key: 'dataset',
       appliesTo: ['Hierarchical', 'Spyker'],
       description: 'Hugging Face dataset identifier used to load and partition training data.',
-      effect: 'Lets you benchmark the same topology against different datasets by changing only the dataset id.',
+      effect: 'The maintained baseline is CIFAR-10. Other datasets require compatible image/label columns and model preprocessing.',
       format: 'Dataset id string, for example uoft-cs/cifar10',
     },
     {
       label: 'Seed set',
       key: 'seed_set',
       appliesTo: ['Hierarchical', 'Spyker'],
-      description: 'Fixed list of integer seeds used for reproducible benchmark repetitions.',
-      effect: 'Using the same seed set across scenarios and architectures makes repeated experiments fair and directly comparable.',
+      description: 'Integer seeds controlling model initialization, data assignment and private random streams.',
+      effect: 'Match dataset contents, partition assignments and training budgets as well as seeds. Asynchronous callback order can still vary.',
       format: 'Comma-separated integers, each minimum 0',
     },
     {
@@ -289,17 +292,6 @@ export class HelpDialog {
       appliesTo: ['Hierarchical', 'Spyker'],
       description: 'Toggle for a final post-training evaluation once the run completes.',
       effect: 'Returns result metrics such as accuracy and average loss after training finishes.',
-    },
-  ];
-
-  public readonly hierarchicalParameters: ParameterSpec[] = [
-    {
-      label: 'Batch size',
-      key: 'batch_size',
-      appliesTo: ['Hierarchical'],
-      description: 'Mini-batch size used for local client training.',
-      effect: 'Larger batches reduce the number of optimizer steps per epoch but increase memory demand per step.',
-      format: 'Integer, minimum 1',
     },
   ];
 
@@ -363,20 +355,12 @@ export class HelpDialog {
       effect: 'Controls how strongly the server model moves toward incoming updates during aggregation.',
       format: 'Positive decimal number',
     },
-    {
-      label: 'TCP RTO delay',
-      key: 'tcp_rto_delay',
-      appliesTo: ['Spyker'],
-      description: 'Simulated TCP retransmission timeout delay.',
-      effect: 'Lets you model additional network recovery delay when communication is unreliable.',
-      format: 'Decimal number, minimum 0',
-    },
   ];
 
   public readonly implementationNotes: string[] = [
-    'Shared parameters are documented once in this helper so repeated fields do not appear again in multiple sections.',
     'Edges are imported symmetrically by the backend, so one edge defines the link behavior in both directions between the two connected nodes.',
     'Packet loss fields use fractions, not percentages. 0.01 means 1 percent, not 0.01 percent.',
+    'Packet loss reduces effective throughput; individual packets and retransmission timeouts are not simulated.',
     'GPU budget set to 0 means CPU-only execution.',
     'In Hierarchical mode a client type is required, and in Spyker mode there must be no Super Server.',
   ];

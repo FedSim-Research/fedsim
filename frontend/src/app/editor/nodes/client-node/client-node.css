@@ -12,10 +12,10 @@
 
 .node-card {
   width: 220px;
-  background: rgb(15, 15, 15);
-  border: 1px solid rgba(255, 255, 255, 0.107);
+  background: var(--node-bg);
+  border: 1px solid rgb(var(--fg-rgb) / 0.107);
   border-radius: 12px;
-  color: #ffffff;
+  color: var(--text);
   font-family: 'Inter', system-ui, sans-serif;
   overflow: hidden;
   transition: transform 0.2s ease, border-color 0.2s ease;
@@ -26,7 +26,7 @@
   height: 32px;
   border: none;
   background: transparent;
-  color: #ef4444;
+  color: var(--error);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -59,24 +59,24 @@
 }
 
 .edit-button {
-  color: #60a5fa;
+  color: var(--info);
 }
 
 .forward-button,
 .forward-button .pi {
-  color: #ffffff !important;
+  color: var(--text) !important;
 }
 
 .edit-button:hover {
-  color: #93c5fd;
+  color: var(--info-hover);
 }
 
 .save-button {
-  color: #34d399;
+  color: var(--success);
 }
 
 .save-button:hover {
-  color: #6ee7b7;
+  color: var(--success-hover);
 }
 
 .delete-button--visible {
@@ -86,13 +86,13 @@
 }
 
 .delete-button:hover {
-  color: #f87171;
+  color: var(--error-hover);
 }
 
 .node-header {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgb(var(--fg-rgb) / 0.03);
   padding: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgb(var(--fg-rgb) / 0.08);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -108,7 +108,7 @@
   font-weight: 700;
   font-size: 0.9rem;
   letter-spacing: 0.02em;
-  color: #fff;
+  color: var(--text);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -134,24 +134,24 @@
   justify-content: space-between;
   align-items: center;
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
 }
 
 .spec-value {
   font-family: 'Menlo', 'Monaco', monospace;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgb(var(--fg-rgb) / 0.9);
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgb(var(--fg-rgb) / 0.1);
   padding: 2px 6px;
   border-radius: 4px;
 }
 
 .spec-input {
   width: 92px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgb(var(--fg-rgb) / 0.25);
+  background: rgb(var(--fg-rgb) / 0.1);
   border-radius: 4px;
-  color: rgba(255, 255, 255, 0.95);
+  color: rgb(var(--fg-rgb) / 0.95);
   padding: 2px 6px;
   font-size: 0.78rem;
 }
@@ -163,9 +163,9 @@
 
 .node-footer {
   padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--panel);
   font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-muted);
   text-align: right;
   text-transform: uppercase;
   letter-spacing: 0.05em;

@@ -95,7 +95,6 @@ export class GraphValidatorService {
       if (!Number.isFinite(s.hIntra) || s.hIntra < 1) errors.push('spyker: hIntra must be >= 1');
       if (!Number.isFinite(s.sigmoidPhi) || s.sigmoidPhi <= 0) errors.push('spyker: sigmoid phi must be > 0');
       if (!Number.isFinite(s.serverLearningRate) || s.serverLearningRate <= 0) errors.push('spyker: server learning rate must be > 0');
-      if (!Number.isFinite(s.tcpRtoDelay) || s.tcpRtoDelay < 0) errors.push('spyker: tcp rto delay must be >= 0');
     }
     return errors;
   }

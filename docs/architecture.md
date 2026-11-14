@@ -210,6 +210,11 @@ and Ray serialization overhead. Spyker control messages use an estimated
 1,000-byte payload. An empty model has zero tensor bytes; link latency still
 applies. This corrects the former mixing of MiB sizes with decimal Mbps.
 
+Loss is a fraction and reduces effective throughput; individual packets and
+retransmission state are not simulated. The API retains `tcp_rto_delay` for
+compatibility with existing records, but neither engine reads it. The start
+dialog therefore does not expose it as a tunable simulation control.
+
 The aggregation-time helper uses the same zero-mean noise convention. Its
 delay is currently not scheduled by either engine. These corrections change
 effective settings and virtual timings; historical results must retain their

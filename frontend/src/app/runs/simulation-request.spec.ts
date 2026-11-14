@@ -21,9 +21,10 @@ describe('toStartRequest', () => {
     const request = toStartRequest(4, {
       trainingConfig,
       simulationSettings: { ...simulationSettings, idleTokenDelay: 0.5, outputFilename: 'model.pth' },
-      spykerConfig: { decayBeta: 0.1, minLearningRate: 1e-6, hInter: 5, hIntra: 50, sigmoidPhi: 1, serverLearningRate: 0.1, tcpRtoDelay: 0.2 },
+      spykerConfig: { decayBeta: 0.1, minLearningRate: 1e-6, hInter: 5, hIntra: 50, sigmoidPhi: 1, serverLearningRate: 0.1 },
     });
     expect(request.simulation_settings).toMatchObject({ idle_token_delay: 0.5, output_filename: 'model.pth' });
-    expect(request.spyker_config).toMatchObject({ h_inter: 5, tcp_rto_delay: 0.2 });
+    expect(request.spyker_config).toMatchObject({ h_inter: 5, server_learning_rate: 0.1 });
+    expect(request.spyker_config).not.toHaveProperty('tcp_rto_delay');
   });
 });

@@ -78,8 +78,13 @@ describe('StartPopup stored settings', () => {
       settings: { epochs: 'many', lr: 0.01, batchSize: null, injected: '<b>x</b>' },
       updatedAt: 1,
     }));
+    localStorage.setItem('fedsim.start-params.spyker.4', JSON.stringify({
+      settings: { hIntra: 70, tcpRtoDelay: 9 },
+      updatedAt: 1,
+    }));
     const fixture = TestBed.createComponent(StartPopup);
     fixture.componentInstance.hierflGraphId = 3;
+    fixture.componentInstance.spykerGraphId = 4;
     fixture.detectChanges();
 
     const settings = fixture.componentInstance.hierflSettings as Record<string, unknown>;
@@ -87,5 +92,7 @@ describe('StartPopup stored settings', () => {
     expect(settings['lr']).toBe(0.01);
     expect(settings['batchSize']).toBe(32);
     expect(settings['injected']).toBeUndefined();
+    expect(fixture.componentInstance.spykerSettings.hIntra).toBe(70);
+    expect(fixture.componentInstance.spykerSettings).not.toHaveProperty('tcpRtoDelay');
   });
 });

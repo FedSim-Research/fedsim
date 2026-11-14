@@ -134,6 +134,7 @@ export interface SimulationStartRequest {
     h_intra?: number;
     sigmoid_phi?: number;
     server_learning_rate?: number;
+    /** Reserved for historical payload compatibility; not applied by the engines. */
     tcp_rto_delay?: number;
   };
 }

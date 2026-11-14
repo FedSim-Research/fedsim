@@ -39,7 +39,7 @@ packages = ["src/fedsim"]
 [tool.hatch.build.targets.sdist]
 include = [
     "src/fedsim", "tests", "docs", "experiments", "pyproject.toml", "uv.lock", ".python-version",
-    "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md",
+    "README.md", "CITATION.cff", "LICENSE", "THIRD_PARTY_NOTICES.md",
 ]
 
 [tool.pytest.ini_options]

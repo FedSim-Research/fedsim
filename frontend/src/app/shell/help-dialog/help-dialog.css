@@ -406,16 +406,6 @@
   color: var(--help-muted);
 }
 
-.help-panel--split {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
-
-.help-panel__column {
-  min-width: 0;
-}
-
 .notes-list {
   margin: 0;
   padding-left: 1.2rem;
@@ -446,10 +436,6 @@
 
   .help-hero__badges {
     justify-content: flex-start;
-  }
-
-  .help-panel--split {
-    grid-template-columns: 1fr;
   }
 
   .applicability-boxes--header {

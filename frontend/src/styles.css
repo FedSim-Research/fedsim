@@ -1,6 +1,20 @@
 @import "primeicons/primeicons.css";
 
 :root {
+  color-scheme: dark;
+  --info: #60a5fa;
+  --info-hover: #93c5fd;
+  --warning: #facc15;
+  --cyan: #22d3ee;
+  --success: #34d399;
+  --success-hover: #6ee7b7;
+  --error: #ef4444;
+  --error-hover: #f87171;
+  --fg-rgb: 255 255 255;
+  --surface-rgb: 15 15 15;
+  --sidebar-bg: #000000;
+  --dashboard-bg: #090909;
+  --muted: var(--text-muted);
   --panel: #0b0b0b;
   --text: #ffffff;
   --text-muted: rgba(255, 255, 255, 0.6);
@@ -12,12 +26,26 @@
 }
 
 body.light-mode {
+  --muted: var(--text-muted);
+  color-scheme: light;
+  --info: #1d4ed8;
+  --info-hover: #1e40af;
+  --warning: #854d0e;
+  --cyan: #0e7490;
+  --success: #15803d;
+  --success-hover: #166534;
+  --error: #b91c1c;
+  --error-hover: #991b1b;
+  --fg-rgb: 17 24 39;
+  --surface-rgb: 255 255 255;
+  --sidebar-bg: #ffffff;
+  --dashboard-bg: #f8fafc;
   --panel: #ffffff;
   --text: #111827;
-  --text-muted: rgba(0, 0, 0, 0.5);
+  --text-muted: #4b5563;
   --border: rgba(0, 0, 0, 0.1);
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  --node-bg: rgba(235, 25, 25, 0.9);
+  --node-bg: #ffffff;
 
   --bg: #d4d4d8; /* Backgroundcolor */
 }

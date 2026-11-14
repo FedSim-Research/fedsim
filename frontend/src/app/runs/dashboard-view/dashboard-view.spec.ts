@@ -1,14 +1,17 @@
 import { TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { SecurityContext, signal } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
 import { SimulationRunResponse } from '../../api/graph-api.service';
 import { DashboardRunsService } from '../dashboard-runs.service';
 import { FrameworkJobsService } from '../framework-jobs.service';
 import { DashboardViewComponent } from './dashboard-view';
+import { ThemeService } from '../../shared/theme.service';
 
 describe('Dashboard server evaluation results', () => {
   const selectedRun = signal<SimulationRunResponse | null>(null);
 
   beforeEach(async () => {
+    document.body.classList.remove('light-mode');
     selectedRun.set(null);
     await TestBed.configureTestingModule({
       imports: [DashboardViewComponent],
@@ -20,6 +23,24 @@ describe('Dashboard server evaluation results', () => {
         } },
       ],
     }).compileComponents();
+  });
+
+  afterEach(() => document.body.classList.remove('light-mode'));
+
+  it('updates embedded dashboards when the shared theme changes', () => {
+    selectedRun.set({ run_id: 'theme-run', status: 'completed', architecture: 'hierfl',
+      started_at: '2026-11-14T10:00:00Z', finished_at: '2026-11-14T10:01:00Z' });
+    const fixture = TestBed.createComponent(DashboardViewComponent);
+    const sanitizer = TestBed.inject(DomSanitizer);
+    const theme = TestBed.inject(ThemeService);
+    const darkUrl = fixture.componentInstance.modelQualityTrendEmbed();
+    expect(sanitizer.sanitize(SecurityContext.RESOURCE_URL, darkUrl)).toContain('&theme=dark&');
+    theme.toggle();
+    const lightUrl = fixture.componentInstance.modelQualityTrendEmbed();
+    expect(sanitizer.sanitize(SecurityContext.RESOURCE_URL, lightUrl)).toContain('&theme=light&');
+    expect(lightUrl).not.toBe(darkUrl);
+    theme.toggle();
+    expect(fixture.componentInstance.modelQualityTrendEmbed()).toBe(darkUrl);
   });
 
   const serverEvaluation = (accuracy: number) => ({

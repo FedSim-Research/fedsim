@@ -30,7 +30,6 @@ export interface SpykerConfig {
   hIntra: number;
   sigmoidPhi: number;
   serverLearningRate: number;
-  tcpRtoDelay: number;
 }
 
 /** Everything needed to simulate one architecture. */
@@ -80,7 +79,6 @@ export function toStartRequest(graphId: number, config: ArchitectureRunConfig): 
       h_intra: spyker.hIntra,
       sigmoid_phi: spyker.sigmoidPhi,
       server_learning_rate: spyker.serverLearningRate,
-      tcp_rto_delay: spyker.tcpRtoDelay,
     },
   };
 }

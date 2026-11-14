@@ -17,7 +17,7 @@ class SpykerAlgorithmConfig:
     sigmoid_phi: float = 1.5
     server_learning_rate: float = 0.6
 
-    # --- TCP Simulation ---
+    # Reserved compatibility field; neither engine simulates TCP retransmissions.
     tcp_rto_delay: float = 0.2
 
 

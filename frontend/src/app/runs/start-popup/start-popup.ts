@@ -70,7 +70,6 @@ export class StartPopup implements OnInit {
     hIntra: 50,
     sigmoidPhi: 1.0,
     serverLearningRate: 0.1,
-    tcpRtoDelay: 0.2,
   };
 
   private lastPersistedSignature: string | null = null;
@@ -179,7 +178,6 @@ export class StartPopup implements OnInit {
           hIntra: this.spykerSettings.hIntra,
           sigmoidPhi: this.spykerSettings.sigmoidPhi,
           serverLearningRate: this.spykerSettings.serverLearningRate,
-          tcpRtoDelay: this.spykerSettings.tcpRtoDelay,
         },
       },
     });

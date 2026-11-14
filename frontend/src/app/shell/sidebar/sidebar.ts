@@ -1,5 +1,5 @@
 import { Component, HostListener, Output, inject, EventEmitter, ViewChild, ElementRef, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
-import { CommonModule, DOCUMENT } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StartPopup } from '../../runs/start-popup/start-popup';
 import { ResetButton } from '../../editor/reset-button/reset-button';
@@ -14,6 +14,7 @@ import { NodeEvents, NodeForward } from '../../editor/nodes/node-events.service'
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SimulationRequest } from '../../runs/simulation-request';
 import { Architecture, NodeKind } from '../../domain/topology';
+import { ThemeService } from '../../shared/theme.service';
 
 type SuperServerConfig = {
   name: string;
@@ -100,7 +101,7 @@ const DEFAULT_CLIENT_CONFIG: ClientConfig = {
 })
 export class SidebarComponent implements OnInit, OnChanges {
   public isOpen = true;
-  public isDarkMode = true;
+  public get isDarkMode(): boolean { return this.theme.isDark(); }
   public showSimulationpopup = false;
   public showResetPopup = false;
   public showViewGraphsDialog = false;
@@ -127,7 +128,7 @@ export class SidebarComponent implements OnInit, OnChanges {
 
   public architectureMenuOpen = false;
 
-  private readonly document = inject(DOCUMENT);
+  private readonly theme = inject(ThemeService);
   private readonly messageService = inject(MessageService);
   private readonly graphApi = inject(GraphApiService);
 
@@ -333,9 +334,7 @@ export class SidebarComponent implements OnInit, OnChanges {
   }
 
   public toggleTheme(): void {
-    this.isDarkMode = !this.isDarkMode;
-    if (this.isDarkMode) { this.document.body.classList.remove('light-mode'); }
-    else { this.document.body.classList.add('light-mode'); }
+    this.theme.toggle();
   }
 
   public onDragStart(event: DragEvent, kind: NodeKind): void {
