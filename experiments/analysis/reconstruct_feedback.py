@@ -10,11 +10,72 @@ import re
 import statistics
 import zipfile
 from collections import Counter, defaultdict
+from fractions import Fraction
 from pathlib import Path
 
 from generate_lr_ablation import Archive
 from generate_population_results import expected_client_servers, require
-from generate_primary_results import digest
+from generate_primary_results import digest, write_table
+
+
+def floor_assignments_per_wave(clients, base_rate, minimum_rate, beta):
+    """Count floor assignments in a complete post-initial equal-count wave."""
+    require(type(clients) is int and clients > 0, "Invalid server population")
+    require(
+        all(math.isfinite(value) for value in (base_rate, minimum_rate, beta))
+        and 0 < minimum_rate < base_rate
+        and beta >= 0,
+        "Invalid analytical-control rates",
+    )
+    if beta == 0:
+        return 0
+    # At processing position j, the count surplus is 1-j/N. Exact decimal
+    # rationals preserve the inclusive boundary independently of the trace rule.
+    threshold = (Fraction(str(base_rate)) - Fraction(str(minimum_rate))) / Fraction(str(beta))
+    return max(0, min(clients, math.floor(clients * (1 - threshold))))
+
+
+def summarize_client_floor(values, completed_waves):
+    """Describe client exposure without treating clients as independent seeds."""
+    require(completed_waves >= 2 and bool(values), "Incomplete client distribution")
+    maximum = completed_waves - 2
+    require(
+        all(type(value) is int and 0 <= value <= maximum for value in values), "Invalid floor count"
+    )
+    return {
+        "clients": len(values),
+        "completed_waves": completed_waves,
+        "minimum_client_floor_updates": min(values),
+        "maximum_client_floor_updates": max(values),
+        "clients_never_at_floor": sum(value == 0 for value in values),
+        "clients_at_every_eligible_floor": sum(value == maximum for value in values),
+        "maximum_eligible_floor_updates": maximum,
+        "total_completed_floor_updates": sum(values),
+    }
+
+
+def metric_scope(assigned_counts, per_server):
+    """Compare two summaries of the same models, without forming an ensemble."""
+    require(set(assigned_counts) == set(per_server), "Incomplete server metric mapping")
+    require(
+        all(type(value) is int and value > 0 for value in assigned_counts.values()),
+        "Invalid server weights",
+    )
+    scores = {sid: peer["accuracy"] for sid, peer in per_server.items()}
+    require(
+        all(math.isfinite(value) and 0 <= value <= 1 for value in scores.values()),
+        "Invalid server accuracy",
+    )
+    macro = statistics.mean(scores.values())
+    weighted = math.fsum(assigned_counts[sid] * score for sid, score in scores.items()) / sum(
+        assigned_counts.values()
+    )
+    return {
+        "server_macro_accuracy": macro,
+        "assigned_client_weighted_accuracy": weighted,
+        "minimum_server_accuracy": min(scores.values()),
+        "weighted_minus_macro_pp": 100 * (weighted - macro),
+    }
 
 
 def source_contract(archive):
@@ -125,6 +186,9 @@ def analyze(archive):
     rows = []
     clients_out = []
     logs_out = []
+    waves_out = []
+    distributions_out = []
+    metric_scope_out = []
     for segment in membership["segments"]:
         cases = {
             key: archive.cases[key]
@@ -139,6 +203,13 @@ def analyze(archive):
         }
         assignments = {key: expected_client_servers(case) for key, case in cases.items()}
         counts = {sid: Counter() for sid in ownership}
+        populations = {
+            sid: sum(server == sid for server in assignments[ownership[sid]].values())
+            for sid in ownership
+        }
+        wave_seen = {sid: set() for sid in ownership}
+        complete_waves = Counter()
+        equal_count_waves = {sid: True for sid in ownership}
         rates = defaultdict(dict)
         samples = {key: {"next": [], "completed": []} for key in cases}
         client_floor = {key: Counter() for key in cases}
@@ -177,6 +248,12 @@ def analyze(archive):
                 previous = rates[sid].get(cid, eta)
                 samples[key]["completed"].append(previous)
                 client_floor[key][cid] += int(previous == minimum)
+                if cid in wave_seen[sid]:
+                    equal_count_waves[sid] = False
+                wave_seen[sid].add(cid)
+                if len(wave_seen[sid]) == populations[sid]:
+                    complete_waves[sid] += 1
+                    wave_seen[sid].clear()
                 counts[sid][cid] += 1
                 mean = counts[sid].total() / len(counts[sid])
                 rate = (
@@ -197,7 +274,7 @@ def analyze(archive):
             )
             # Existing endpoint checks independently bind complete runs, four models,
             # counter totals, seeds, Loki records and checkpoint identity.
-            _, _, points = archive.endpoint(key)
+            _, evaluation, points = archive.endpoint(key)
             work = archive.work[key]
             require(
                 len(samples[key]["next"]) == work["delivered_updates"] == 14600,
@@ -245,7 +322,61 @@ def analyze(archive):
                 "Completed-rate shift does not match initial and final assignments",
             )
             rows.append(row)
+            metric_scope_out.append(
+                {
+                    "case": key,
+                    "placement": row["placement"],
+                    "seed": row["seed"],
+                    "beta": row["beta"],
+                    **metric_scope(Counter(assignments[key].values()), evaluation["per_server"]),
+                }
+            )
+            require(
+                all(
+                    equal_count_waves[sid] and not wave_seen[sid] and complete_waves[sid] == 73
+                    for sid in sid_list
+                ),
+                "Equal-count wave assumptions do not hold; do not apply the closed-form control",
+            )
+            cfg = case["request"]
+            expected_per_wave = sum(
+                floor_assignments_per_wave(
+                    populations[sid], cfg["training_config"]["lr"], minimum, row["beta"]
+                )
+                for sid in sid_list
+            )
+            require(
+                row["next_floor"] == 72 * expected_per_wave
+                and row["completed_floor"] == 71 * expected_per_wave,
+                "Trace reconstruction differs from independent equal-wave control",
+            )
+            waves_out.append(
+                {
+                    "case": key,
+                    "beta": row["beta"],
+                    "completed_waves_per_server": 73,
+                    "equal_count_wave_order_verified": True,
+                    "expected_floor_assignments_per_post_initial_wave": expected_per_wave,
+                    "expected_next_floor_assignments": 72 * expected_per_wave,
+                    "expected_completed_floor_updates": 71 * expected_per_wave,
+                    "observed_next_floor_assignments": row["next_floor"],
+                    "observed_completed_floor_updates": row["completed_floor"],
+                }
+            )
             for sid in sid_list:
+                distribution = summarize_client_floor(
+                    [client_floor[key][cid] for cid in counts[sid]], complete_waves[sid]
+                )
+                distributions_out.append(
+                    {
+                        "case": key,
+                        "placement": row["placement"],
+                        "seed": row["seed"],
+                        "beta": row["beta"],
+                        "server": sid,
+                        **distribution,
+                    }
+                )
                 for cid, updates in sorted(counts[sid].items()):
                     clients_out.append(
                         {
@@ -270,6 +401,11 @@ def analyze(archive):
             "manifest_sha256": digest(archive.root / "artifact-checksums.json"),
             "source_contract": contract,
             "logs": logs_out,
+        },
+        {
+            "wave_controls": waves_out,
+            "client_distributions": distributions_out,
+            "metric_scope": metric_scope_out,
         },
     )
 
@@ -331,6 +467,105 @@ def main():
     }
     (generated / "feedback-reconstruction-evidence.json").write_text(
         json.dumps(evidence, indent=2) + "\n", encoding="utf-8"
+    )
+    controls = [row for result in datasets for row in result[3]["wave_controls"]]
+    distributions = [row for result in datasets for row in result[3]["client_distributions"]]
+    metric_rows = [row for result in datasets for row in result[3]["metric_scope"]]
+    with (generated / "feedback-metric-scope-values.csv").open(
+        "w", newline="", encoding="utf-8"
+    ) as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(metric_rows[0]))
+        writer.writeheader()
+        writer.writerows(metric_rows)
+    cells = []
+    for beta in (0.05, 0.0):
+        for placement in ("balanced", "concentrated"):
+            members = [
+                row for row in metric_rows if row["beta"] == beta and row["placement"] == placement
+            ]
+            require(
+                len(members) == 3 and {row["seed"] for row in members} == {42, 43, 44},
+                "Incomplete metric-scope cell",
+            )
+            cells.append(
+                {
+                    "beta": beta,
+                    "placement": placement,
+                    "server_macro_mean_accuracy_pct": 100
+                    * statistics.mean(row["server_macro_accuracy"] for row in members),
+                    "assigned_client_weighted_mean_accuracy_pct": 100
+                    * statistics.mean(row["assigned_client_weighted_accuracy"] for row in members),
+                    "weighted_minus_macro_mean_pp": statistics.mean(
+                        row["weighted_minus_macro_pp"] for row in members
+                    ),
+                }
+            )
+    maximum_metric_change = max(abs(row["weighted_minus_macro_mean_pp"]) for row in cells)
+    (generated / "feedback-wave-numbers.tex").write_text(
+        f"\\newcommand{{\\MaximumMetricScopeMeanChangePP}}{{{maximum_metric_change:.2f}}}\n",
+        encoding="utf-8",
+    )
+    with (generated / "feedback-floor-distribution.csv").open(
+        "w", newline="", encoding="utf-8"
+    ) as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(distributions[0]))
+        writer.writeheader()
+        writer.writerows(distributions)
+    table_rows = []
+
+    def interval(values):
+        return str(min(values)) if min(values) == max(values) else f"{min(values)}--{max(values)}"
+
+    for population in (50, 20, 140):
+        members = [
+            row for row in distributions if row["beta"] == 0.05 and row["clients"] == population
+        ]
+        require(bool(members), "Missing server-size distribution")
+        table_rows.append(
+            [
+                str(population),
+                interval(
+                    [row["minimum_client_floor_updates"] for row in members]
+                    + [row["maximum_client_floor_updates"] for row in members]
+                ),
+                interval([row["clients_never_at_floor"] for row in members]),
+                interval([row["clients_at_every_eligible_floor"] for row in members]),
+            ]
+        )
+    write_table(
+        generated / "feedback-floor-distribution.tex",
+        "Reconstructed client exposure at $\\beta=0.05$. Ranges span constituent server-runs "
+        "across three seeds; each client delivers 73 updates. Zero/All 71 count clients per "
+        "server with zero/71 floor-rate updates. The 50-client servers are balanced; "
+        "20/140-client servers are concentrated.",
+        "tab:feedback-floor-distribution",
+        "rccc",
+        ["Clients/server", "Floor updates/client", "Zero", "All 71"],
+        table_rows,
+    )
+    wave_evidence = {
+        "scope": "Post-hoc analytical equal-wave control and descriptive client exposure from the same source-checked dispatch traces. No new training or optimizer-rate telemetry.",
+        "derivation": "After every client has participated, processing position j in a full equal-count wave has count surplus 1-j/N. Floor count is clamp(floor(N*(1-(eta0-etamin)/beta)),0,N) for beta>0. The first wave has active-client mean one and no floor; beta=0 has no floor for eta0>etamin. With R complete waves, next assignments count R-1 eligible waves and completed updates R-2.",
+        "assumptions_verified": [
+            "Each server's dispatch sequence consists of complete waves containing every assigned client exactly once",
+            "Each included case has 73 complete waves and no trailing partial wave",
+            "Base rate exceeds the positive floor; source-checked active-client mean excludes unseen clients",
+            "Trace reconstruction matches the independent exact-rational count for every included case",
+        ],
+        "interpretation": "Client exposure differs despite equal global floor counts. This is reconstructed control state; it does not measure optimizer execution, causal data influence, or identify the physical scheduling cause.",
+        "cases": controls,
+        "server_distributions": distributions,
+        "metric_scope_sensitivity": {
+            "primary_metric_retained": "server_macro_mean",
+            "alternative": "Assigned-client-count weighted mean of the same separately evaluated server model accuracies; not an ensemble score or independent client evaluations.",
+            "maximum_absolute_cell_mean_change_pp": maximum_metric_change,
+            "cells": cells,
+            "cases": metric_rows,
+        },
+        "inputs": [result[2] for result in datasets],
+    }
+    (generated / "feedback-wave-evidence.json").write_text(
+        json.dumps(wave_evidence, indent=2) + "\n", encoding="utf-8"
     )
     print(
         json.dumps(

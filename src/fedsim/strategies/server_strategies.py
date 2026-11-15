@@ -16,7 +16,7 @@ class SyncServerStrategy(ABC):
 
 
 class FedAvgSyncStrategy(SyncServerStrategy):
-    """Standard Federated Averaging (HierFAVG baseline)."""
+    """Sample-weighted FedAvg, used at both levels of a globally synchronized round."""
 
     def aggregate(
         self, global_weights: List[np.ndarray], updates: List[Tuple[List[np.ndarray], int]]

@@ -17,7 +17,7 @@ def estimate_transmission_time(
     """Estimate virtual transfer seconds from payload bytes and decimal Mbps."""
     rng = random if rng is None else rng
     # We treat packet loss as a reduction in effective throughput (TCP throughput model approximation)
-    # Assuming packet_loss_avg is a percentage (0.0 to 1.0).
+    # packet_loss_avg is a fraction in [0.0, 1.0].
     packet_loss = rng.gauss(
         network_metrics[metrics_id].packet_loss_avg,
         network_metrics[metrics_id].packet_loss_stddev,

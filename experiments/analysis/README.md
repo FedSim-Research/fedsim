@@ -177,6 +177,58 @@ frequency alone cannot explain their different accuracy response. This is
 source-implied control state, not captured optimizer telemetry, a unique causal
 attribution or an empirically calibrated intermediate penalty.
 
+The same command now checks the equal-count wave assumption against each server's
+dispatch sequence: every assigned client must occur exactly once before the next
+wave begins, with 73 complete waves and no partial remainder. For a server with
+`N` clients, position `j` after the first wave has update-count surplus `1-j/N`.
+Exact decimal-rational arithmetic gives the number of floor assignments as
+`floor(N * (1 - (eta0-etamin)/beta))`, clamped to `[0,N]`, for positive beta.
+The first wave has no floor because the mean contains only active clients.
+The independent formula predicts 160 assignments per later wave at beta=0.05:
+72 such waves give 11,520 next assignments, while only 71 contribute completed
+floor-rate updates. The script rejects the analytical comparison if its wave
+assumptions fail; it is not a claim about heterogeneous timing or arbitrary orders.
+
+Additive outputs are `feedback-wave-evidence.json`,
+`feedback-floor-distribution.csv` and `.tex`, `feedback-metric-scope-values.csv`,
+and `feedback-wave-numbers.tex`. The distribution retains all 48 server-run
+records across the twelve cases. At beta=0.05, the 140-client server has 14--15
+clients with no completed floor-rate updates and 96--99 with all 71 eligible
+updates at the floor, across the three seeds. The balanced 50-client servers
+have 34--70 floor-rate updates per client and no client at either extreme.
+This describes reconstructed exposure; it does not establish why clients occupy
+particular positions, how much their data affect a model, or an optimizer trace.
+
+The metric-scope CSV preserves the server macro mean and adds the assigned-client
+weighted mean and minimum server accuracy for the same separately evaluated
+models. Across the four placement/feedback cells, the largest absolute change
+in three-seed mean accuracy from weighting is 0.0355 percentage points. This is
+a descriptive sensitivity check, not an ensemble evaluation or a change of the
+primary metric. Raw measurements and the original reconstruction outputs remain
+unchanged.
+
+## Peer-age accounting
+
+```sh
+python experiments/analysis/generate_age_jump_audit.py --population ../experiment-runs/cifar10-population-cohort-20d5070-2026-11-14 --feedback ../experiment-runs/cifar10-lr-factorial-cohort-20d5070-2026-11-14 --network ../experiment-runs/cifar10-main-study-2f724ba-2026-11-13 --paper ../paper
+```
+
+The audit binds source, lock, original segment membership and each consumed log
+to the frozen archive manifests. Source AST checks establish initial age zero,
+one increment per client update, monotonic peer-age updates and the conditional
+positive-jump print. At each final periodic server snapshot, it independently
+checks `model_age = total_client_updates + sum(positive peer-age increments)`.
+All 84 server instances in the 24 accepted asynchronous runs satisfy this identity.
+Exact duplicate worker files and proven shorter prefix captures are counted once;
+conflicting copies and incomplete age accounting are rejected.
+
+Four additive outputs under `generated/` retain the proof, individual events,
+server summaries and descriptive groups: `age-jump-audit.json`,
+`age-jump-events.csv`, `age-jump-server-summary.csv` and
+`age-jump-group-summary.json`. They contain no current timestamps or absolute
+workspace paths. These observations establish counter transitions, not identical
+model parameters, per-client mixing coefficients or a causal effect on accuracy.
+
 ## Operational repeat audit
 
 ~~~powershell
@@ -187,6 +239,26 @@ The first excluded attempt contains only two completed cases, one per method at
 balanced seed42. These can be compared with their retained counterparts as an
 operational replay observation. They are never pooled as extra seeds or selected
 as better endpoints. One contrast per method does not estimate replay variance.
+
+The separate four-case check repeats balanced and concentrated seed42 cases at
+both feedback settings. Once its two calibration/measurement phases per setting
+are complete and sealed, run:
+
+```sh
+python experiments/analysis/analyze_operational_repeats.py --repeat-root ../experiment-runs/cifar10-operational-repeat-2026-11-15 --primary ../experiment-runs/cifar10-population-cohort-20d5070-2026-11-14 --feedback ../experiment-runs/cifar10-lr-factorial-cohort-20d5070-2026-11-14 --paper ../paper
+```
+
+This audit checks the producing source, image, dataset, planned partitions,
+captured inputs, initial metrics, exact Loki records and checkpoint inventory.
+It retains all four prespecified outcomes in `operational-repeat-grid.csv` and
+`.tex`, with provenance and separate original/repeat contrasts in
+`operational-repeat-grid-evidence.json`. Manifest-bound update-order digests
+separate global interleaving, server-local client order and timestamp changes;
+work counters are reported for both executions. Differences remain visible.
+These are physical reruns of one seed,
+not four additional independent seeds. They do not replace or enlarge the
+three-seed primary estimates, estimate replay variance or isolate a scheduling
+mechanism. A fresh output directory can be used instead of the paper directory.
 
 ## Short functional capacity probes
 

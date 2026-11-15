@@ -295,10 +295,15 @@ not suppress other peers' contributions. Client training continues while the
 server exchange is in progress.
 
 The initiator releases the token only after aggregating every peer's response.
+The token holder checks thresholds on token arrival and each local client update;
+an idle handoff adds a configurable heartbeat (default 1 s), while a completed
+exchange hands off immediately, with network delay in both cases.
 Duplicate, self-originated, and unknown-sender model messages cannot complete
 the round. IDs use an increasing counter per initiating actor, independently
 of model age. The duplicate cache retains up to 1,000 recent rounds and protects
 the active round from eviction; arbitrarily old duplicates are not covered.
+The completed-round counter is local to a server, so summing it counts participant
+completions rather than initiated exchanges.
 
 The existing model-weighting formula, integer monotonic model ages, and token
 circulation policy are retained. Peer aggregation remains asynchronous and
@@ -307,3 +312,7 @@ equivalence with the original Spyker implementation or validate paper results.
 The scheduler assigns tie-breaking sequence IDs when callbacks complete.
 Fixed seeds therefore do not by themselves guarantee identical event order
 across runs.
+
+Independent reference tests cover hand-computed client/peer blends, floor counts
+and token cadence, including the case where an identical peer model changes the
+age counter and dampens a pending client update.

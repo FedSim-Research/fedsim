@@ -53,9 +53,6 @@ class SpykerServer(BaseAsyncServer):
         self.client_update_counts: Dict[str, int] = {}
         self.total_client_updates_processed = 0
 
-        # Self-Reference for scheduling events back to this actor
-        self.self_ref = None
-
         # A round includes our own broadcast and one contribution per peer.
         self._sync_participants: OrderedDict[str, set[str]] = OrderedDict()
         self._sync_sequence = 0
@@ -119,7 +116,11 @@ class SpykerServer(BaseAsyncServer):
         self.has_token = is_holder
 
     def get_metrics(self) -> Dict[str, Any]:
-        """Returns Spyker specific metrics for telemetry."""
+        """Return local counters; each server counts its own completed exchanges.
+
+        Summing round completions over all servers counts one completion per
+        participant, not one per token-initiated exchange.
+        """
         return {
             "model_age": self.model_age,
             "total_client_updates": sum(self.client_update_counts.values()),
@@ -291,7 +292,13 @@ class SpykerServer(BaseAsyncServer):
         delta_age = sender_age - self.model_age
         denominator = max(1, self.model_age)
         a_val = (self.spyker_config.sigmoid_phi * delta_age) / denominator
-        sigmoid_w = 1.0 / (1.0 + math.exp(-a_val))
+        try:
+            sigmoid_w = 1.0 / (1.0 + math.exp(-a_val))
+        except OverflowError:
+            # Preserve the normal-range expression and resolve the negative tail
+            # without overflowing exp(-a_val) or dropping representable weights.
+            exp_a = math.exp(a_val)
+            sigmoid_w = exp_a / (1.0 + exp_a)
 
         # Aggregation as in SPYKER: W = W + eta_server * sigmoid * (W_peer - W)
         effective_alpha = self.spyker_config.server_learning_rate * sigmoid_w
