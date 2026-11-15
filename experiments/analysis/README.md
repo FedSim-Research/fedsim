@@ -222,7 +222,7 @@ JSON and TeX numerical macros retain that scope.
 
 The three learning figures use shared `figure_style.py`: single-column
 3.45-by-3.65-inch canvases with two vertically stacked panels, conventional
-Matplotlib typography (DejaVu Sans), the original report's green/blue method colors, black
+Matplotlib typography (DejaVu Sans), the shared green/blue method colors, black
 box axes, ordinary grids and framed legends. Both 200-client figures use the
 same labeled 0--40% range; the separate network figure uses 0--85%. Every y axis
 starts at zero. Different ranges must not be read as a cross-cohort effect
@@ -240,7 +240,7 @@ Selected tables fit one column through shorter, caption-defined labels rather
 than smaller fonts. The work table omits repeated plus/minus-zero suffixes and
 states explicitly that all counts agree across three seeds. Full-precision CSV
 and JSON outputs are unchanged. The two original PNG plots remain unmodified;
-the manuscript displays each at normal column width, as in the original report.
+the manuscript displays each at normal column width.
 Only outer white margins of the original PNGs are trimmed in TeX; axes, labels
 and plotted data remain intact. References start on their own final page;
 the preceding body page closes with balanced columns. Neither data points
