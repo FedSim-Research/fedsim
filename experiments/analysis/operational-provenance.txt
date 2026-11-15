@@ -1,0 +1,23 @@
+FedSim operational provenance accompanying the main manuscript
+=============================================================
+
+The following retained source text records operational boundaries of the measured cohorts. It was moved out of the scientific narrative on 15 November 2026; no measured cases, exclusions or input definitions were changed. All original raw archives, manifests, restart records and source snapshots remain authoritative.
+
+\subsection{Execution and Evidence Capture}
+The 200-client and learning-rate cohorts use revision \texttt{20d507096582}; the six-client network cohort uses \texttt{2f724ba1767e}. All execute on a Ryzen 7 3800X workstation (eight physical cores, 16 logical threads), in Linux containers under WSL2, without GPU training or evaluation. The 200-client container exposes 16 logical CPUs and has a 22 GiB RAM limit with a 2 GiB Ray object store; the six-client container exposes four CPUs with a 12 GiB limit and 512 MiB object store. Training workers use one Torch thread each. These are configured execution budgets, not isolated hardware-throughput measurements.
+
+The locked runtime uses Python 3.14.10, PyTorch 2.15.0+cpu, Ray 2.60.0, Flower Datasets 0.6.1 and datasets 4.8.5. Cached CIFAR-10 provenance records Hugging Face revision \texttt{0b2714987fa4}; files are hashed before and after execution. Planned physical row assignments for all seeds are reconstructed using production partition code and archived; they are not actor-level runtime exports. The source ZIP, dependency-lock hash, container identity and installed package/source agreement are checked.
+
+Jobs execute sequentially through the production HTTP API; method order alternates by seed. Each frozen definition is checked against its submitted plan. Raw periodic metrics, individual server checkpoints and protocol counters are retained under exact run identities. Automatic Loki records are queried and compared with the API metrics, without manually inserting evaluation points. The observer copies checkpoints before advancing.
+
+An initial operational attempt stopped after a Windows file-replacement lock and is excluded. The retained measurements span four source-matched execution segments after an observer read failure and host-memory-guard interruptions. All completely verified cases are retained: six, four, one and one from the successive segments. Only unfinished cases are restarted; interrupted attempts, including segments with no complete measurement, are excluded. Source, original plan, dataset, seeds and allocated CPU/RAM remain identical. Case origins, original-container worker logs and raw segment manifests record these operational boundaries. File-access retries, memory guards and logged WSL clean-cache reclamation and free-page compaction manage execution without changing backend code, resource limits or scientific inputs. No results are selected by accuracy.
+
+The feedback follow-up spans two source-matched segments after a Ray reference-count assertion interrupted concentrated seed43. All four completed measurements are retained; only the failed case and the previously unsubmitted seed44 are executed in the second segment. The partial failed execution is excluded, and the cohort records both original manifests and per-case origins. Its precise failure cause is unresolved; restarting is not evidence of a fix.
+
+
+
+Capacity-probe provenance
+-------------------------
+The pre-commit capacity image is resolved post hoc to the same 70 runtime Python files and dependency lock as revision \texttt{20d507096582}, including a direct installed-package check; its original candidate provenance is retained. This equivalence concerns executed code, not a retroactive claim of a clean committed launch.
+
+The first excluded operational campaign contains one completed balanced seed-42 run per method. Comparing these with their retained counterparts under the same declared source, plan, data and resource budget yields absolute endpoint differences of \OperationalHierReplayAbsoluteDifference\ percentage points for HierFL and \OperationalSpykerReplayAbsoluteDifference\ for the asynchronous mean. These single operational contrasts are excluded from all seed statistics and do not estimate replay variance. They illustrate why fixed seeds and nominal budgets should not be described as a guarantee of bitwise asynchronous replay.

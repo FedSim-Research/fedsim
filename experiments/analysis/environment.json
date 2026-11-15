@@ -1,0 +1,18 @@
+{
+  "recorded_at": "2026-11-14T20:25:27.532127+00:00",
+  "python": "3.14.10 (main, Oct 26 2026, 14:10:46) [MSC v.1944 64 bit (AMD64)]",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "packages": {
+    "matplotlib": "3.11.2",
+    "numpy": "2.5.4",
+    "pillow": "13.0.0",
+    "fonttools": "4.68.0",
+    "contourpy": "1.4.0",
+    "cycler": "0.12.1",
+    "kiwisolver": "1.5.1",
+    "packaging": "26.3",
+    "pyparsing": "3.3.3",
+    "python-dateutil": "4.0.0"
+  },
+  "scope": "Environment used for these derived tables/plots; distinct from the frozen simulation image. Plot PDFs omit creation/modification dates; asynchronous training replay is not claimed bitwise."
+}

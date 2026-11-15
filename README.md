@@ -27,8 +27,10 @@ checkpoints, and evaluation logs are stored in the ignored `var/` directory.
 
 The current implementation uses IID partitions and a fixed CNN, with CIFAR-10 as
 the baseline dataset. Training clients run on CPU. The optional GPU deployment
-supports evaluation. Additional dataset paths and the semantics of comparisons
-between engines still need validation before drawing scientific conclusions.
+supports evaluation. The accompanying research studies use scoped CIFAR-10
+configurations; their results concern those update policies and execution budgets,
+rather than a general ranking of federated-learning architectures. Additional
+dataset paths, non-IID workloads and physical timing calibration remain unvalidated.
 
 ## Documentation
 
@@ -40,6 +42,11 @@ between engines still need validation before drawing scientific conclusions.
 - [Third-party notices](THIRD_PARTY_NOTICES.md): dependency and source attributions.
 
 ## Citation
+
+The accompanying [analysis scripts](experiments/analysis/README.md) regenerate
+manuscript results from verified experiment archives. The artifact deposit under
+reserved Zenodo DOI
+**10.5281/zenodo.24245352** is being prepared and is not yet published.
 
 Use [CITATION.cff](CITATION.cff) to cite the software. Record the source commit
 and dependency lockfile with your experiment results.
