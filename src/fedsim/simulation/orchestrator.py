@@ -1,4 +1,5 @@
 import heapq
+import os
 import queue
 import threading
 from typing import Dict, List
@@ -6,6 +7,10 @@ from typing import Dict, List
 import ray
 
 from fedsim.simulation.event import Event
+
+
+def _event_log_enabled() -> bool:
+    return os.environ.get("FEDSIM_EVENT_LOG", "on").strip().lower() != "off"
 
 
 @ray.remote(num_cpus=0, num_gpus=0)
@@ -16,11 +21,14 @@ class SimulationOrchestrator:
         self.global_virtual_time: float = 0.0
         self._sequence_counter: int = 0
 
-        self._log_queue = queue.Queue()
-        self._log_thread = threading.Thread(
-            target=self._log_worker, daemon=True, name="AsyncLogger"
-        )
-        self._log_thread.start()
+        self._event_log_on = _event_log_enabled()
+        self._log_queue = None
+        if self._event_log_on:
+            self._log_queue = queue.Queue()
+            self._log_thread = threading.Thread(
+                target=self._log_worker, daemon=True, name="AsyncLogger"
+            )
+            self._log_thread.start()
 
     def add_event(self, delay: float, actor_ref, method_name: str, payload, refs=None):
         """Used externally to seed the initial simulation events."""
@@ -58,7 +66,8 @@ class SimulationOrchestrator:
                     event = heapq.heappop(self._event_heap)
                     actor_ref, method_name, payload, refs = event.callback
 
-                    self._log_queue.put((self.global_virtual_time, payload))
+                    if self._event_log_on:
+                        self._log_queue.put((self.global_virtual_time, payload))
 
                     # Dispatch to the Ray cluster asynchronously
                     kwargs = {} if refs is None else {"direct_refs": refs}
