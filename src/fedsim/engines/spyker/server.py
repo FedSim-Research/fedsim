@@ -70,6 +70,8 @@ class SpykerServer(BaseAsyncServer):
         # RcvAge: announce once per sync epoch; reset whenever a new exchange round starts
         self._age_announced = False
         self._sync_timeouts = 0
+        # Latest scheduled arrival per peer (only used when fifo_links is on)
+        self._last_arrival: Dict[str, float] = {}
 
         # The current broadcast ID
         self.current_bid: str = ""
@@ -547,6 +549,13 @@ class SpykerServer(BaseAsyncServer):
         )
 
         final_delay = delay + added_delay
+        if self.spyker_config.fifo_links:
+            # Spyker assumes FIFO links: never deliver before an earlier message to this peer.
+            arrival = max(
+                self.current_virtual_time + final_delay, self._last_arrival.get(target_id, 0.0)
+            )
+            self._last_arrival[target_id] = arrival
+            final_delay = arrival - self.current_virtual_time
 
         payload["sender_id"] = self.server_id
         payload["type"] = msg_type

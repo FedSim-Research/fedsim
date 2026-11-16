@@ -318,6 +318,17 @@ def test_peer_merge_age_modes(servers, mode, expected):
         assert server.model_age == expected
 
 
+@pytest.mark.parametrize("fifo", [False, True])
+def test_fifo_links_keep_send_order_per_peer(servers, fifo):
+    server = servers["A"]
+    server.spyker_config.fifo_links = fifo
+    # The 1 kB token is slower than the 8-byte test model, so it would be overtaken.
+    server._send_server_message("B", "TOKEN", {})
+    server._send_server_message("B", "MODEL_BROADCAST", {})
+    token, model = (event[0] for event in server._get_and_clear_events())
+    assert (model >= token) is fifo
+
+
 def test_incomplete_sync_releases_token_after_timeout(servers):
     holder = servers["A"]
     holder.spyker_config.sync_timeout = 2.0

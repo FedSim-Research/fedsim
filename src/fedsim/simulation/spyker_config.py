@@ -17,6 +17,8 @@ class SpykerAlgorithmConfig:
     h_intra: int = 350
     # RcvAge (Zuo et al. 2024, Alg. 2): servers without the token announce threshold drift.
     age_announcements: bool = False
+    # Deliver server-to-server messages in send order per link, as Spyker assumes.
+    fifo_links: bool = False
     # Virtual seconds after which an incomplete exchange round releases the token; None waits.
     sync_timeout: float | None = None
 

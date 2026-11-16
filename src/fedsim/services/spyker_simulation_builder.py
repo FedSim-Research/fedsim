@@ -170,6 +170,7 @@ def _require_spyker_config(spyker_config: dict[str, Any] | None) -> dict[str, An
         "tcp_rto_delay": parse_nonnegative_float,
         "sample_weighting": parse_bool,
         "age_announcements": parse_bool,
+        "fifo_links": parse_bool,
         "sync_timeout": parse_positive_float,
         "h_inter": parse_h_inter,
         "h_intra": parse_positive_int,

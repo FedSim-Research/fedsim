@@ -49,6 +49,7 @@ class SpykerParameters(BaseModel):
     sample_weighting: StrictBool = False
     age_merge: Literal["monotonic", "weighted"] = "monotonic"
     age_announcements: StrictBool = False
+    fifo_links: StrictBool = False
     sync_timeout: Annotated[float, Field(gt=0, allow_inf_nan=False)] | None = None
     min_learning_rate: PositiveFloat
     h_inter: PositiveInt | Literal["auto"]

@@ -143,7 +143,7 @@ def _validate_spyker_payload(
         _parse_float_gt_zero(server_learning_rate, "spyker_invalid_server_learning_rate")
     if tcp_rto_delay is not None:
         _parse_float_ge_zero(tcp_rto_delay, "spyker_invalid_tcp_rto_delay")
-    for key in ("sample_weighting", "age_announcements"):
+    for key in ("sample_weighting", "age_announcements", "fifo_links"):
         if spyker_config.get(key) is not None:
             parse_bool(spyker_config[key], f"spyker_invalid_{key}")
     if spyker_config.get("sync_timeout") is not None:

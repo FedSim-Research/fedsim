@@ -50,6 +50,7 @@ class SpykerAlgorithmConfig(BaseModel):
     sample_weighting: bool | None = None
     age_merge: Literal["monotonic", "weighted"] | None = None
     age_announcements: bool | None = None
+    fifo_links: bool | None = None
     sync_timeout: float | None = None
     min_learning_rate: float | None = None
     h_inter: int | Literal["auto"] | None = None
