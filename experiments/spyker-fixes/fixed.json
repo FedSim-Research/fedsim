@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "name": "spyker-fixes-fixed",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "scenarios": {
+    "balanced": [
+      50,
+      50,
+      50,
+      50
+    ],
+    "concentrated": [
+      140,
+      20,
+      20,
+      20
+    ]
+  },
+  "run_time_limit": 60,
+  "eval_interval": 10,
+  "epochs": 1,
+  "lr": 0.01,
+  "batch_size": 32,
+  "model_complexity": 1,
+  "client_compute_factor": 500,
+  "phase": "measurement",
+  "network": {
+    "client_upload_mbps": [
+      100,
+      100,
+      100,
+      100
+    ],
+    "client_download_mbps": [
+      100,
+      100,
+      100,
+      100
+    ],
+    "server_upload_mbps": [
+      100,
+      100,
+      100,
+      100
+    ],
+    "server_download_mbps": [
+      100,
+      100,
+      100,
+      100
+    ],
+    "client_latency_ms": [
+      10,
+      10,
+      10,
+      10
+    ],
+    "server_latency_ms": 100
+  },
+  "spyker_config": {
+    "decay_beta": 0.05,
+    "min_learning_rate": 1e-06,
+    "h_inter": 5,
+    "h_intra": 4,
+    "sigmoid_phi": 1.5,
+    "server_learning_rate": 0.6,
+    "tcp_rto_delay": 0.2,
+    "decay_mode": "relative",
+    "staleness_mode": "delta"
+  },
+  "require_peer_exchange": true
+}
