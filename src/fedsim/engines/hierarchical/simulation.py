@@ -173,11 +173,9 @@ class HierarchicalSimulation:
 
     def _spawn_actors(self):
         """Spawns the SuperServer and EdgeServer actors on the Ray cluster."""
-        first_edge = self.edge_ids[0]
-        if not self.client_map[first_edge]:
-            raise ValueError(
-                "First edge server must have at least one client to initialize global model."
-            )
+        for eid in self.edge_ids:
+            if not self.client_map[eid]:
+                raise ValueError(f"Edge server {eid} must have at least one client.")
 
         dummy_model = Net(seed=self.seed)
         initial_weights = [val.cpu().numpy() for _, val in dummy_model.state_dict().items()]

@@ -165,6 +165,14 @@ export class GraphValidatorService {
           break;
         }
       }
+      const clientIds = new Set(clientNodes.map((n) => n.id));
+      for (const server of serverNodes) {
+        const neighbors = adjacency.get(server.id) ?? new Set<string>();
+        if (![...neighbors].some((id) => clientIds.has(id))) {
+          errors.push('hierfl: each Server must have at least one Client');
+          break;
+        }
+      }
     }
 
     for (const client of clientNodes) {

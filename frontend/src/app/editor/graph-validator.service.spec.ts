@@ -81,6 +81,17 @@ describe('Spyker topology validation', () => {
     expect(errors.some((error) => error.includes('epochs'))).toBe(true);
   });
 
+  it('rejects a hierarchical Server without Clients', () => {
+    const nodes = [
+      node('S', 'SuperServerNode'), node('A', 'ServerNode'), node('idle', 'ServerNode'),
+      node('client', 'ClientNode'),
+    ];
+    const edges = [edge('A', 'S'), edge('idle', 'S'), edge('client', 'A')];
+    expect(validator.validateSimulationRequest('hierfl', nodes, edges, config)).toContain(
+      'hierfl: each Server must have at least one Client',
+    );
+  });
+
   it.each([['pingMs', null, 'ping'], ['packetloss', false, 'packetloss']])(
     'rejects nonnumeric edge control %s', (field, value, keyword) => {
       const link = edge('client', 'A');

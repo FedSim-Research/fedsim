@@ -83,6 +83,29 @@ def test_builders_reject_disconnected_clients(architecture):
         builder(graph, training_config={"epochs": 1, "lr": 0.01})
 
 
+def test_hierfl_rejects_edge_server_without_clients():
+    graph = topology("hierfl")
+    graph.nodes.append(
+        Node(
+            id="idle",
+            type="ServerNode",
+            config_json=json.dumps({"computeFactor": 10, "uploadMbps": 5, "downloadMbps": 20}),
+            position_json='{"x": 0, "y": 0}',
+        )
+    )
+    graph.edges.append(
+        Edge(
+            source_node_id="coordinator",
+            target_node_id="idle",
+            config_json=json.dumps(
+                {"pingMs": 10, "jitterMs": 0, "packetloss": 0, "packetlossStddev": 0}
+            ),
+        )
+    )
+    with pytest.raises(ValueError, match="hierfl_server_requires_clients"):
+        build_hierfl_simulation(graph, training_config={"epochs": 1, "lr": 0.01})
+
+
 @pytest.mark.parametrize("complete", [False, True])
 def test_spyker_requires_direct_links_between_every_pair_of_servers(complete):
     graph = topology("spyker")
