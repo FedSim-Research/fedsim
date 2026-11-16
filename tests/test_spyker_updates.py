@@ -108,3 +108,16 @@ def test_aggregate_delta():
         [np.array([1.0, 2.0])], [np.array([3.0, 3.0])], [np.array([1.0, 1.0])], alpha=0.5
     )
     np.testing.assert_allclose(result[0], [2.0, 3.0])
+
+
+def test_delta_staleness_survives_overlapping_dispatch(make_server, monkeypatch):
+    server = make_server(staleness_mode="delta")
+    monkeypatch.undo()
+    monkeypatch.setattr(server.__class__, "_schedule_event", lambda *a, **k: None, raising=False)
+    server.assigned_client_instances = {"c": object()}
+    server.model_age = 1
+    server._schedule_client_task("c")
+    server.global_model_weights = [np.array([4.0])]
+    server._cached_global_weights_ref = None
+    server._schedule_client_task("c")
+    assert update(server, 4.0, ref_age=0) == pytest.approx(4.0)

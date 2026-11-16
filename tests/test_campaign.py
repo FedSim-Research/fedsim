@@ -621,3 +621,17 @@ def test_status_transport_errors_are_retried_without_repeating_submissions(monke
     with pytest.raises(requests.HTTPError):
         campaign._request(client, "GET", "http://backend/runs/missing")
     assert client.request.call_count == 1
+
+
+def test_runtime_sigma_is_written_to_client_nodes():
+    plan = campaign.build_plan(config(client_runtime_sigma=0.02), "sigma-test")
+    for case in plan["cases"]:
+        clients = [n for n in case["graph"]["nodes"] if n["type"] == "ClientNode"]
+        assert clients and all(n["data"]["config"]["performanceSigma"] == 0.02 for n in clients)
+
+
+def test_zero_runtime_sigma_leaves_plan_unchanged():
+    assert json.dumps(campaign.build_plan(config(), "sigma-test")) == json.dumps(
+        campaign.build_plan(config(client_runtime_sigma=0.0), "sigma-test")
+    )
+    assert "client_runtime_sigma" not in campaign.build_plan(config(), "sigma-test")["config"]

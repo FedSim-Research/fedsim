@@ -75,6 +75,7 @@ class CampaignConfig(BaseModel):
     batch_size: PositiveInt
     model_complexity: PositiveFloat
     client_compute_factor: PositiveFloat
+    client_runtime_sigma: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0
     spyker_config: SpykerParameters | None = None
     require_peer_exchange: Annotated[bool, Field(strict=True)] | None = None
 
@@ -209,6 +210,8 @@ def build_plan(config: CampaignConfig, campaign_id: str) -> dict:
                 for node in graph["nodes"]:
                     if node["type"] == "ClientNode":
                         node["data"]["config"]["computeFactor"] = config.client_compute_factor
+                        if config.client_runtime_sigma > 0:
+                            node["data"]["config"]["performanceSigma"] = config.client_runtime_sigma
                 cases.append(
                     {
                         "key": key,
@@ -249,8 +252,8 @@ def build_plan(config: CampaignConfig, campaign_id: str) -> dict:
     return {
         "schema_version": 1,
         "campaign_id": campaign_id,
-        # Keep saved v1 plans without the optional controls byte-compatible.
-        "config": config.model_dump(exclude_none=True),
+        # Keep saved v1 plans without the optional controls (unset or default) byte-compatible.
+        "config": config.model_dump(exclude_none=True, exclude_defaults=True),
         "cases": cases,
     }
 
@@ -324,11 +327,13 @@ def _calibration_review(path: Path, config: CampaignConfig) -> dict:
         "batch_size",
         "model_complexity",
         "client_compute_factor",
+        "client_runtime_sigma",
         "spyker_config",
         "require_peer_exchange",
     ):
         # Compare in the plan's own serialization, which omits unset optional controls.
-        if pilot["config"].get(field) != config.model_dump(exclude_none=True).get(field):
+        planned = config.model_dump(exclude_none=True, exclude_defaults=True)
+        if pilot["config"].get(field) != planned.get(field):
             raise ValueError("campaign_calibration_conditions_mismatch")
     if next(iter(pilot["config"]["scenarios"].values())) not in config.scenarios.values():
         raise ValueError("campaign_calibration_topology_mismatch")
