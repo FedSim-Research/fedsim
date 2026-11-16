@@ -53,9 +53,6 @@ class SpykerServer(BaseAsyncServer):
         self.client_update_counts: Dict[str, int] = {}
         self.total_client_updates_processed = 0
 
-        # Self-Reference for scheduling events back to this actor
-        self.self_ref = None
-
         # A round includes our own broadcast and one contribution per peer.
         self._sync_participants: OrderedDict[str, set[str]] = OrderedDict()
         self._sync_sequence = 0
