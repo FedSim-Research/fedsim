@@ -198,6 +198,7 @@ def build_spyker_simulation(
     eval_interval: float | None = None,
     partitioning: str | None = None,
     labels_per_client: int | None = None,
+    local_holdout: float | None = None,
 ):
     SpykerSimulation, _, _ = _import_spyker()
     validate_spyker_graph(graph)
@@ -231,6 +232,7 @@ def build_spyker_simulation(
         seed=seed,
         partitioning=partitioning or "iid",
         labels_per_client=labels_per_client,
+        **({} if local_holdout is None else {"local_holdout": local_holdout}),
     )
     sim.set_configurations(
         spyker_params=algorithm_config,

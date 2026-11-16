@@ -6,7 +6,7 @@ import ray
 import torch
 
 from fedsim.engines.spyker.server import SpykerServer
-from fedsim.learning import Net, get_dataset_provider
+from fedsim.learning import DEFAULT_LOCAL_HOLDOUT, Net, get_dataset_provider
 from fedsim.runtime import ensure_ray_initialized
 from fedsim.simulation.context import SimulationContext, set_global_context
 from fedsim.simulation.cpu_execution import get_cpu_execution_pool
@@ -26,12 +26,14 @@ class SpykerSimulation:
         seed: int | None = None,
         partitioning: str = "iid",
         labels_per_client: int | None = None,
+        local_holdout: float = DEFAULT_LOCAL_HOLDOUT,
     ):
         self.dataset_id = dataset_id
         self.gpu_budget = gpu_budget
         self.seed = seed
         self.partitioning = partitioning
         self.labels_per_client = labels_per_client
+        self.local_holdout = local_holdout
         self.server_ids = []
         self.client_ids = []
 
@@ -286,6 +288,7 @@ class SpykerSimulation:
                 self.seed,
                 self.partitioning,
                 self.labels_per_client,
+                self.local_holdout,
             ),
         )
 

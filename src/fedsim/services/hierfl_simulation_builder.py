@@ -176,6 +176,9 @@ def build_hierfl_simulation(
     eval_interval: float | None = None,
     partitioning: str | None = None,
     labels_per_client: int | None = None,
+    local_holdout: float | None = None,
+    edge_rounds: int | None = None,
+    aggregation_delay: bool | None = None,
 ):
     HierarchicalSimulation, Network, _ = _import_hierfl()
     validate_hierfl_graph(graph)
@@ -208,6 +211,16 @@ def build_hierfl_simulation(
         seed=seed,
         partitioning=partitioning or "iid",
         labels_per_client=labels_per_client,
+        # Unset optional controls keep the engine defaults.
+        **{
+            key: value
+            for key, value in {
+                "local_holdout": local_holdout,
+                "edge_rounds": edge_rounds,
+                "aggregation_delay": aggregation_delay,
+            }.items()
+            if value is not None
+        },
     )
     sim.set_metadata(
         run_id=run_id or "unknown_run",

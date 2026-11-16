@@ -24,6 +24,7 @@ class EdgeServer(BaseAsyncServer):
         super_server_ref: ray.ObjectRef,
         min_clients_per_round: int,
         context: SimulationContext,
+        edge_rounds: int = 1,
     ):
         set_global_context(context)
 
@@ -33,6 +34,8 @@ class EdgeServer(BaseAsyncServer):
         self.super_server_id = super_server_id
         self.super_server_ref = super_server_ref
         self.min_clients_per_round = min_clients_per_round
+        self.edge_rounds = edge_rounds
+        self.edge_rounds_done = 0
 
         self.assigned_client_instances: Dict[str, ClientHandle] = {}
 
@@ -80,31 +83,32 @@ class EdgeServer(BaseAsyncServer):
             self.global_model_weights = direct_refs
             self.model_age = data["model_age"]
             self.training_config = data["training_config"]
-
-            local_config = self.training_config.copy()
-            local_config["server_id"] = self.server_id
-            local_config["model_age"] = self.model_age
-            target_ref = self.self_ref if self.self_ref else ray.get_runtime_context().current_actor
-
-            weights_ref = ray.put(self.global_model_weights)
-
-            for (
-                client_id,
-                virtual_client_actor,
-            ) in self.assigned_client_instances.items():
-                self._schedule_event(
-                    delay=0.0,
-                    target_actor=virtual_client_actor,
-                    event_type="START_FIT",
-                    data={
-                        "config": local_config,
-                        "server_id": self.server_id,
-                        "server_ref": target_ref,
-                    },
-                    refs=weights_ref,
-                )
+            self.edge_rounds_done = 0
+            self._dispatch_clients()
         else:
             raise ValueError(f"[Edge Server {self.server_id}] Unknown event type: {event_type}")
+
+    def _dispatch_clients(self):
+        """Send START_FIT with the current edge model to all assigned clients."""
+        local_config = self.training_config.copy()
+        local_config["server_id"] = self.server_id
+        local_config["model_age"] = self.model_age
+        target_ref = self.self_ref if self.self_ref else ray.get_runtime_context().current_actor
+
+        weights_ref = ray.put(self.global_model_weights)
+
+        for virtual_client_actor in self.assigned_client_instances.values():
+            self._schedule_event(
+                delay=0.0,
+                target_actor=virtual_client_actor,
+                event_type="START_FIT",
+                data={
+                    "config": local_config,
+                    "server_id": self.server_id,
+                    "server_ref": target_ref,
+                },
+                refs=weights_ref,
+            )
 
     def on_client_update(self, data: Dict[str, Any], direct_refs: Any = None):
         client_id = data["client_id"]
@@ -131,6 +135,15 @@ class EdgeServer(BaseAsyncServer):
         aggregated_weights = self.aggregation_strategy.aggregate(
             global_weights=self.global_model_weights, updates=updates_list
         )
+        self.client_updates_buffer.clear()
+
+        # HierFAVG (Liu et al. 2020): repeat edge rounds before reporting upstream.
+        self.edge_rounds_done += 1
+        if self.edge_rounds_done < self.edge_rounds:
+            self.global_model_weights = aggregated_weights
+            self._dispatch_clients()
+            return
+        self.edge_rounds_done = 0
 
         # Optimize cross-node transfer
         weights_ref = ray.put(aggregated_weights)

@@ -7,6 +7,7 @@ import ray
 
 from fedsim.clients.handle import ClientHandle
 from fedsim.engines.base import BaseAsyncServer
+from fedsim.simulation.compute_model import estimate_aggregation_time
 from fedsim.simulation.context import SimulationContext, set_global_context
 from fedsim.simulation.network_model import estimate_transmission_time
 from fedsim.simulation.spyker_config import FullConfiguration
@@ -217,7 +218,16 @@ class SpykerServer(BaseAsyncServer):
         else:
             self._announce_age_if_drifting()
 
-        self._schedule_client_task(client_id)
+        if self.spyker_config.aggregation_delay:
+            delay = estimate_aggregation_time(
+                self.context.get_server_spec(self.server_id),
+                1,
+                self._get_model_size_bytes(),
+                rng=self.random_streams.stream("aggregation"),
+            )
+            self._schedule_client_task(client_id, delay=delay)
+        else:
+            self._schedule_client_task(client_id)
 
     def on_server_message(self, data: Any, direct_refs: Any = None):
         msg_type = data["type"]
@@ -470,7 +480,7 @@ class SpykerServer(BaseAsyncServer):
 
     # =====================================================================
 
-    def _schedule_client_task(self, client_id):
+    def _schedule_client_task(self, client_id, delay: float = 0.0):
         train_config = self.full_config.training
 
         client_lr = self.client_learning_rates.get(client_id, train_config.learning_rate)
@@ -494,7 +504,7 @@ class SpykerServer(BaseAsyncServer):
             self._sent_weights[client_id] = self.global_model_weights
 
         self._schedule_event(
-            delay=0.0,
+            delay=delay,
             target_actor=client_actor,
             event_type="START_FIT",
             data={

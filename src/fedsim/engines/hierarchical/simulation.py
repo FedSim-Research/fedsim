@@ -6,7 +6,7 @@ import torch
 
 from fedsim.engines.hierarchical.coordinator import SuperServer
 from fedsim.engines.hierarchical.edge import EdgeServer
-from fedsim.learning import Net, get_dataset_provider
+from fedsim.learning import DEFAULT_LOCAL_HOLDOUT, Net, get_dataset_provider
 from fedsim.runtime import ensure_ray_initialized
 from fedsim.simulation.context import SimulationContext, set_global_context
 from fedsim.simulation.cpu_execution import get_cpu_execution_pool
@@ -30,13 +30,21 @@ class HierarchicalSimulation:
         seed: int | None = None,
         partitioning: str = "iid",
         labels_per_client: int | None = None,
+        local_holdout: float = DEFAULT_LOCAL_HOLDOUT,
+        edge_rounds: int = 1,
+        aggregation_delay: bool = False,
     ):
+        if isinstance(edge_rounds, bool) or not isinstance(edge_rounds, int) or edge_rounds < 1:
+            raise ValueError("hierfl_invalid_edge_rounds")
         self.dataset_id = dataset_id
         self.run_time_limit = run_time_limit
         self.gpu_budget = gpu_budget
         self.seed = seed
         self.partitioning = partitioning
         self.labels_per_client = labels_per_client
+        self.local_holdout = local_holdout
+        self.edge_rounds = edge_rounds
+        self.aggregation_delay = aggregation_delay
         self.super_id = None
         self.edge_ids = []
         self.client_ids = []
@@ -191,6 +199,7 @@ class HierarchicalSimulation:
             required_updates=len(self.edge_ids),
             training_config=self.super_config,
             context=self.context,
+            aggregation_delay=self.aggregation_delay,
         )
 
         print("Spawning Edge Servers...")
@@ -201,6 +210,7 @@ class HierarchicalSimulation:
                 super_server_ref=self.super_actor,
                 min_clients_per_round=len(self.client_map[eid]),
                 context=self.context,
+                edge_rounds=self.edge_rounds,
             )
             self.edge_actors_map[eid] = edge_actor
 
@@ -248,6 +258,7 @@ class HierarchicalSimulation:
                 self.seed,
                 self.partitioning,
                 self.labels_per_client,
+                self.local_holdout,
             ),
         )
         set_global_context(self.context)

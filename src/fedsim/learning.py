@@ -12,6 +12,7 @@ import ray
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from datasets import DatasetDict
 from filelock import FileLock
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner, PathologicalPartitioner
@@ -136,6 +137,18 @@ def build_partitioner(
     raise ValueError("dataset_unsupported_partitioning")
 
 
+DEFAULT_LOCAL_HOLDOUT = 0.2
+
+
+def split_partition(partition, local_holdout: float, seed: int):
+    """Split a client partition into train/test; holdout 0 trains on every example."""
+    if not 0 <= local_holdout < 1:
+        raise ValueError("dataset_invalid_local_holdout")
+    if local_holdout == 0:
+        return DatasetDict({"train": partition, "test": partition.select([])})
+    return partition.train_test_split(test_size=local_holdout, seed=seed)
+
+
 @ray.remote(num_cpus=0, num_gpus=0)
 class DatasetProvider:
     def __init__(
@@ -145,9 +158,11 @@ class DatasetProvider:
         seed: int,
         partitioning: str = PARTITIONING_IID,
         labels_per_client: int | None = None,
+        local_holdout: float = DEFAULT_LOCAL_HOLDOUT,
     ):
         self.num_partitions = num_partitions
         self.seed = seed
+        self.local_holdout = local_holdout
         partitioner = build_partitioner(num_partitions, partitioning, labels_per_client, seed)
         self.fds = FederatedDataset(
             dataset=dataset_id,
@@ -163,8 +178,9 @@ class DatasetProvider:
             raise ValueError("dataset_partition_id_out_of_range")
         if partition_id not in self.partitions:
             part = self.fds.load_partition(partition_id)
-            split_seed = derive_seed(self.seed, "data", "split", str(partition_id))
-            self.partitions[partition_id] = part.train_test_split(test_size=0.2, seed=split_seed)
+            self.partitions[partition_id] = split_partition(
+                part, self.local_holdout, derive_seed(self.seed, "data", "split", str(partition_id))
+            )
         return self.partitions[partition_id]
 
 
@@ -175,11 +191,15 @@ def dataset_provider_name(
     job_id: str,
     partitioning: str = PARTITIONING_IID,
     labels_per_client: int | None = None,
+    local_holdout: float = DEFAULT_LOCAL_HOLDOUT,
 ) -> str:
     """Identify a job-local data assignment independently of client shuffle seeds."""
     parts = ["fedsim-iid-v1", dataset_id, num_partitions, partition_seed]
+    # Non-default controls extend the key, so default provider names stay unchanged.
     if partitioning != PARTITIONING_IID:
         parts += [partitioning, labels_per_client]
+    if local_holdout != DEFAULT_LOCAL_HOLDOUT:
+        parts += ["holdout", local_holdout]
     definition = json.dumps(parts, ensure_ascii=False, separators=(",", ":"))
     return f"fedsim-dataset-{job_id}-" + hashlib.sha256(definition.encode("utf-8")).hexdigest()
 
@@ -190,6 +210,7 @@ def get_dataset_provider(
     partition_seed: int | None = None,
     partitioning: str = PARTITIONING_IID,
     labels_per_client: int | None = None,
+    local_holdout: float = DEFAULT_LOCAL_HOLDOUT,
 ):
     """Create/reuse a job-owned provider; engines call this from the driver."""
     if num_partitions < 1:
@@ -204,9 +225,15 @@ def get_dataset_provider(
         job_id,
         partitioning,
         labels_per_client,
+        local_holdout,
     )
     return DatasetProvider.options(name=name, get_if_exists=True, lifetime="non_detached").remote(
-        normalized_dataset_id, num_partitions, data_seed, partitioning, labels_per_client
+        normalized_dataset_id,
+        num_partitions,
+        data_seed,
+        partitioning,
+        labels_per_client,
+        local_holdout,
     )
 
 

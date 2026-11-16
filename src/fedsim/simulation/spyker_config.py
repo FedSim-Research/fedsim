@@ -26,6 +26,8 @@ class SpykerAlgorithmConfig:
     staleness_mode: Literal["reciprocal", "none", "delta", "relative"] = "reciprocal"
     # Scale each client blend by its training-set size relative to the server's mean.
     sample_weighting: bool = False
+    # Models server-side aggregation compute time as virtual delay.
+    aggregation_delay: bool = False
 
     # Reserved compatibility field; neither engine simulates TCP retransmissions.
     tcp_rto_delay: float = 0.2

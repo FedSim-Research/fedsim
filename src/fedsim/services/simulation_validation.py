@@ -44,6 +44,18 @@ def _validate_partitioning(simulation_settings: dict, prefix: str) -> None:
         if labels is None:
             raise ValueError(f"{prefix}_missing_labels_per_client")
         _parse_int_min_one(labels, f"{prefix}_invalid_labels_per_client")
+    holdout = simulation_settings.get("local_holdout")
+    if holdout is not None:
+        value = _parse_float_ge_zero(holdout, f"{prefix}_invalid_local_holdout")
+        if value >= 1:
+            raise ValueError(f"{prefix}_invalid_local_holdout")
+
+
+def _validate_hierfl_extensions(simulation_settings: dict) -> None:
+    if simulation_settings.get("edge_rounds") is not None:
+        _parse_int_min_one(simulation_settings["edge_rounds"], "hierfl_invalid_edge_rounds")
+    if simulation_settings.get("aggregation_delay") is not None:
+        parse_bool(simulation_settings["aggregation_delay"], "hierfl_invalid_aggregation_delay")
 
 
 def _validate_hierfl_payload(
@@ -73,6 +85,7 @@ def _validate_hierfl_payload(
             _parse_int_ge_zero(seed, "hierfl_invalid_seed")
         _validate_seed_controls(simulation_settings, "hierfl")
         _validate_partitioning(simulation_settings, "hierfl")
+        _validate_hierfl_extensions(simulation_settings)
 
 
 def _validate_spyker_payload(

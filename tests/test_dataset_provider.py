@@ -117,7 +117,9 @@ def test_provider_factory_uses_atomic_job_owned_creation(monkeypatch):
         get_if_exists=True,
         lifetime="non_detached",
     )
-    factory.options.return_value.remote.assert_called_once_with("local/images", 3, 17, "iid", None)
+    factory.options.return_value.remote.assert_called_once_with(
+        "local/images", 3, 17, "iid", None, 0.2
+    )
 
 
 def test_provider_factory_normalizes_default_dataset_and_data_seed(monkeypatch):
@@ -128,7 +130,7 @@ def test_provider_factory_normalizes_default_dataset_and_data_seed(monkeypatch):
     )
     learning.get_dataset_provider(" ", 3)
     factory.options.return_value.remote.assert_called_once_with(
-        learning.DEFAULT_DATASET_ID, 3, 42, "iid", None
+        learning.DEFAULT_DATASET_ID, 3, 42, "iid", None, 0.2
     )
 
 
@@ -212,6 +214,6 @@ def test_engines_create_provider_in_driver_and_pass_its_handle_in_context(
     monkeypatch.setattr(simulation, "_spawn_actors", lambda: None)
     monkeypatch.setattr(simulation, "_configure_network", lambda: None)
     simulation.build()
-    factory.assert_called_once_with("local/images", 2, 17, "iid", None)
+    factory.assert_called_once_with("local/images", 2, 17, "iid", None, 0.2)
     assert simulation.context.dataset_provider is provider
     assert simulation.context.seed == 17

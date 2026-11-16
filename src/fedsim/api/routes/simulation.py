@@ -38,6 +38,9 @@ class SimulationSettings(BaseModel):
     evaluate_model: bool = False
     partitioning: Literal["iid", "label-skew"] | None = None
     labels_per_client: int | None = None
+    local_holdout: float | None = None
+    edge_rounds: int | None = None
+    aggregation_delay: bool | None = None
 
 
 class SpykerAlgorithmConfig(BaseModel):
