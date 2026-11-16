@@ -252,14 +252,21 @@ def build_plan(config: CampaignConfig, campaign_id: str) -> dict:
     return {
         "schema_version": 1,
         "campaign_id": campaign_id,
-        # Keep saved v1 plans without the optional controls (unset or default) byte-compatible.
-        "config": config.model_dump(exclude_none=True, exclude_defaults=True),
+        "config": _plan_config(config),
         "cases": cases,
     }
 
 
 def read_plan(path: Path) -> dict:
     return _validated_plan(json.loads(path.read_bytes()))
+
+
+def _plan_config(config: CampaignConfig) -> dict:
+    # Omit the zero-valued new field so plans archived before it existed stay comparable.
+    dumped = config.model_dump(exclude_none=True)
+    if not config.client_runtime_sigma:
+        dumped.pop("client_runtime_sigma")
+    return dumped
 
 
 def _validated_plan(plan: dict) -> dict:
@@ -320,6 +327,8 @@ def _calibration_review(path: Path, config: CampaignConfig) -> dict:
         ):
             raise ValueError("campaign_calibration_missing_checkpoints")
     # Horizons may change after calibration; training and network conditions may not.
+    # Compare in the plan's own serialization, which omits unset optional controls.
+    planned = _plan_config(config)
     for field in (
         "network",
         "epochs",
@@ -331,8 +340,6 @@ def _calibration_review(path: Path, config: CampaignConfig) -> dict:
         "spyker_config",
         "require_peer_exchange",
     ):
-        # Compare in the plan's own serialization, which omits unset optional controls.
-        planned = config.model_dump(exclude_none=True, exclude_defaults=True)
         if pilot["config"].get(field) != planned.get(field):
             raise ValueError("campaign_calibration_conditions_mismatch")
     if next(iter(pilot["config"]["scenarios"].values())) not in config.scenarios.values():

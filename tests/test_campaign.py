@@ -41,6 +41,13 @@ def exchange_details():
     }
 
 
+def old_format_config(cfg):
+    # What model_dump(exclude_none=True) produced before client_runtime_sigma existed.
+    dumped = cfg.model_dump(exclude_none=True)
+    del dumped["client_runtime_sigma"]
+    return dumped
+
+
 def test_plan_has_matched_inputs_unique_outputs_and_alternating_order():
     plan = campaign.build_plan(config(), "test-campaign")
     assert len(plan["cases"]) == 12
@@ -227,6 +234,17 @@ def test_campaign_round_trip_uses_real_graph_and_export_routes(
     approved = campaign._calibration_review(review, config())
     assert approved["pilot_campaign_id"] == plan["campaign_id"]
     assert approved["pilot_archive"] == str(output.resolve())
+    # A pilot archived before the runtime noise field existed must still compare equal.
+    old = json.loads((output / "plan.json").read_text())
+    old["config"] = old_format_config(
+        config(phase="calibration", seeds=[42], scenarios={"balanced": [2, 2, 2]})
+    )
+    campaign._write_json(output / "plan.json", old)
+    checksums["plan.json"] = hashlib.sha256((output / "plan.json").read_bytes()).hexdigest()
+    campaign._write_json(output / "checksums.json", checksums)
+    assert (
+        campaign._calibration_review(review, config())["pilot_campaign_id"] == plan["campaign_id"]
+    )
     with pytest.raises(ValueError, match="decision_mismatch"):
         campaign._calibration_review(review, config(run_time_limit=120))
     network = json.loads((CONFIG.parent / "network-sensitivity.json").read_text())["network"]
@@ -635,3 +653,10 @@ def test_zero_runtime_sigma_leaves_plan_unchanged():
         campaign.build_plan(config(client_runtime_sigma=0.0), "sigma-test")
     )
     assert "client_runtime_sigma" not in campaign.build_plan(config(), "sigma-test")["config"]
+
+
+def test_plan_saved_before_runtime_sigma_still_validates():
+    plan = campaign.build_plan(config(), "old-plan")
+    plan["config"] = old_format_config(config())
+    assert "decay_mode" in plan["config"]["spyker_config"]
+    assert campaign._validated_plan(plan) == plan
