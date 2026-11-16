@@ -121,17 +121,18 @@ def validate_hierfl_graph(graph: Graph) -> None:
         if super_id not in neighbors:
             raise ValueError("hierfl_server_missing_superserver_link")
 
-    client_ids = {n.id for n in client_nodes}
-    for server in server_nodes:
-        neighbors = adjacency.get(server.id, set())
-        if not any(nid in client_ids for nid in neighbors):
-            raise ValueError("hierfl_server_requires_clients")
-
     for client in client_nodes:
         neighbors = adjacency.get(client.id, set())
         connected_servers = [nid for nid in neighbors if nid in server_ids]
         if len(connected_servers) != 1:
             raise ValueError("hierfl_client_requires_single_server_link")
+
+    # Checked after client links so a disconnected client reports its own error.
+    client_ids = {n.id for n in client_nodes}
+    for server in server_nodes:
+        neighbors = adjacency.get(server.id, set())
+        if not any(nid in client_ids for nid in neighbors):
+            raise ValueError("hierfl_server_requires_clients")
 
     required_common = [
         "computeFactor",
