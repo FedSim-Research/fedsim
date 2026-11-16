@@ -3,6 +3,7 @@ import { HttpClient, HttpContext } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { APP_CONFIG } from '../config/app-config';
 import { Architecture, NodeKind } from '../domain/topology';
+import type { DecayMode, StalenessMode } from '../domain/spyker-modes';
 import { EdgeMetrics } from './edge-metrics';
 import { SILENT_ERRORS } from './global-error.interceptor';
 
@@ -132,8 +133,8 @@ export interface SimulationStartRequest {
   spyker_config?: {
     [option: string]: unknown;
     decay_beta?: number;
-    decay_mode?: 'absolute' | 'relative';
-    staleness_mode?: 'reciprocal' | 'none' | 'delta' | 'relative';
+    decay_mode?: DecayMode;
+    staleness_mode?: StalenessMode;
     min_learning_rate?: number;
     h_inter?: number | 'auto';
     h_intra?: number;

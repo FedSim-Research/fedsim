@@ -101,6 +101,28 @@ describe('Spyker topology validation', () => {
     expect(errors.some((error) => error.includes(field as string))).toBe(rejected);
   });
 
+  it('reports the exact message for an invalid decayMode', () => {
+    const spykerConfig = {
+      decayBeta: 0.05, minLearningRate: 1e-6, hInter: 5, hIntra: 350,
+      sigmoidPhi: 1.5, serverLearningRate: 0.6, decayMode: 'bogus',
+    } as any;
+    const errors = validator.validateSimulationRequest('spyker',
+      [node('A', 'ServerNode'), node('client', 'ClientNode')], [edge('client', 'A')],
+      { ...config, spykerConfig });
+    expect(errors).toContain('spyker: decayMode must be absolute or relative');
+  });
+
+  it('reports the exact message for an invalid stalenessMode', () => {
+    const spykerConfig = {
+      decayBeta: 0.05, minLearningRate: 1e-6, hInter: 5, hIntra: 350,
+      sigmoidPhi: 1.5, serverLearningRate: 0.6, stalenessMode: 'bogus',
+    } as any;
+    const errors = validator.validateSimulationRequest('spyker',
+      [node('A', 'ServerNode'), node('client', 'ClientNode')], [edge('client', 'A')],
+      { ...config, spykerConfig });
+    expect(errors).toContain('spyker: stalenessMode must be reciprocal, none, delta or relative');
+  });
+
   it('rejects fractional local epochs', () => {
     const errors = validator.validateSimulationRequest('spyker',
       [node('A', 'ServerNode'), node('client', 'ClientNode')], [edge('client', 'A')],

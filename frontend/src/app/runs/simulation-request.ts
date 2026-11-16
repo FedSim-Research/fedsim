@@ -1,5 +1,6 @@
 import { SimulationStartRequest } from '../api/graph-api.service';
 import { Architecture } from '../domain/topology';
+import type { DecayMode, StalenessMode } from '../domain/spyker-modes';
 import { OptionRequestFields } from './run-options';
 
 export type SimulationMode = Architecture | 'both';
@@ -24,8 +25,7 @@ export interface SimulationSettings {
   idleTokenDelay?: number;
 }
 
-export type DecayMode = 'absolute' | 'relative';
-export type StalenessMode = 'reciprocal' | 'none' | 'delta' | 'relative';
+export type { DecayMode, StalenessMode } from '../domain/spyker-modes';
 
 export interface SpykerConfig {
   decayBeta: number;
