@@ -1,4 +1,5 @@
 import math
+import os
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
@@ -13,13 +14,20 @@ from fedsim.simulation.network_model import estimate_transmission_time
 from fedsim.simulation.spyker_config import FullConfiguration
 from fedsim.specs.network_metrics import Network
 from fedsim.strategies.server_strategies import get_async_server_strategy
+from fedsim.telemetry.logging import setup_telemetry_logger
 
 TOKEN_PAYLOAD_BYTES = 1000
 
 
 @ray.remote(num_cpus=0, num_gpus=0)
 class SpykerServer(BaseAsyncServer):
-    def __init__(self, server_id: str, config: FullConfiguration, context: SimulationContext):
+    def __init__(
+        self,
+        server_id: str,
+        config: FullConfiguration,
+        context: SimulationContext,
+        run_id: str | None = None,
+    ):
         set_global_context(context)
         self.context = context
         try:
@@ -49,6 +57,11 @@ class SpykerServer(BaseAsyncServer):
         self.server_ages: Dict[str, int] = {}
 
         self.client_learning_rates: Dict[str, float] = {}
+        self._dispatched_lrs: Dict[str, float] = {}  # rate of each client's in-flight fit
+
+        self._run_id = run_id
+        trace_on = os.environ.get("FEDSIM_UPDATE_TRACE", "off").strip().lower() == "on"
+        self._trace_logger = setup_telemetry_logger(run_id) if trace_on and run_id else None
 
         # Tracking client activity for Decay function
         self.client_update_counts: Dict[str, int] = {}
@@ -170,6 +183,7 @@ class SpykerServer(BaseAsyncServer):
         # Model age the client trained on
         metrics = data.get("metrics", {})
         ref_model_age = metrics.get("ref_model_age", self.model_age)
+        age_before = self.model_age
 
         staleness_mode = self.spyker_config.staleness_mode
         staleness_weight = self._staleness_weight(self.model_age - ref_model_age)
@@ -213,6 +227,11 @@ class SpykerServer(BaseAsyncServer):
         new_client_lr = self._calculate_decay(count, avg_updates, base_client_lr)
         self.client_learning_rates[client_id] = new_client_lr
 
+        if self._trace_logger:
+            self._trace_update(
+                client_id, age_before, ref_model_age, effective_alpha, new_client_lr, count
+            )
+
         # Check Sync (Algorithm 2 SPYKER)
         if self.has_token:
             self.server_ages[self.server_id] = self.model_age
@@ -230,6 +249,28 @@ class SpykerServer(BaseAsyncServer):
             self._schedule_client_task(client_id, delay=delay)
         else:
             self._schedule_client_task(client_id)
+
+    def _trace_update(self, client_id, server_age, ref_age, alpha, lr_next, update_count):
+        lr_used = self._dispatched_lrs.get(client_id, self.full_config.training.learning_rate)
+        self._trace_logger.info(
+            "Client Update",
+            extra={
+                "extra_data": {
+                    "log_type": "client_update",
+                    "run_id": self._run_id,
+                    "server_id": self.server_id,
+                    "client_id": client_id,
+                    "virtual_time": self.current_virtual_time,
+                    "server_age": server_age,
+                    "ref_age": ref_age,
+                    "staleness": max(0, server_age - ref_age),
+                    "alpha": alpha,
+                    "lr_used": lr_used,
+                    "lr_next": lr_next,
+                    "update_count": update_count,
+                }
+            },
+        )
 
     def on_server_message(self, data: Any, direct_refs: Any = None):
         msg_type = data["type"]
@@ -488,6 +529,7 @@ class SpykerServer(BaseAsyncServer):
         train_config = self.full_config.training
 
         client_lr = self.client_learning_rates.get(client_id, train_config.learning_rate)
+        self._dispatched_lrs[client_id] = client_lr
 
         config = {
             "server_id": self.server_id,

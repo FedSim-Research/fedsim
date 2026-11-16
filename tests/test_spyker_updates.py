@@ -11,13 +11,13 @@ from fedsim.strategies.server_strategies import SpykerDefaultAsyncStrategy
 
 @pytest.fixture
 def make_server(local_actor, monkeypatch):
-    def make(**spyker):
+    def make(run_id=None, **spyker):
         config = FullConfiguration()
         for key, value in spyker.items():
             setattr(config.spyker, key, value)
         specs = {"A": ServerSpec("A", "A", Performance(10, 0), {}, 1000, 1000)}
         context = SimulationContext("orchestrator", {}, specs)
-        server = local_actor(SpykerServer, "A", config, context)
+        server = local_actor(SpykerServer, "A", config, context, run_id=run_id)
         server.set_orchestrator("orchestrator")
         server.set_initial_weights([np.array([10.0])])
         monkeypatch.setattr(server, "_schedule_client_task", lambda client_id: None)
@@ -121,3 +121,50 @@ def test_delta_staleness_survives_overlapping_dispatch(make_server, monkeypatch)
     server._cached_global_weights_ref = None
     server._schedule_client_task("c")
     assert update(server, 4.0, ref_age=0) == pytest.approx(4.0)
+
+
+class ListLogger:
+    def __init__(self):
+        self.records = []
+
+    def info(self, message, extra):
+        self.records.append(extra["extra_data"])
+
+
+@pytest.fixture
+def trace_logger(monkeypatch):
+    logger = ListLogger()
+    monkeypatch.setattr(
+        "fedsim.engines.spyker.server.setup_telemetry_logger", lambda run_id: logger
+    )
+    return logger
+
+
+def test_update_trace_records_alpha_and_rates(make_server, trace_logger, monkeypatch):
+    monkeypatch.setenv("FEDSIM_UPDATE_TRACE", "on")
+    server = make_server(run_id="r1")
+    server.model_age = 3
+    server._dispatched_lrs["c"] = 0.02
+    update(server, 20.0, ref_age=0)
+    (record,) = trace_logger.records
+    assert record == {
+        "log_type": "client_update",
+        "run_id": "r1",
+        "server_id": "A",
+        "client_id": "c",
+        "virtual_time": 0.0,
+        "server_age": 3,
+        "ref_age": 0,
+        "staleness": 3,
+        "alpha": pytest.approx(0.15),
+        "lr_used": 0.02,
+        "lr_next": server.client_learning_rates["c"],
+        "update_count": 1,
+    }
+
+
+def test_update_trace_is_off_by_default(make_server, trace_logger, monkeypatch):
+    monkeypatch.delenv("FEDSIM_UPDATE_TRACE", raising=False)
+    server = make_server(run_id="r1")
+    update(server, 20.0, ref_age=0)
+    assert trace_logger.records == []

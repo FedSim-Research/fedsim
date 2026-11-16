@@ -211,7 +211,7 @@ class SpykerSimulation:
 
         for s_id in self.server_ids:
             actor = SpykerServer.options(**self._server_actor_options).remote(
-                server_id=s_id, config=self.config, context=self.context
+                server_id=s_id, config=self.config, context=self.context, run_id=self.run_id
             )
             self.spyker_actors_map[s_id] = actor
 
