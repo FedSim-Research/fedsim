@@ -47,6 +47,7 @@ class SpykerParameters(BaseModel):
     decay_mode: Literal["absolute", "relative"] = "absolute"
     staleness_mode: Literal["reciprocal", "none", "delta", "relative"] = "reciprocal"
     sample_weighting: StrictBool = False
+    age_merge: Literal["monotonic", "weighted"] = "monotonic"
     age_announcements: StrictBool = False
     sync_timeout: Annotated[float, Field(gt=0, allow_inf_nan=False)] | None = None
     min_learning_rate: PositiveFloat

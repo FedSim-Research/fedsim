@@ -22,6 +22,8 @@ class SpykerAlgorithmConfig:
 
     # --- Server Aggregation ---
     sigmoid_phi: float = 1.5
+    # "monotonic": rounded integer age that never decreases; "weighted": real-valued as in Alg. 2.
+    age_merge: Literal["monotonic", "weighted"] = "monotonic"
     server_learning_rate: float = 0.6
     staleness_mode: Literal["reciprocal", "none", "delta", "relative"] = "reciprocal"
     # Scale each client blend by its training-set size relative to the server's mean.

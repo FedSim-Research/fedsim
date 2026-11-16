@@ -49,6 +49,7 @@ def parse_positive_int(value: object, error_code: str) -> int:
 SPYKER_MODE_CHOICES = {
     "decay_mode": ("absolute", "relative"),
     "staleness_mode": ("reciprocal", "none", "delta", "relative"),
+    "age_merge": ("monotonic", "weighted"),
 }
 
 

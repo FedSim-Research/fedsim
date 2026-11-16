@@ -48,6 +48,7 @@ class SpykerAlgorithmConfig(BaseModel):
     decay_mode: Literal["absolute", "relative"] | None = None
     staleness_mode: Literal["reciprocal", "none", "delta", "relative"] | None = None
     sample_weighting: bool | None = None
+    age_merge: Literal["monotonic", "weighted"] | None = None
     age_announcements: bool | None = None
     sync_timeout: float | None = None
     min_learning_rate: float | None = None

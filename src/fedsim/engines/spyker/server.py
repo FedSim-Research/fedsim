@@ -373,9 +373,11 @@ class SpykerServer(BaseAsyncServer):
         # Update local age
         old_age = self.model_age
         weighted_age = (1.0 - effective_alpha) * self.model_age + (effective_alpha * sender_age)
-        self.model_age = int(round(weighted_age))
-
-        self.model_age = max(old_age, self.model_age)
+        if self.spyker_config.age_merge == "weighted":
+            # Zuo et al. 2024, Alg. 2 l. 50: real-valued age that may also decrease.
+            self.model_age = weighted_age
+        else:
+            self.model_age = max(old_age, int(round(weighted_age)))
         self.server_ages[self.server_id] = self.model_age
 
         self._peer_models_aggregated += 1

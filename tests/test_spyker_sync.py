@@ -307,6 +307,17 @@ def test_token_holder_starts_sync_on_age_announcement(servers):
     assert "MODEL_BROADCAST" in message_types(holder)
 
 
+@pytest.mark.parametrize(("mode", "expected"), [("monotonic", 10), ("weighted", None)])
+def test_peer_merge_age_modes(servers, mode, expected):
+    server = servers["A"]
+    server.spyker_config.age_merge = mode
+    receive(server, "B", "b-1", 20, age=4)
+    if expected is None:
+        assert 4 < server.model_age < 10 and not float(server.model_age).is_integer()
+    else:
+        assert server.model_age == expected
+
+
 def test_incomplete_sync_releases_token_after_timeout(servers):
     holder = servers["A"]
     holder.spyker_config.sync_timeout = 2.0
