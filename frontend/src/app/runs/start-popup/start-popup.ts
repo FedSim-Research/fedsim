@@ -208,11 +208,8 @@ export class StartPopup implements OnInit, OnDestroy {
   }
 
   public ngOnDestroy(): void {
+    // Pending sync timers stay armed so an edit made just before closing still reaches the backend.
     this.destroyed = true;
-    for (const timer of Object.values(this.backendSyncTimers)) {
-      clearTimeout(timer);
-    }
-    this.backendSyncTimers = {};
   }
 
   public ngOnInit(): void {
@@ -235,6 +232,7 @@ export class StartPopup implements OnInit, OnDestroy {
   }
 
   public onEvaluateAfterRunChanged(value: boolean): void {
+    this.userEdited = true;
     this.evaluateAfterRun = value;
 
     if (this.selectedMode === 'hierfl') {

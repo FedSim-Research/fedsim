@@ -96,3 +96,67 @@ describe('StartPopup stored settings', () => {
     expect(fixture.componentInstance.spykerSettings).not.toHaveProperty('tcpRtoDelay');
   });
 });
+
+describe('StartPopup backend sync', () => {
+  let resolveGraph: (graph: { metadata: Record<string, unknown> }) => void;
+  const api = { getGraph: vi.fn(), patchGraphMetadata: vi.fn() };
+
+  function createPopup() {
+    const fixture = TestBed.createComponent(StartPopup);
+    fixture.componentInstance.hierflGraphId = 5;
+    fixture.componentInstance.selectedMode = 'hierfl';
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    localStorage.clear();
+    api.getGraph.mockReset().mockReturnValue(new Promise((resolve) => { resolveGraph = resolve; }));
+    api.patchGraphMetadata.mockReset().mockResolvedValue({});
+    TestBed.configureTestingModule({
+      imports: [StartPopup],
+      providers: [{ provide: GraphApiService, useValue: api }],
+    });
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  it('still syncs a pending settings change when destroyed within the debounce window', async () => {
+    const fixture = createPopup();
+    await vi.advanceTimersByTimeAsync(500);
+    api.patchGraphMetadata.mockClear();
+
+    fixture.componentInstance.hierflSettings.epochs = 7;
+    fixture.componentInstance.onSettingsChanged();
+    fixture.destroy();
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(api.patchGraphMetadata).toHaveBeenCalledTimes(1);
+    expect(api.patchGraphMetadata.mock.calls[0][0]).toBe(5);
+    expect(api.patchGraphMetadata.mock.calls[0][1].patch.start_params.settings.epochs).toBe(7);
+  });
+
+  it('keeps the evaluate toggle when the backend answers late', async () => {
+    const fixture = createPopup();
+    fixture.componentInstance.onEvaluateAfterRunChanged(true);
+
+    resolveGraph({ metadata: { start_params: { evaluateAfterRun: false, updatedAt: Date.now() + 1000 } } });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(fixture.componentInstance.evaluateAfterRun).toBe(true);
+    expect(localStorage.getItem('fedsim.start-params.hierfl.5')).toContain('"evaluateAfterRun":true');
+  });
+
+  it('ignores a backend answer that arrives after destroy', async () => {
+    const fixture = createPopup();
+    const stored = localStorage.getItem('fedsim.start-params.hierfl.5');
+    fixture.destroy();
+
+    resolveGraph({ metadata: { start_params: { settings: { epochs: 9 }, updatedAt: Date.now() + 1000 } } });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(fixture.componentInstance.hierflSettings.epochs).toBe(1);
+    expect(localStorage.getItem('fedsim.start-params.hierfl.5')).toBe(stored);
+  });
+});
