@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output, SimpleChanges, inject } from '@angular/core';
+import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { InputNumberModule } from 'primeng/inputnumber';
@@ -30,7 +30,7 @@ type PersistedStartParams = {
   templateUrl: './start-popup.html',
   styleUrl: './start-popup.css',
 })
-export class StartPopup implements OnInit {
+export class StartPopup implements OnInit, OnDestroy {
   @Input() hierflGraphId: number | null = null;
   @Input() spykerGraphId: number | null = null;
   @Output() close = new EventEmitter<void>();
@@ -89,6 +89,9 @@ export class StartPopup implements OnInit {
   public readonly runOptions = RUN_OPTIONS;
 
   private lastPersistedSignature: string | null = null;
+  private destroyed = false;
+  /** Set once the user edits settings, so a late backend response cannot overwrite them. */
+  private userEdited = false;
   private api = inject(GraphApiService);
   private backendSyncTimers: Partial<Record<Architecture, ReturnType<typeof setTimeout>>> = {};
 
@@ -204,6 +207,14 @@ export class StartPopup implements OnInit {
     this.persistSettingsIfChanged();
   }
 
+  public ngOnDestroy(): void {
+    this.destroyed = true;
+    for (const timer of Object.values(this.backendSyncTimers)) {
+      clearTimeout(timer);
+    }
+    this.backendSyncTimers = {};
+  }
+
   public ngOnInit(): void {
     this.restoreHierflSettings();
     this.restoreSpykerSettings();
@@ -219,6 +230,7 @@ export class StartPopup implements OnInit {
   }
 
   public onSettingsChanged(): void {
+    this.userEdited = true;
     this.persistSettingsIfChanged();
   }
 
@@ -427,6 +439,9 @@ export class StartPopup implements OnInit {
 
     try {
       const graph = await this.api.getGraph(graphId);
+      if (this.destroyed || this.userEdited) {
+        return;
+      }
       const backendParams = this.extractBackendStartParams(graph.metadata);
 
       if (!backendParams) {
