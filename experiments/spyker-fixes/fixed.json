@@ -64,7 +64,7 @@
   "spyker_config": {
     "decay_beta": 0.05,
     "min_learning_rate": 1e-06,
-    "h_inter": 5,
+    "h_inter": "auto",
     "h_intra": 4,
     "sigmoid_phi": 1.5,
     "server_learning_rate": 0.6,

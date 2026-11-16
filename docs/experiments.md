@@ -239,3 +239,27 @@ Only a campaign with `execution.json` status `completed` has passed all collecti
 checks. Preserve the original archive before deriving tables or figures. Evaluation
 snapshots remain per-actor, not globally simultaneous; asynchronous event order
 can still vary. Historical paper measurements remain a separate evidence set.
+
+## Spyker fix comparison
+
+`experiments/spyker-fixes/` holds six campaigns: `default`, `relative-decay`,
+`delta-staleness`, `fixed`, `default-noise` and `fixed-noise`. Each has two
+placements and three seeds; the hierarchical counterpart runs in every campaign.
+
+"Fixed" means relative decay, delta staleness and `h_inter: "auto"`, which
+is `n_C / (5 n)`: 10 for 200 clients on 4 servers. The noise campaigns add a
+per-fit runtime standard deviation of 0.02 virtual seconds (5 % of the 0.4 s
+training time) to break synchronous completion waves.
+
+With β = 0.05, `relative-decay` lowers a rate by at most 5 % in synchronous
+waves, so it is expected to land near the archived β = 0 results.
+
+`FEDSIM_UPDATE_TRACE=on` writes one telemetry line per client update: learning
+rate used and assigned, staleness, blend coefficient and ages.
+
+Smoke test (10+ minutes):
+
+```bash
+FEDSIM_EVENT_LOG=off .venv/bin/python experiments/spyker-fixes/smoke.py default 60
+FEDSIM_EVENT_LOG=off .venv/bin/python experiments/spyker-fixes/smoke.py fixed 60
+```
