@@ -591,6 +591,13 @@ def test_invalid_campaign_algorithm_parameters_are_rejected(field, value):
         config(spyker_config={**config().spyker_config.model_dump(), field: value})
 
 
+def test_campaign_accepts_h_inter_auto_but_not_other_strings():
+    parameters = config().spyker_config.model_dump()
+    assert config(spyker_config={**parameters, "h_inter": "auto"}).spyker_config.h_inter == "auto"
+    with pytest.raises(ValidationError):
+        config(spyker_config={**parameters, "h_inter": "fast"})
+
+
 def test_status_transport_errors_are_retried_without_repeating_submissions(monkeypatch):
     monkeypatch.setattr(campaign.time, "sleep", lambda _: None)
     client = Mock()

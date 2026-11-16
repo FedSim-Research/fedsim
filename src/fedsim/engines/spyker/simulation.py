@@ -179,6 +179,13 @@ class SpykerSimulation:
         }
         self.client_map[server_id].append((client_id, client_config))
 
+    def _resolve_h_inter(self):
+        if self.config.spyker.h_inter == "auto":
+            # n_C / (5n), rounded to the nearest integer (ties to even), at least 1.
+            self.config.spyker.h_inter = max(
+                1, round(len(self.client_ids) / (5 * len(self.server_ids)))
+            )
+
     def _spawn_actors(self):
         if not self.server_ids:
             raise ValueError("No servers defined.")
@@ -188,6 +195,8 @@ class SpykerSimulation:
             raise ValueError(
                 "First spyker server must have at least one client to initialize global model."
             )
+
+        self._resolve_h_inter()
 
         dummy_model = Net(seed=self.seed)
         initial_weights_np = [val.cpu().numpy() for _, val in dummy_model.state_dict().items()]

@@ -130,7 +130,7 @@ export interface SimulationStartRequest {
   spyker_config?: {
     decay_beta?: number;
     min_learning_rate?: number;
-    h_inter?: number;
+    h_inter?: number | 'auto';
     h_intra?: number;
     sigmoid_phi?: number;
     server_learning_rate?: number;

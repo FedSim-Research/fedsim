@@ -26,7 +26,7 @@ export interface SimulationSettings {
 export interface SpykerConfig {
   decayBeta: number;
   minLearningRate: number;
-  hInter: number;
+  hInter: number | 'auto';
   hIntra: number;
   sigmoidPhi: number;
   serverLearningRate: number;

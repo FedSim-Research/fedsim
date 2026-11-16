@@ -44,8 +44,10 @@ class SpykerParameters(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decay_beta: Annotated[float, Field(ge=0, allow_inf_nan=False)]
+    decay_mode: Literal["absolute", "relative"] = "absolute"
+    staleness_mode: Literal["reciprocal", "none", "delta"] = "reciprocal"
     min_learning_rate: PositiveFloat
-    h_inter: PositiveInt
+    h_inter: PositiveInt | Literal["auto"]
     h_intra: PositiveInt
     sigmoid_phi: PositiveFloat
     server_learning_rate: PositiveFloat

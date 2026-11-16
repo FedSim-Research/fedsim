@@ -6,6 +6,9 @@ from typing import Any
 
 from fedsim.persistence.models import Edge, Graph, Node
 from fedsim.services.input_values import (
+    SPYKER_MODE_CHOICES,
+    parse_choice,
+    parse_h_inter,
     parse_nonnegative_float,
     parse_positive_float,
     parse_positive_int,
@@ -164,9 +167,11 @@ def _require_spyker_config(spyker_config: dict[str, Any] | None) -> dict[str, An
         "server_learning_rate": parse_positive_float,
         "decay_beta": parse_nonnegative_float,
         "tcp_rto_delay": parse_nonnegative_float,
-        "h_inter": parse_positive_int,
+        "h_inter": parse_h_inter,
         "h_intra": parse_positive_int,
     }
+    for key, choices in SPYKER_MODE_CHOICES.items():
+        parsers[key] = lambda value, code, choices=choices: parse_choice(value, choices, code)
     return {
         key: parsers[key](value, f"spyker_invalid_{key}")
         for key, value in spyker_config.items()

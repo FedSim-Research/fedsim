@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from fedsim.persistence.models import Graph
 from fedsim.services.hierfl_simulation_builder import validate_hierfl_graph
+from fedsim.services.input_values import SPYKER_MODE_CHOICES, parse_choice, parse_training_config
 from fedsim.services.input_values import parse_nonnegative_float as _parse_float_ge_zero
 from fedsim.services.input_values import parse_nonnegative_int as _parse_int_ge_zero
 from fedsim.services.input_values import parse_positive_float as _parse_float_gt_zero
 from fedsim.services.input_values import parse_positive_int as _parse_int_min_one
-from fedsim.services.input_values import parse_training_config
 from fedsim.services.spyker_simulation_builder import validate_spyker_graph
 
 
@@ -100,7 +100,7 @@ def _validate_spyker_payload(
         _parse_float_ge_zero(decay_beta, "spyker_invalid_decay_beta")
     if min_learning_rate is not None:
         _parse_float_gt_zero(min_learning_rate, "spyker_invalid_min_learning_rate")
-    if h_inter is not None:
+    if h_inter is not None and h_inter != "auto":
         _parse_int_min_one(h_inter, "spyker_invalid_h_inter")
     if h_intra is not None:
         _parse_int_min_one(h_intra, "spyker_invalid_h_intra")
@@ -110,6 +110,10 @@ def _validate_spyker_payload(
         _parse_float_gt_zero(server_learning_rate, "spyker_invalid_server_learning_rate")
     if tcp_rto_delay is not None:
         _parse_float_ge_zero(tcp_rto_delay, "spyker_invalid_tcp_rto_delay")
+    for key, choices in SPYKER_MODE_CHOICES.items():
+        value = spyker_config.get(key)
+        if value is not None:
+            parse_choice(value, choices, f"spyker_invalid_{key}")
 
 
 def _validate_seed_controls(simulation_settings: dict, prefix: str) -> None:

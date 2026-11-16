@@ -62,6 +62,9 @@ class SpykerServer(BaseAsyncServer):
 
         self._cached_global_weights_ref = None
 
+        # Weights last sent to each client (only tracked for staleness_mode == "delta")
+        self._sent_weights: Dict[str, List[np.ndarray]] = {}
+
         # The current broadcast ID
         self.current_bid: str = ""
         self.ongoing_sync: bool = False
@@ -160,18 +163,33 @@ class SpykerServer(BaseAsyncServer):
         ref_model_age = metrics.get("ref_model_age", self.model_age)
 
         # Staleness Dampener
+        staleness_mode = self.spyker_config.staleness_mode
         age_drift = self.model_age - ref_model_age
-        staleness_weight = 1.0 / (1.0 + max(0, age_drift))
+        if staleness_mode == "none":
+            staleness_weight = 1.0
+        elif staleness_mode in ("reciprocal", "delta"):
+            staleness_weight = 1.0 / (1.0 + max(0, age_drift))
+        else:
+            raise ValueError(f"Unknown staleness_mode: {staleness_mode!r}")
 
         # Aggregate Client weights into global model
         eta_server = self.spyker_config.server_learning_rate
         effective_alpha = eta_server * staleness_weight
 
-        self.global_model_weights = self.aggregation_strategy.aggregate(
-            global_weights=self.global_model_weights,
-            update_weights=client_weights,
-            alpha=effective_alpha,
-        )
+        if staleness_mode == "delta":
+            # Apply only the client's change, so stale or near-zero-lr updates cannot pull back.
+            self.global_model_weights = self.aggregation_strategy.aggregate_delta(
+                global_weights=self.global_model_weights,
+                update_weights=client_weights,
+                base_weights=self._sent_weights.pop(client_id),
+                alpha=effective_alpha,
+            )
+        else:
+            self.global_model_weights = self.aggregation_strategy.aggregate(
+                global_weights=self.global_model_weights,
+                update_weights=client_weights,
+                alpha=effective_alpha,
+            )
 
         # Invalidate global weights cache because of recent change
         self._cached_global_weights_ref = None
@@ -209,11 +227,19 @@ class SpykerServer(BaseAsyncServer):
 
     def _calculate_decay(self, client_updates, avg_updates, base_lr):
         """Spyker Algorithm 1: Learning Rate Decay."""
+        mode = self.spyker_config.decay_mode
+        if mode not in ("absolute", "relative"):
+            raise ValueError(f"Unknown decay_mode: {mode!r}")
+
         if client_updates < avg_updates:
             return base_lr
 
         # linear decay for active clients
-        decayed_lr = base_lr - (self.spyker_config.decay_beta * (client_updates - avg_updates))
+        excess = client_updates - avg_updates
+        if mode == "absolute":
+            decayed_lr = base_lr - (self.spyker_config.decay_beta * excess)
+        else:
+            decayed_lr = base_lr * (1.0 - self.spyker_config.decay_beta * excess)
         return max(self.spyker_config.min_learning_rate, decayed_lr)
 
     def _get_model_size_bytes(self) -> int:
@@ -388,6 +414,9 @@ class SpykerServer(BaseAsyncServer):
 
         if self._cached_global_weights_ref is None:
             self._cached_global_weights_ref = ray.put(self.global_model_weights)
+
+        if self.spyker_config.staleness_mode == "delta":
+            self._sent_weights[client_id] = self.global_model_weights
 
         self._schedule_event(
             delay=0.0,

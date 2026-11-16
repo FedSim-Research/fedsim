@@ -1,4 +1,5 @@
 import logging
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, Field
@@ -39,8 +40,10 @@ class SimulationSettings(BaseModel):
 
 class SpykerAlgorithmConfig(BaseModel):
     decay_beta: float | None = None
+    decay_mode: Literal["absolute", "relative"] | None = None
+    staleness_mode: Literal["reciprocal", "none", "delta"] | None = None
     min_learning_rate: float | None = None
-    h_inter: int | None = None
+    h_inter: int | Literal["auto"] | None = None
     h_intra: int | None = None
     sigmoid_phi: float | None = None
     server_learning_rate: float | None = None

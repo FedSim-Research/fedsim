@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Literal
 
 
 @dataclass
@@ -7,15 +8,18 @@ class SpykerAlgorithmConfig:
 
     # --- Algorithm 1: Client Learning Rate Decay ---
     decay_beta: float = 0.05
+    decay_mode: Literal["absolute", "relative"] = "absolute"
     min_learning_rate: float = 1e-6
 
     # --- Algorithm 2: Server Synchronization Triggers ---
-    h_inter: int = 5
+    # "auto" resolves to n_C / (5n) per Zuo et al. 2024 (Table 2).
+    h_inter: int | Literal["auto"] = 5
     h_intra: int = 350
 
     # --- Server Aggregation ---
     sigmoid_phi: float = 1.5
     server_learning_rate: float = 0.6
+    staleness_mode: Literal["reciprocal", "none", "delta"] = "reciprocal"
 
     # Reserved compatibility field; neither engine simulates TCP retransmissions.
     tcp_rto_delay: float = 0.2
