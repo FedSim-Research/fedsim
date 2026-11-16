@@ -85,6 +85,22 @@ describe('Spyker topology validation', () => {
     expect(errors.some((error) => error.includes('hInter'))).toBe(rejected);
   });
 
+  it.each([
+    ['decayMode', 'relative', false],
+    ['decayMode', 'bogus', true],
+    ['stalenessMode', 'delta', false],
+    ['stalenessMode', 'bogus', true],
+  ])('validates %s %s (rejected: %s)', (field, value, rejected) => {
+    const spykerConfig = {
+      decayBeta: 0.05, minLearningRate: 1e-6, hInter: 5, hIntra: 350,
+      sigmoidPhi: 1.5, serverLearningRate: 0.6, [field as string]: value,
+    } as any;
+    const errors = validator.validateSimulationRequest('spyker',
+      [node('A', 'ServerNode'), node('client', 'ClientNode')], [edge('client', 'A')],
+      { ...config, spykerConfig });
+    expect(errors.some((error) => error.includes(field as string))).toBe(rejected);
+  });
+
   it('rejects fractional local epochs', () => {
     const errors = validator.validateSimulationRequest('spyker',
       [node('A', 'ServerNode'), node('client', 'ClientNode')], [edge('client', 'A')],

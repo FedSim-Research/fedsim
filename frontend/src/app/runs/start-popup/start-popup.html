@@ -162,10 +162,27 @@
                   </div>
                   <div class="sim-settings-section sim-settings-section--separated">
                     <div class="sim-settings-subtitle">Algorithm</div>
+                    <button type="button" class="nav-btn" (click)="applyPaperFaithfulFixes()">Paper-faithful fixes</button>
                     <div class="grid">
                       <label class="field">
                         <span class="field-label">Decay beta <span class="help-dot" title="Decay factor for reducing contribution of frequently-updating clients.">?</span></span>
                         <p-inputNumber [(ngModel)]="spykerSettings.decayBeta" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Decay mode <span class="help-dot" title="absolute: subtract beta per excess update from the base rate; relative: scale the base rate by (1 - beta per excess update).">?</span></span>
+                        <select [(ngModel)]="spykerSettings.decayMode" (ngModelChange)="onSettingsChanged()">
+                          <option value="absolute">absolute</option>
+                          <option value="relative">relative</option>
+                        </select>
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Staleness mode <span class="help-dot" title="reciprocal: eta/(1+drift), full-model blend; none: fixed eta; delta: reciprocal weight, but only the client's change is applied; relative: drift measured in waves of this server's clients.">?</span></span>
+                        <select [(ngModel)]="spykerSettings.stalenessMode" (ngModelChange)="onSettingsChanged()">
+                          <option value="reciprocal">reciprocal</option>
+                          <option value="none">none</option>
+                          <option value="delta">delta</option>
+                          <option value="relative">relative</option>
+                        </select>
                       </label>
                       <label class="field">
                         <span class="field-label">Min learning rate <span class="help-dot" title="Lower bound for client contribution scaling during decay.">?</span></span>
@@ -173,7 +190,11 @@
                       </label>
                       <label class="field">
                         <span class="field-label">h_inter <span class="help-dot" title="Inter-server drift threshold to trigger synchronization.">?</span></span>
-                        <p-inputNumber [(ngModel)]="spykerSettings.hInter" [min]="1" [step]="1" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                        <p-inputNumber [(ngModel)]="spykerSettings.hInter" [min]="1" [step]="1" [useGrouping]="false" [disabled]="spykerSettings.hInterAuto" (ngModelChange)="onSettingsChanged()" />
+                        <label class="field checkbox field-checkbox-inline">
+                          <input type="checkbox" [(ngModel)]="spykerSettings.hInterAuto" (ngModelChange)="onSettingsChanged()" />
+                          <span>Auto (n_C / 5n)</span>
+                        </label>
                       </label>
                       <label class="field">
                         <span class="field-label">h_intra <span class="help-dot" title="Intra-server drift threshold to trigger synchronization.">?</span></span>

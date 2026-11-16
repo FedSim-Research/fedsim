@@ -23,8 +23,13 @@ export interface SimulationSettings {
   idleTokenDelay?: number;
 }
 
+export type DecayMode = 'absolute' | 'relative';
+export type StalenessMode = 'reciprocal' | 'none' | 'delta' | 'relative';
+
 export interface SpykerConfig {
   decayBeta: number;
+  decayMode?: DecayMode;
+  stalenessMode?: StalenessMode;
   minLearningRate: number;
   hInter: number | 'auto';
   hIntra: number;
@@ -74,6 +79,8 @@ export function toStartRequest(graphId: number, config: ArchitectureRunConfig): 
     },
     spyker_config: spyker && {
       decay_beta: spyker.decayBeta,
+      decay_mode: spyker.decayMode,
+      staleness_mode: spyker.stalenessMode,
       min_learning_rate: spyker.minLearningRate,
       h_inter: spyker.hInter,
       h_intra: spyker.hIntra,

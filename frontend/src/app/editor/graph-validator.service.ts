@@ -90,6 +90,8 @@ export class GraphValidatorService {
     if (architecture === 'spyker' && config.spykerConfig) {
       const s = config.spykerConfig;
       if (!Number.isFinite(s.decayBeta) || s.decayBeta < 0) errors.push('spyker: decay beta must be >= 0');
+      if (s.decayMode !== undefined && !['absolute', 'relative'].includes(s.decayMode)) errors.push('spyker: decayMode must be absolute or relative');
+      if (s.stalenessMode !== undefined && !['reciprocal', 'none', 'delta', 'relative'].includes(s.stalenessMode)) errors.push('spyker: stalenessMode must be reciprocal, none, delta or relative');
       if (!Number.isFinite(s.minLearningRate) || s.minLearningRate <= 0) errors.push('spyker: min learning rate must be > 0');
       if (s.hInter !== 'auto' && (!Number.isInteger(s.hInter) || s.hInter < 1)) errors.push('spyker: hInter must be an integer >= 1');
       if (!Number.isInteger(s.hIntra) || s.hIntra < 1) errors.push('spyker: hIntra must be an integer >= 1');

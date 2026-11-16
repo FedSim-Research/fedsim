@@ -129,6 +129,8 @@ export interface SimulationStartRequest {
   };
   spyker_config?: {
     decay_beta?: number;
+    decay_mode?: 'absolute' | 'relative';
+    staleness_mode?: 'reciprocal' | 'none' | 'delta' | 'relative';
     min_learning_rate?: number;
     h_inter?: number | 'auto';
     h_intra?: number;

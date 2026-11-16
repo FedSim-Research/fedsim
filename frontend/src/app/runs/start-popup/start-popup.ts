@@ -5,7 +5,7 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { StepperModule } from 'primeng/stepper';
 import { GraphApiService } from '../../api/graph-api.service';
-import { SimulationMode, SimulationRequest } from '../simulation-request';
+import { DecayMode, SimulationMode, SimulationRequest, StalenessMode } from '../simulation-request';
 import { Architecture } from '../../domain/topology';
 
 type PersistedStartParams = {
@@ -65,8 +65,11 @@ export class StartPopup implements OnInit {
     outputFilename: 'final_model_spyker.pth',
     evaluateModel: false,
     decayBeta: 0.1,
+    decayMode: 'absolute',
+    stalenessMode: 'reciprocal',
     minLearningRate: 0.000001,
     hInter: 5,
+    hInterAuto: false,
     hIntra: 50,
     sigmoidPhi: 1.0,
     serverLearningRate: 0.1,
@@ -173,8 +176,10 @@ export class StartPopup implements OnInit {
         },
         spykerConfig: {
           decayBeta: this.spykerSettings.decayBeta,
+          decayMode: this.spykerSettings.decayMode as DecayMode,
+          stalenessMode: this.spykerSettings.stalenessMode as StalenessMode,
           minLearningRate: this.spykerSettings.minLearningRate,
-          hInter: this.spykerSettings.hInter,
+          hInter: this.spykerSettings.hInterAuto ? 'auto' : this.spykerSettings.hInter,
           hIntra: this.spykerSettings.hIntra,
           sigmoidPhi: this.spykerSettings.sigmoidPhi,
           serverLearningRate: this.spykerSettings.serverLearningRate,
@@ -189,6 +194,13 @@ export class StartPopup implements OnInit {
     this.restoreSpykerSettings();
     this.applyEvaluateFlagForMode(this.selectedMode);
     this.persistSettingsIfChanged();
+  }
+
+  public applyPaperFaithfulFixes(): void {
+    this.spykerSettings.decayMode = 'relative';
+    this.spykerSettings.stalenessMode = 'delta';
+    this.spykerSettings.hInterAuto = true;
+    this.onSettingsChanged();
   }
 
   public onSettingsChanged(): void {
