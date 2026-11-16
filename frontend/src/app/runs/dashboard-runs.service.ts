@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { GraphApiService, SimulationRunResponse } from '../api/graph-api.service';
-import { Architecture } from '../domain/topology';
+import { Architecture, parseRunArchitecture } from '../domain/topology';
 
 @Injectable({ providedIn: 'root' })
 export class DashboardRunsService {
@@ -56,7 +56,7 @@ export class DashboardRunsService {
     const search = this.searchText().trim().toLowerCase();
 
     return this.runs().filter((run) => {
-      if (architecture !== 'all' && String(run.architecture) !== architecture) {
+      if (architecture !== 'all' && parseRunArchitecture(run.architecture) !== architecture) {
         return false;
       }
       if (status !== 'all' && run.status !== status) {

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { GraphApiService } from '../api/graph-api.service';
+import { GraphApiService, SimulationRunResponse } from '../api/graph-api.service';
 import { DashboardRunsService } from './dashboard-runs.service';
 
 describe('DashboardRunsService polling', () => {
@@ -57,5 +57,23 @@ describe('DashboardRunsService polling', () => {
     await Promise.all([refresh, deleted]);
     expect(deleteRun).toHaveBeenCalledWith('old-run');
     expect(listRuns).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('DashboardRunsService architecture filter', () => {
+  it('matches backend architecture names through one resolution', () => {
+    TestBed.configureTestingModule({ providers: [{ provide: GraphApiService, useValue: {} }] });
+    const service = TestBed.inject(DashboardRunsService);
+    service.runs.set(['hierarchical', 'hierfl', 'spyker', 'p2p'].map((architecture, index) => ({
+      run_id: `run-${index}`, status: 'completed', architecture,
+    })) as unknown as SimulationRunResponse[]);
+    const architectures = () => service.filteredRuns().map((run) => String(run.architecture));
+
+    service.filterArchitecture.set('hierfl');
+    expect(architectures()).toEqual(['hierarchical', 'hierfl']);
+    service.filterArchitecture.set('spyker');
+    expect(architectures()).toEqual(['spyker']);
+    service.filterArchitecture.set('all');
+    expect(architectures()).toHaveLength(4);
   });
 });

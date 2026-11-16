@@ -96,4 +96,14 @@ describe('Dashboard server evaluation results', () => {
     expect(fixture.nativeElement.querySelector('.server-results')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Recorded model');
   });
+
+  it('treats an unknown architecture as unknown, not as Spyker', () => {
+    const run = { run_id: 'odd', status: 'completed', architecture: 'p2p', seed: 1,
+      evaluation: serverEvaluation(0.6) } as unknown as SimulationRunResponse;
+    selectedRun.set(run);
+    const fixture = TestBed.createComponent(DashboardViewComponent);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.getSpykerServerResults(run)).toEqual([]);
+    expect(fixture.nativeElement.textContent).toContain('Unknown');
+  });
 });
