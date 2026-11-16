@@ -68,6 +68,8 @@ class SimulationController:
                     run_id=self.run_id,
                     graph_id=graph_id,
                     eval_interval=self.simulation_settings.get("eval_interval"),
+                    partitioning=self.simulation_settings.get("partitioning"),
+                    labels_per_client=self.simulation_settings.get("labels_per_client"),
                 ),
                 evaluator=get_hierfl_evaluate_model,
             )
@@ -86,6 +88,8 @@ class SimulationController:
                     run_id=self.run_id,
                     graph_id=graph_id,
                     eval_interval=self.simulation_settings.get("eval_interval"),
+                    partitioning=self.simulation_settings.get("partitioning"),
+                    labels_per_client=self.simulation_settings.get("labels_per_client"),
                 ),
                 evaluator=get_spyker_evaluate_model,
             )

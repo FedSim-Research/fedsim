@@ -7,6 +7,7 @@ from typing import Any
 from fedsim.persistence.models import Edge, Graph, Node
 from fedsim.services.input_values import (
     SPYKER_MODE_CHOICES,
+    parse_bool,
     parse_choice,
     parse_h_inter,
     parse_nonnegative_float,
@@ -167,6 +168,9 @@ def _require_spyker_config(spyker_config: dict[str, Any] | None) -> dict[str, An
         "server_learning_rate": parse_positive_float,
         "decay_beta": parse_nonnegative_float,
         "tcp_rto_delay": parse_nonnegative_float,
+        "sample_weighting": parse_bool,
+        "age_announcements": parse_bool,
+        "sync_timeout": parse_positive_float,
         "h_inter": parse_h_inter,
         "h_intra": parse_positive_int,
     }
@@ -192,6 +196,8 @@ def build_spyker_simulation(
     run_id: str | None = None,
     graph_id: int | None = None,
     eval_interval: float | None = None,
+    partitioning: str | None = None,
+    labels_per_client: int | None = None,
 ):
     SpykerSimulation, _, _ = _import_spyker()
     validate_spyker_graph(graph)
@@ -220,7 +226,11 @@ def build_spyker_simulation(
             raise ValueError("spyker_invalid_idle_token_delay")
         simulation_config["idle_token_delay"] = idle
     sim = SpykerSimulation(
-        dataset_id=dataset_id or "uoft-cs/cifar10", gpu_budget=gpu_budget, seed=seed
+        dataset_id=dataset_id or "uoft-cs/cifar10",
+        gpu_budget=gpu_budget,
+        seed=seed,
+        partitioning=partitioning or "iid",
+        labels_per_client=labels_per_client,
     )
     sim.set_configurations(
         spyker_params=algorithm_config,

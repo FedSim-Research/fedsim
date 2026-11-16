@@ -273,3 +273,49 @@ def test_duplicate_cache_is_bounded_and_keeps_the_active_round(servers):
     receive(server, "B", "delayed-4", 200)
     assert weight(server) == before
     assert not server._get_and_clear_events()
+
+
+def message_types(server):
+    return [event[3]["data"]["type"] for event in server._get_and_clear_events()]
+
+
+def test_age_announcements_are_off_by_default(servers):
+    server = servers["B"]
+    server.model_age = 30
+    server._announce_age_if_drifting()
+    assert not message_types(server)
+
+
+def test_drifting_server_without_token_announces_age_once_per_epoch(servers):
+    server = servers["B"]
+    server.spyker_config.age_announcements = True
+    server.model_age = 30
+    server._announce_age_if_drifting()
+    assert message_types(server) == ["AGE", "AGE"]
+    server._announce_age_if_drifting()
+    assert not message_types(server)
+    server._remember_sync("next")
+    server._announce_age_if_drifting()
+    assert message_types(server) == ["AGE", "AGE"]
+
+
+def test_token_holder_starts_sync_on_age_announcement(servers):
+    holder = servers["A"]
+    holder.has_token = True
+    holder.on_server_message({"type": "AGE", "sender_id": "B", "age": 30})
+    assert holder.ongoing_sync
+    assert "MODEL_BROADCAST" in message_types(holder)
+
+
+def test_incomplete_sync_releases_token_after_timeout(servers):
+    holder = servers["A"]
+    holder.spyker_config.sync_timeout = 2.0
+    holder.has_token = True
+    holder._broadcast_model_to_all()
+    assert "SYNC_TIMEOUT" in message_types(holder)
+    holder.on_server_message({"type": "SYNC_TIMEOUT", "sender_id": "A", "bid": "stale"})
+    assert holder.ongoing_sync
+    holder.on_server_message({"type": "SYNC_TIMEOUT", "sender_id": "A", "bid": holder.current_bid})
+    assert not holder.ongoing_sync and not holder.has_token
+    assert holder.get_metrics()["sync_timeouts"] == 1
+    assert message_types(holder) == ["TOKEN"]

@@ -71,6 +71,38 @@ def test_delta_staleness_applies_only_the_client_change(make_server):
     assert "c" not in server._sent_weights
 
 
+def test_relative_staleness_measures_drift_in_client_waves(make_server):
+    server = make_server(staleness_mode="relative")
+    server.assigned_client_instances = dict.fromkeys("abcd")
+    assert server._staleness_weight(4) == pytest.approx(0.5)
+    assert server._staleness_weight(-2) == 1.0
+
+
+def test_unknown_staleness_mode_is_rejected(make_server):
+    with pytest.raises(ValueError, match="staleness_mode"):
+        make_server(staleness_mode="linear")._staleness_weight(1)
+
+
+def test_sample_weighting_is_off_by_default(make_server):
+    assert make_server()._sample_weight("c", 400) == 1.0
+
+
+def test_sample_weighting_uses_share_of_reporting_clients(make_server):
+    server = make_server(sample_weighting=True)
+    assert server._sample_weight("a", 100) == 1.0
+    assert server._sample_weight("b", 300) == pytest.approx(1.5)
+
+
+def test_sample_weighted_blend_never_overshoots_client_model(make_server):
+    server = make_server(staleness_mode="none", sample_weighting=True)
+    server._client_num_examples = {"x": 10}
+    server.on_client_update(
+        {"client_id": "c", "num_examples": 1000, "metrics": {"ref_model_age": 0}},
+        [np.array([20.0])],
+    )
+    assert float(server.get_global_model()[0][0]) == pytest.approx(20.0)
+
+
 def test_aggregate_delta():
     result = SpykerDefaultAsyncStrategy().aggregate_delta(
         [np.array([1.0, 2.0])], [np.array([3.0, 3.0])], [np.array([1.0, 1.0])], alpha=0.5

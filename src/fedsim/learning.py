@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from filelock import FileLock
 from flwr_datasets import FederatedDataset
-from flwr_datasets.partitioner import IidPartitioner
+from flwr_datasets.partitioner import IidPartitioner, PathologicalPartitioner
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Lambda, Normalize, Resize, ToTensor
 
@@ -109,12 +109,46 @@ generic_transforms = Compose(
 )
 
 
+PARTITIONING_IID = "iid"
+PARTITIONING_LABEL_SKEW = "label-skew"
+PARTITIONING_MODES = (PARTITIONING_IID, PARTITIONING_LABEL_SKEW)
+
+
+def build_partitioner(
+    num_partitions: int,
+    partitioning: str = PARTITIONING_IID,
+    labels_per_client: int | None = None,
+    seed: int = 42,
+):
+    """Return the flwr_datasets partitioner for the requested data distribution."""
+    if partitioning == PARTITIONING_IID:
+        return IidPartitioner(num_partitions=num_partitions)
+    if partitioning == PARTITIONING_LABEL_SKEW:
+        if not isinstance(labels_per_client, int) or labels_per_client < 1:
+            raise ValueError("dataset_label_skew_requires_positive_labels_per_client")
+        return PathologicalPartitioner(
+            num_partitions=num_partitions,
+            partition_by="label",
+            num_classes_per_partition=labels_per_client,
+            class_assignment_mode="first-deterministic",
+            seed=seed,
+        )
+    raise ValueError("dataset_unsupported_partitioning")
+
+
 @ray.remote(num_cpus=0, num_gpus=0)
 class DatasetProvider:
-    def __init__(self, dataset_id: str, num_partitions: int, seed: int):
+    def __init__(
+        self,
+        dataset_id: str,
+        num_partitions: int,
+        seed: int,
+        partitioning: str = PARTITIONING_IID,
+        labels_per_client: int | None = None,
+    ):
         self.num_partitions = num_partitions
         self.seed = seed
-        partitioner = IidPartitioner(num_partitions=num_partitions)
+        partitioner = build_partitioner(num_partitions, partitioning, labels_per_client, seed)
         self.fds = FederatedDataset(
             dataset=dataset_id,
             partitioners={"train": partitioner},
@@ -135,19 +169,27 @@ class DatasetProvider:
 
 
 def dataset_provider_name(
-    dataset_id: str, num_partitions: int, partition_seed: int, job_id: str
+    dataset_id: str,
+    num_partitions: int,
+    partition_seed: int,
+    job_id: str,
+    partitioning: str = PARTITIONING_IID,
+    labels_per_client: int | None = None,
 ) -> str:
-    """Identify a job-local IID assignment independently of client shuffle seeds."""
-    definition = json.dumps(
-        ["fedsim-iid-v1", dataset_id, num_partitions, partition_seed],
-        ensure_ascii=False,
-        separators=(",", ":"),
-    )
+    """Identify a job-local data assignment independently of client shuffle seeds."""
+    parts = ["fedsim-iid-v1", dataset_id, num_partitions, partition_seed]
+    if partitioning != PARTITIONING_IID:
+        parts += [partitioning, labels_per_client]
+    definition = json.dumps(parts, ensure_ascii=False, separators=(",", ":"))
     return f"fedsim-dataset-{job_id}-" + hashlib.sha256(definition.encode("utf-8")).hexdigest()
 
 
 def get_dataset_provider(
-    dataset_id: str | None, num_partitions: int, partition_seed: int | None = None
+    dataset_id: str | None,
+    num_partitions: int,
+    partition_seed: int | None = None,
+    partitioning: str = PARTITIONING_IID,
+    labels_per_client: int | None = None,
 ):
     """Create/reuse a job-owned provider; engines call this from the driver."""
     if num_partitions < 1:
@@ -155,9 +197,16 @@ def get_dataset_provider(
     normalized_dataset_id = (dataset_id or "").strip() or DEFAULT_DATASET_ID
     data_seed = 42 if partition_seed is None else int(partition_seed)
     job_id = str(ray.get_runtime_context().get_job_id())
-    name = dataset_provider_name(normalized_dataset_id, num_partitions, data_seed, job_id)
+    name = dataset_provider_name(
+        normalized_dataset_id,
+        num_partitions,
+        data_seed,
+        job_id,
+        partitioning,
+        labels_per_client,
+    )
     return DatasetProvider.options(name=name, get_if_exists=True, lifetime="non_detached").remote(
-        normalized_dataset_id, num_partitions, data_seed
+        normalized_dataset_id, num_partitions, data_seed, partitioning, labels_per_client
     )
 
 

@@ -64,6 +64,11 @@ class SpykerServer(BaseAsyncServer):
 
         # Weights last sent to each client (only tracked for staleness_mode == "delta")
         self._sent_weights: Dict[str, List[np.ndarray]] = {}
+        # Training-set sizes of reporting clients (only tracked when sample_weighting is on)
+        self._client_num_examples: Dict[str, int] = {}
+        # RcvAge: announce once per sync epoch; reset whenever a new exchange round starts
+        self._age_announced = False
+        self._sync_timeouts = 0
 
         # The current broadcast ID
         self.current_bid: str = ""
@@ -127,6 +132,7 @@ class SpykerServer(BaseAsyncServer):
             "sync_rounds_initiated": self._sync_sequence,
             "sync_rounds_completed": self._sync_rounds_completed,
             "peer_models_aggregated": self._peer_models_aggregated,
+            "sync_timeouts": self._sync_timeouts,
         }
 
     # ==============================================================
@@ -162,19 +168,16 @@ class SpykerServer(BaseAsyncServer):
         metrics = data.get("metrics", {})
         ref_model_age = metrics.get("ref_model_age", self.model_age)
 
-        # Staleness Dampener
         staleness_mode = self.spyker_config.staleness_mode
-        age_drift = self.model_age - ref_model_age
-        if staleness_mode == "none":
-            staleness_weight = 1.0
-        elif staleness_mode in ("reciprocal", "delta"):
-            staleness_weight = 1.0 / (1.0 + max(0, age_drift))
-        else:
-            raise ValueError(f"Unknown staleness_mode: {staleness_mode!r}")
+        staleness_weight = self._staleness_weight(self.model_age - ref_model_age)
 
         # Aggregate Client weights into global model
         eta_server = self.spyker_config.server_learning_rate
         effective_alpha = eta_server * staleness_weight
+        # A larger-than-average data share must not push the blend past the client model.
+        effective_alpha = min(
+            1.0, effective_alpha * self._sample_weight(client_id, data.get("num_examples"))
+        )
 
         if staleness_mode == "delta":
             # Apply only the client's change, so stale or near-zero-lr updates cannot pull back.
@@ -211,6 +214,8 @@ class SpykerServer(BaseAsyncServer):
         if self.has_token:
             self.server_ages[self.server_id] = self.model_age
             self._check_synchronization()
+        else:
+            self._announce_age_if_drifting()
 
         self._schedule_client_task(client_id)
 
@@ -222,6 +227,10 @@ class SpykerServer(BaseAsyncServer):
             self._handle_model_broadcast(sender_id, data, direct_refs)
         elif msg_type == "TOKEN":
             self._handle_token_arrival(sender_id, data)
+        elif msg_type == "AGE":
+            self._handle_age_announcement(sender_id, data)
+        elif msg_type == "SYNC_TIMEOUT":
+            self._handle_sync_timeout(data["bid"])
 
     # =============================================================
 
@@ -241,6 +250,27 @@ class SpykerServer(BaseAsyncServer):
         else:
             decayed_lr = base_lr * (1.0 - self.spyker_config.decay_beta * excess)
         return max(self.spyker_config.min_learning_rate, decayed_lr)
+
+    def _staleness_weight(self, age_drift: int) -> float:
+        """Dampening factor for a client update trained on a model `age_drift` updates old."""
+        mode = self.spyker_config.staleness_mode
+        drift = max(0, age_drift)
+        if mode == "none":
+            return 1.0
+        if mode in ("reciprocal", "delta"):
+            return 1.0 / (1.0 + drift)
+        if mode == "relative":
+            # Measure drift in waves of this server's clients, so ordinary concurrency is not penalised.
+            return 1.0 / (1.0 + drift / max(1, len(self.assigned_client_instances)))
+        raise ValueError(f"Unknown staleness_mode: {mode!r}")
+
+    def _sample_weight(self, client_id: str, num_examples: int | None) -> float:
+        """Relative data share of a client among this server's reporting clients (1.0 if disabled)."""
+        if not self.spyker_config.sample_weighting or not num_examples:
+            return 1.0
+        self._client_num_examples[client_id] = num_examples
+        mean = sum(self._client_num_examples.values()) / len(self._client_num_examples)
+        return num_examples / mean
 
     def _get_model_size_bytes(self) -> int:
         """Count tensor payload bytes, excluding transport and message metadata."""
@@ -280,8 +310,10 @@ class SpykerServer(BaseAsyncServer):
         print(f"[{self.server_id}] Initiating SYNC {bid}. Reason: {reason}")
 
         self._perform_broadcast(bid)
+        self._schedule_sync_timeout(bid)
 
     def _remember_sync(self, bid):
+        self._age_announced = False
         participants = {self.server_id}
         self._sync_participants[bid] = participants
         if len(self._sync_participants) > self.MAX_BROADCAST_CACHE:
@@ -362,6 +394,49 @@ class SpykerServer(BaseAsyncServer):
         self.server_ages[self.server_id] = self.model_age
 
         self._check_synchronization()
+
+    def _handle_age_announcement(self, sender_id, payload):
+        """Spyker Algorithm 2 RcvAge: learn a peer's age so the token holder can react."""
+        if sender_id not in self.peer_connections:
+            return
+        self.server_ages[sender_id] = max(self.server_ages.get(sender_id, 0), payload["age"])
+        if self.has_token:
+            self.server_ages[self.server_id] = self.model_age
+            self._check_synchronization()
+
+    def _announce_age_if_drifting(self):
+        """Without the token, broadcast our age once per sync epoch when a threshold is exceeded."""
+        if not self.spyker_config.age_announcements or self.has_token or self._age_announced:
+            return
+        self.server_ages[self.server_id] = self.model_age
+        inter_drift = max(self.server_ages.values()) - min(self.server_ages.values())
+        intra_drift = self.model_age - self.age_at_last_sync
+        if inter_drift < self.spyker_config.h_inter and intra_drift < self.spyker_config.h_intra:
+            return
+        self._age_announced = True
+        for peer_id in self.peer_connections:
+            self._send_server_message(peer_id, "AGE", {"age": self.model_age})
+
+    def _schedule_sync_timeout(self, bid):
+        timeout = self.spyker_config.sync_timeout
+        if timeout is None:
+            return
+        self._schedule_event(
+            delay=timeout,
+            target_actor=self.context.server_actor_handles[self.server_id],
+            event_type="SERVER_MESSAGE",
+            data={"type": "SYNC_TIMEOUT", "sender_id": self.server_id, "bid": bid},
+        )
+
+    def _handle_sync_timeout(self, bid):
+        """Release a token whose exchange round did not complete in time."""
+        if not (self.has_token and self.ongoing_sync and bid == self.current_bid):
+            return
+        print(f"[{self.server_id}] Sync {bid} timed out. Releasing Token.")
+        self._sync_timeouts += 1
+        self.current_bid = ""
+        self.ongoing_sync = False
+        self._pass_token(immediate_sync_after_release=True)
 
     def _pass_token(self, immediate_sync_after_release: bool = False):
         if not self.next_token_peer or self.next_token_peer == self.server_id:

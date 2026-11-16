@@ -17,7 +17,7 @@ from typing import Annotated, Literal
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import requests
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 from fedsim.simulation.spyker_config import SpykerAlgorithmConfig
 
@@ -45,7 +45,10 @@ class SpykerParameters(BaseModel):
 
     decay_beta: Annotated[float, Field(ge=0, allow_inf_nan=False)]
     decay_mode: Literal["absolute", "relative"] = "absolute"
-    staleness_mode: Literal["reciprocal", "none", "delta"] = "reciprocal"
+    staleness_mode: Literal["reciprocal", "none", "delta", "relative"] = "reciprocal"
+    sample_weighting: StrictBool = False
+    age_announcements: StrictBool = False
+    sync_timeout: Annotated[float, Field(gt=0, allow_inf_nan=False)] | None = None
     min_learning_rate: PositiveFloat
     h_inter: PositiveInt | Literal["auto"]
     h_intra: PositiveInt
@@ -322,7 +325,8 @@ def _calibration_review(path: Path, config: CampaignConfig) -> dict:
         "spyker_config",
         "require_peer_exchange",
     ):
-        if pilot["config"].get(field) != config.model_dump().get(field):
+        # Compare in the plan's own serialization, which omits unset optional controls.
+        if pilot["config"].get(field) != config.model_dump(exclude_none=True).get(field):
             raise ValueError("campaign_calibration_conditions_mismatch")
     if next(iter(pilot["config"]["scenarios"].values())) not in config.scenarios.values():
         raise ValueError("campaign_calibration_topology_mismatch")

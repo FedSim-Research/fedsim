@@ -174,6 +174,8 @@ def build_hierfl_simulation(
     run_id: str | None = None,
     graph_id: int | None = None,
     eval_interval: float | None = None,
+    partitioning: str | None = None,
+    labels_per_client: int | None = None,
 ):
     HierarchicalSimulation, Network, _ = _import_hierfl()
     validate_hierfl_graph(graph)
@@ -204,6 +206,8 @@ def build_hierfl_simulation(
         run_time_limit=limit,
         gpu_budget=gpu_budget,
         seed=seed,
+        partitioning=partitioning or "iid",
+        labels_per_client=labels_per_client,
     )
     sim.set_metadata(
         run_id=run_id or "unknown_run",

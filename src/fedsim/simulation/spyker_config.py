@@ -15,11 +15,17 @@ class SpykerAlgorithmConfig:
     # "auto" resolves to n_C / (5n) per Zuo et al. 2024 (Table 2).
     h_inter: int | Literal["auto"] = 5
     h_intra: int = 350
+    # RcvAge (Zuo et al. 2024, Alg. 2): servers without the token announce threshold drift.
+    age_announcements: bool = False
+    # Virtual seconds after which an incomplete exchange round releases the token; None waits.
+    sync_timeout: float | None = None
 
     # --- Server Aggregation ---
     sigmoid_phi: float = 1.5
     server_learning_rate: float = 0.6
-    staleness_mode: Literal["reciprocal", "none", "delta"] = "reciprocal"
+    staleness_mode: Literal["reciprocal", "none", "delta", "relative"] = "reciprocal"
+    # Scale each client blend by its training-set size relative to the server's mean.
+    sample_weighting: bool = False
 
     # Reserved compatibility field; neither engine simulates TCP retransmissions.
     tcp_rto_delay: float = 0.2

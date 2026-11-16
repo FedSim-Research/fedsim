@@ -28,11 +28,15 @@ class HierarchicalSimulation:
         run_time_limit: float = RUNTIME_LIMIT,
         gpu_budget: float | None = None,
         seed: int | None = None,
+        partitioning: str = "iid",
+        labels_per_client: int | None = None,
     ):
         self.dataset_id = dataset_id
         self.run_time_limit = run_time_limit
         self.gpu_budget = gpu_budget
         self.seed = seed
+        self.partitioning = partitioning
+        self.labels_per_client = labels_per_client
         self.super_id = None
         self.edge_ids = []
         self.client_ids = []
@@ -239,7 +243,11 @@ class HierarchicalSimulation:
             server_registry=self.server_registry,
             seed=self.seed,
             dataset_provider=get_dataset_provider(
-                self.dataset_id, len(self.client_registry), self.seed
+                self.dataset_id,
+                len(self.client_registry),
+                self.seed,
+                self.partitioning,
+                self.labels_per_client,
             ),
         )
         set_global_context(self.context)
