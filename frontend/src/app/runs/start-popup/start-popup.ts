@@ -7,6 +7,15 @@ import { StepperModule } from 'primeng/stepper';
 import { GraphApiService } from '../../api/graph-api.service';
 import { DecayMode, SimulationMode, SimulationRequest, StalenessMode } from '../simulation-request';
 import { Architecture } from '../../domain/topology';
+import {
+  RUN_OPTIONS,
+  RunOption,
+  RunOptionValues,
+  defaultOptionValues,
+  optionRequestFields,
+  validateOption,
+} from '../run-options';
+import { RunOptionsPanel } from '../run-options-panel/run-options-panel';
 
 type PersistedStartParams = {
   evaluateAfterRun?: boolean;
@@ -17,7 +26,7 @@ type PersistedStartParams = {
 @Component({
   selector: 'app-start-popup',
   standalone: true,
-  imports: [CommonModule, FormsModule, InputNumberModule, InputTextModule, StepperModule],
+  imports: [CommonModule, FormsModule, InputNumberModule, InputTextModule, StepperModule, RunOptionsPanel],
   templateUrl: './start-popup.html',
   styleUrl: './start-popup.css',
 })
@@ -48,6 +57,7 @@ export class StartPopup implements OnInit {
     repetitions: 5,
     outputFilename: 'final_model_hierarchical.pth',
     evaluateModel: false,
+    options: defaultOptionValues('hierfl'),
   };
 
   public spykerSettings = {
@@ -73,7 +83,10 @@ export class StartPopup implements OnInit {
     hIntra: 50,
     sigmoidPhi: 1.0,
     serverLearningRate: 0.1,
+    options: defaultOptionValues('spyker'),
   };
+
+  public readonly runOptions = RUN_OPTIONS;
 
   private lastPersistedSignature: string | null = null;
   private api = inject(GraphApiService);
@@ -155,6 +168,7 @@ export class StartPopup implements OnInit {
           outputFilename: this.hierflSettings.outputFilename,
           evaluateModel: this.evaluateAfterRunByArchitecture.hierfl,
         },
+        options: optionRequestFields('hierfl', this.hierflSettings.options),
       },
       spyker: {
         trainingConfig: {
@@ -184,6 +198,7 @@ export class StartPopup implements OnInit {
           sigmoidPhi: this.spykerSettings.sigmoidPhi,
           serverLearningRate: this.spykerSettings.serverLearningRate,
         },
+        options: optionRequestFields('spyker', this.spykerSettings.options),
       },
     });
     this.persistSettingsIfChanged();
@@ -458,6 +473,10 @@ export class StartPopup implements OnInit {
     const merged: Record<string, unknown> = { ...currentSettings };
     for (const [key, current] of Object.entries(currentSettings)) {
       const stored = persistedSettings[key];
+      if (key === 'options') {
+        merged[key] = this.mergeOptionValues(current as RunOptionValues, stored);
+        continue;
+      }
       const sameType = typeof stored === typeof current
         && (typeof stored !== 'number' || Number.isFinite(stored));
       if (sameType) {
@@ -465,6 +484,32 @@ export class StartPopup implements OnInit {
       }
     }
     return merged as T;
+  }
+
+  /** Keeps stored option values only for declared options with a valid value. */
+  private mergeOptionValues(current: RunOptionValues, stored: unknown): RunOptionValues {
+    if (!stored || typeof stored !== 'object') {
+      return current;
+    }
+    const merged: RunOptionValues = { ...current };
+    for (const option of this.allRunOptions()) {
+      const value = (stored as Record<string, unknown>)[option.requestKey];
+      if (option.requestKey in current && this.isValidOptionValue(option, value)) {
+        merged[option.requestKey] = value as RunOptionValues[string];
+      }
+    }
+    return merged;
+  }
+
+  private allRunOptions(): RunOption[] {
+    return Object.values(RUN_OPTIONS).flat();
+  }
+
+  private isValidOptionValue(option: RunOption, value: unknown): boolean {
+    if (value === null) {
+      return option.kind === 'number';
+    }
+    return validateOption(option, value as RunOptionValues[string]) === null;
   }
 
   private extractSeedSetText(

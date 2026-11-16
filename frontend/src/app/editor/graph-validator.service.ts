@@ -3,6 +3,7 @@ import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
 import { Architecture } from '../domain/topology';
 import { canLink } from '../domain/link-rules';
 import { ArchitectureRunConfig } from '../runs/simulation-request';
+import { validateOptionValues } from '../runs/run-options';
 
 type FlowNodeData = { type?: string; config?: Record<string, unknown> };
 type FlowEdgeMetrics = {
@@ -97,6 +98,10 @@ export class GraphValidatorService {
       if (!Number.isInteger(s.hIntra) || s.hIntra < 1) errors.push('spyker: hIntra must be an integer >= 1');
       if (!Number.isFinite(s.sigmoidPhi) || s.sigmoidPhi <= 0) errors.push('spyker: sigmoid phi must be > 0');
       if (!Number.isFinite(s.serverLearningRate) || s.serverLearningRate <= 0) errors.push('spyker: server learning rate must be > 0');
+    }
+    if (config.options) {
+      const values = { ...config.options.simulation_settings, ...config.options.spyker_config };
+      errors.push(...validateOptionValues(architecture, values));
     }
     return errors;
   }

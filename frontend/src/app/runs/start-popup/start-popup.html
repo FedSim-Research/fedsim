@@ -85,6 +85,10 @@
                       <input pInputText type="text" [(ngModel)]="hierflSettings.outputFilename" (ngModelChange)="onSettingsChanged()" />
                     </label>
                   </div>
+                  <div class="sim-settings-section sim-settings-section--separated">
+                    <div class="sim-settings-subtitle">Advanced options</div>
+                    <app-run-options-panel [options]="runOptions.hierfl" [values]="hierflSettings.options" (valuesChange)="onSettingsChanged()" />
+                  </div>
                 </section>
               </div>
 
@@ -209,6 +213,10 @@
                         <p-inputNumber [(ngModel)]="spykerSettings.serverLearningRate" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
                       </label>
                     </div>
+                  </div>
+                  <div class="sim-settings-section sim-settings-section--separated">
+                    <div class="sim-settings-subtitle">Advanced options</div>
+                    <app-run-options-panel [options]="runOptions.spyker" [values]="spykerSettings.options" (valuesChange)="onSettingsChanged()" />
                   </div>
                 </section>
               </div>

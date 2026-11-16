@@ -126,8 +126,11 @@ export interface SimulationStartRequest {
     repetitions?: number;
     output_filename?: string | null;
     evaluate_model?: boolean;
+    /** Optional controls declared in runs/run-options.ts. */
+    [option: string]: unknown;
   };
   spyker_config?: {
+    [option: string]: unknown;
     decay_beta?: number;
     decay_mode?: 'absolute' | 'relative';
     staleness_mode?: 'reciprocal' | 'none' | 'delta' | 'relative';
