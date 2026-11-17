@@ -316,3 +316,12 @@ across runs.
 Independent reference tests cover hand-computed client/peer blends, floor counts
 and token cadence, including the case where an identical peer model changes the
 age counter and dampens a pending client update.
+
+
+### Optional response-delay policy
+
+`aggregation_delay` is an opt-in response-delay approximation. It delays the next
+Spyker fit or a HierFL coordinator broadcast after the model has already changed.
+It does not delay state visibility, serialize a server work queue, or add edge
+aggregation delay. The default remains disabled. See the experiment documentation
+for interpretation limits; this is not a physical server-compute model.

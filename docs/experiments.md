@@ -240,13 +240,15 @@ checks. Preserve the original archive before deriving tables or figures. Evaluat
 snapshots remain per-actor, not globally simultaneous; asynchronous event order
 can still vary. Historical paper measurements remain a separate evidence set.
 
-## Spyker fix comparison
+## Experimental Spyker policy comparisons
 
-`experiments/spyker-fixes/` holds six campaigns: `default`, `relative-decay`,
-`delta-staleness`, `fixed`, `default-noise` and `fixed-noise`. Each has two
+`experiments/spyker-fixes/` holds seven campaigns: `default`, `relative-decay`,
+`delta-staleness`, `auto-threshold`, `fixed`, `default-noise` and `fixed-noise`. Each has two
 placements and three seeds; the hierarchical counterpart runs in every campaign.
 
-"Fixed" means relative decay, delta staleness and `h_inter: "auto"`, which
+The legacy filename "fixed" selects an experimental combination, not a faithful
+reproduction or a demonstrated correction: relative decay, delta staleness and
+`h_inter: "auto"`, which
 is `n_C / (5 n)`: 10 for 200 clients on 4 servers. The noise campaigns add a
 per-fit runtime standard deviation of 0.02 virtual seconds (5 % of the 0.4 s
 training time) to break synchronous completion waves.
@@ -279,3 +281,29 @@ FEDSIM_EVENT_LOG=off .venv/bin/python experiments/spyker-fixes/smoke.py fixed 60
 The smoke runs use the fixed run ids `smoke-default` and `smoke-fixed`, so
 repeated runs append to the same trace file; delete it before analysing a
 smoke trace.
+
+
+### Compatibility and interpretation
+
+Saved v1 plans may omit the later optional controls. The reader compares absent
+controls with explicit defaults without rewriting the archived bytes. Changed
+non-default policies, graphs or requests remain invalid. Calibration approval
+uses the same equivalence for optional defaults. Runtime sources and old result
+archives remain separate from new policy experiments.
+
+The `fixed` preset changes three controls at once. Use the individual
+`relative-decay`, `delta-staleness` and `auto-threshold` profiles to study their
+separate contributions. Larger accuracy is an observation, not proof of fidelity
+to the original Spyker algorithm. Compare all outcomes at fixed data and budgets.
+
+### Aggregation response-delay approximation
+
+The optional `aggregation_delay` API field retains its name for compatibility.
+Its scope is a response-delay approximation: Spyker updates state immediately,
+then delays that client's next fit. HierFL updates its coordinator immediately,
+then delays its broadcasts. Edge aggregation adds no virtual compute delay.
+Neither path queues work on a busy server or hides the updated model until the
+delay expires; evaluations and peer messages can see the current state during
+that wait. This option must not be used as evidence of calibrated server CPU
+utilization, contention, or delayed model availability. It is disabled by default.
+A serialized aggregation-completion model would require a separate extension.

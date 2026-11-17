@@ -168,3 +168,12 @@ def test_update_trace_is_off_by_default(make_server, trace_logger, monkeypatch):
     server = make_server(run_id="r1")
     update(server, 20.0, ref_age=0)
     assert trace_logger.records == []
+
+
+@pytest.mark.parametrize("sample_weighting,expected", [(False, 14.0), (True, 12.0)])
+def test_only_opt_in_sample_weighting_clamps_the_blend(make_server, sample_weighting, expected):
+    server = make_server(server_learning_rate=2.0, sample_weighting=sample_weighting)
+    server.on_client_update(
+        {"client_id": "c", "num_examples": 400, "metrics": {"ref_model_age": 0}}, [np.array([12.0])]
+    )
+    assert server.global_model_weights[0][0] == pytest.approx(expected)

@@ -1,6 +1,7 @@
 """Plan or execute sequential campaigns through the existing FedSim HTTP API."""
 
 import argparse
+import copy
 import hashlib
 import json
 import logging
@@ -47,6 +48,7 @@ class SpykerParameters(BaseModel):
     decay_mode: Literal["absolute", "relative"] = "absolute"
     staleness_mode: Literal["reciprocal", "none", "delta", "relative"] = "reciprocal"
     sample_weighting: StrictBool = False
+    aggregation_delay: StrictBool = False
     age_merge: Literal["monotonic", "weighted"] = "monotonic"
     age_announcements: StrictBool = False
     fifo_links: StrictBool = False
@@ -269,9 +271,49 @@ def _plan_config(config: CampaignConfig) -> dict:
     return dumped
 
 
+# Pin defaults introduced after the original v1 format for archive compatibility.
+_EXTENSION_DEFAULTS = {
+    "decay_mode": "absolute",
+    "staleness_mode": "reciprocal",
+    "sample_weighting": False,
+    "age_merge": "monotonic",
+    "age_announcements": False,
+    "fifo_links": False,
+    "sync_timeout": None,
+    "aggregation_delay": False,
+}
+
+
+def _comparable_spyker_parameters(parameters):
+    if not isinstance(parameters, dict):
+        return parameters
+    return {
+        key: value
+        for key, value in parameters.items()
+        if key not in _EXTENSION_DEFAULTS
+        or type(value) is not type(_EXTENSION_DEFAULTS[key])
+        or value != _EXTENSION_DEFAULTS[key]
+    }
+
+
+def _comparable_plan(plan: dict) -> dict:
+    """Normalize only omitted extension defaults; keep the original archive intact."""
+    result = copy.deepcopy(plan)
+    config = result["config"]
+    if config.get("client_runtime_sigma") == 0:
+        config.pop("client_runtime_sigma")
+    if "spyker_config" in config:
+        config["spyker_config"] = _comparable_spyker_parameters(config["spyker_config"])
+    for case in result["cases"]:
+        request = case["request"]
+        if "spyker_config" in request:
+            request["spyker_config"] = _comparable_spyker_parameters(request["spyker_config"])
+    return result
+
+
 def _validated_plan(plan: dict) -> dict:
     config = CampaignConfig.model_validate(plan["config"])
-    if plan != build_plan(config, plan["campaign_id"]):
+    if _comparable_plan(plan) != _comparable_plan(build_plan(config, plan["campaign_id"])):
         raise ValueError("campaign_plan_does_not_match_configuration")
     return plan
 
@@ -340,7 +382,14 @@ def _calibration_review(path: Path, config: CampaignConfig) -> dict:
         "spyker_config",
         "require_peer_exchange",
     ):
-        if pilot["config"].get(field) != planned.get(field):
+        observed, requested = pilot["config"].get(field), planned.get(field)
+        if field == "spyker_config":
+            observed = _comparable_spyker_parameters(observed)
+            requested = _comparable_spyker_parameters(requested)
+        elif field == "client_runtime_sigma":
+            observed = 0.0 if observed is None else observed
+            requested = 0.0 if requested is None else requested
+        if observed != requested:
             raise ValueError("campaign_calibration_conditions_mismatch")
     if next(iter(pilot["config"]["scenarios"].values())) not in config.scenarios.values():
         raise ValueError("campaign_calibration_topology_mismatch")

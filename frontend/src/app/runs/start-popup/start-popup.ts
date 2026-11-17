@@ -232,7 +232,7 @@ export class StartPopup implements OnInit, OnDestroy {
     this.persistSettingsIfChanged();
   }
 
-  public applyPaperFaithfulFixes(): void {
+  public applyExperimentalPreset(): void {
     this.spykerSettings.decayMode = 'relative';
     this.spykerSettings.stalenessMode = 'delta';
     this.spykerSettings.hInterAuto = true;

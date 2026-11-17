@@ -1,0 +1,670 @@
+{
+  "schema_version": 1,
+  "campaign_id": "measurement-200-a64c9b91cc8c",
+  "config": {
+    "schema_version": 1,
+    "name": "population-200",
+    "phase": "measurement",
+    "seeds": [
+      42
+    ],
+    "scenarios": {
+      "balanced": [
+        50,
+        50,
+        50,
+        50
+      ]
+    },
+    "network": {
+      "client_upload_mbps": [
+        100.0,
+        100.0,
+        100.0,
+        100.0
+      ],
+      "client_download_mbps": [
+        100.0,
+        100.0,
+        100.0,
+        100.0
+      ],
+      "server_upload_mbps": [
+        100.0,
+        100.0,
+        100.0,
+        100.0
+      ],
+      "server_download_mbps": [
+        100.0,
+        100.0,
+        100.0,
+        100.0
+      ],
+      "client_latency_ms": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "server_latency_ms": 100
+    },
+    "run_time_limit": 60.0,
+    "eval_interval": 10.0,
+    "epochs": 1,
+    "lr": 0.01,
+    "batch_size": 32,
+    "model_complexity": 1.0,
+    "client_compute_factor": 500.0,
+    "spyker_config": {
+      "decay_beta": 0.05,
+      "min_learning_rate": 1e-06,
+      "h_inter": 5,
+      "h_intra": 4,
+      "sigmoid_phi": 1.5,
+      "server_learning_rate": 0.6,
+      "tcp_rto_delay": 0.2
+    },
+    "require_peer_exchange": true
+  },
+  "cases": [
+    {
+      "key": "balanced-hierfl-seed42",
+      "architecture": "hierfl",
+      "scenario": "balanced",
+      "graph": {
+        "nodes": [
+          {
+            "id": "f4cc119e-1f58-5545-9e88-ab9f3bd95248",
+            "type": "SuperServerNode",
+            "point": {
+              "x": 0,
+              "y": 0
+            },
+            "data": {
+              "type": "SuperServerNode",
+              "config": {
+                "name": "coordinator",
+                "computeFactor": 1000.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0
+              }
+            }
+          },
+          {
+            "id": "4de48748-4dd5-51a7-957b-3a81957a341a",
+            "type": "ServerNode",
+            "point": {
+              "x": 150,
+              "y": 0
+            },
+            "data": {
+              "type": "ServerNode",
+              "config": {
+                "name": "server-1",
+                "computeFactor": 1000.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0
+              }
+            }
+          },
+          {
+            "id": "06a09f4d-2ee1-52ec-a80a-ebae7dc4ff76",
+            "type": "ServerNode",
+            "point": {
+              "x": 300,
+              "y": 0
+            },
+            "data": {
+              "type": "ServerNode",
+              "config": {
+                "name": "server-2",
+                "computeFactor": 1000.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0
+              }
+            }
+          },
+          {
+            "id": "6c1614e2-abc6-55b3-a1cc-76767d625955",
+            "type": "ServerNode",
+            "point": {
+              "x": 450,
+              "y": 0
+            },
+            "data": {
+              "type": "ServerNode",
+              "config": {
+                "name": "server-3",
+                "computeFactor": 1000.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0
+              }
+            }
+          },
+          {
+            "id": "cf40d581-0429-5269-86a4-576e62f1bbe0",
+            "type": "ServerNode",
+            "point": {
+              "x": 600,
+              "y": 0
+            },
+            "data": {
+              "type": "ServerNode",
+              "config": {
+                "name": "server-4",
+                "computeFactor": 1000.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0
+              }
+            }
+          },
+          {
+            "id": "f74e0be2-ddfb-546d-8b50-5ddf3ba70451",
+            "type": "ClientNode",
+            "point": {
+              "x": 750,
+              "y": 0
+            },
+            "data": {
+              "type": "ClientNode",
+              "config": {
+                "name": "clients-1",
+                "computeFactor": 500.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0,
+                "count": 50,
+                "type": "workstation"
+              }
+            }
+          },
+          {
+            "id": "6bfb2b2c-bd95-52ad-8932-de0ad572ea26",
+            "type": "ClientNode",
+            "point": {
+              "x": 900,
+              "y": 0
+            },
+            "data": {
+              "type": "ClientNode",
+              "config": {
+                "name": "clients-2",
+                "computeFactor": 500.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0,
+                "count": 50,
+                "type": "workstation"
+              }
+            }
+          },
+          {
+            "id": "86491848-2816-5491-b696-3a3c176ab9da",
+            "type": "ClientNode",
+            "point": {
+              "x": 1050,
+              "y": 0
+            },
+            "data": {
+              "type": "ClientNode",
+              "config": {
+                "name": "clients-3",
+                "computeFactor": 500.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0,
+                "count": 50,
+                "type": "workstation"
+              }
+            }
+          },
+          {
+            "id": "722baac6-7847-5ea5-b8bf-2d8f6ae01ada",
+            "type": "ClientNode",
+            "point": {
+              "x": 1200,
+              "y": 0
+            },
+            "data": {
+              "type": "ClientNode",
+              "config": {
+                "name": "clients-4",
+                "computeFactor": 500.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0,
+                "count": 50,
+                "type": "workstation"
+              }
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "0",
+            "source": "4de48748-4dd5-51a7-957b-3a81957a341a",
+            "target": "f4cc119e-1f58-5545-9e88-ab9f3bd95248",
+            "config": {
+              "pingMs": 100,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "1",
+            "source": "06a09f4d-2ee1-52ec-a80a-ebae7dc4ff76",
+            "target": "f4cc119e-1f58-5545-9e88-ab9f3bd95248",
+            "config": {
+              "pingMs": 100,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "2",
+            "source": "6c1614e2-abc6-55b3-a1cc-76767d625955",
+            "target": "f4cc119e-1f58-5545-9e88-ab9f3bd95248",
+            "config": {
+              "pingMs": 100,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "3",
+            "source": "cf40d581-0429-5269-86a4-576e62f1bbe0",
+            "target": "f4cc119e-1f58-5545-9e88-ab9f3bd95248",
+            "config": {
+              "pingMs": 100,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "4",
+            "source": "f74e0be2-ddfb-546d-8b50-5ddf3ba70451",
+            "target": "4de48748-4dd5-51a7-957b-3a81957a341a",
+            "config": {
+              "pingMs": 10,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "5",
+            "source": "6bfb2b2c-bd95-52ad-8932-de0ad572ea26",
+            "target": "06a09f4d-2ee1-52ec-a80a-ebae7dc4ff76",
+            "config": {
+              "pingMs": 10,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "6",
+            "source": "86491848-2816-5491-b696-3a3c176ab9da",
+            "target": "6c1614e2-abc6-55b3-a1cc-76767d625955",
+            "config": {
+              "pingMs": 10,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "7",
+            "source": "722baac6-7847-5ea5-b8bf-2d8f6ae01ada",
+            "target": "cf40d581-0429-5269-86a4-576e62f1bbe0",
+            "config": {
+              "pingMs": 10,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          }
+        ]
+      },
+      "request": {
+        "training_config": {
+          "epochs": 1,
+          "lr": 0.01,
+          "batch_size": 32,
+          "model_complexity": 1.0
+        },
+        "simulation_settings": {
+          "dataset": "uoft-cs/cifar10",
+          "seed": 42,
+          "seed_set": [
+            42
+          ],
+          "repetitions": 1,
+          "gpu_budget": 0.0,
+          "run_time_limit": 60.0,
+          "eval_interval": 10.0,
+          "idle_token_delay": 1.0,
+          "evaluate_model": true,
+          "output_filename": "campaigns/measurement-200-a64c9b91cc8c/balanced-hierfl-seed42/model.pth"
+        },
+        "spyker_config": null
+      },
+      "require_peer_exchange": true
+    },
+    {
+      "key": "balanced-spyker-seed42",
+      "architecture": "spyker",
+      "scenario": "balanced",
+      "graph": {
+        "nodes": [
+          {
+            "id": "b04c6bb6-73b2-5866-a809-427b328fcfc0",
+            "type": "ServerNode",
+            "point": {
+              "x": 0,
+              "y": 0
+            },
+            "data": {
+              "type": "ServerNode",
+              "config": {
+                "name": "server-1",
+                "computeFactor": 1000.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0
+              }
+            }
+          },
+          {
+            "id": "0a4a3aab-39a3-534e-aca9-ef890ad9f895",
+            "type": "ServerNode",
+            "point": {
+              "x": 150,
+              "y": 0
+            },
+            "data": {
+              "type": "ServerNode",
+              "config": {
+                "name": "server-2",
+                "computeFactor": 1000.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0
+              }
+            }
+          },
+          {
+            "id": "d45000bc-479e-55db-9938-f2e9906ae709",
+            "type": "ServerNode",
+            "point": {
+              "x": 300,
+              "y": 0
+            },
+            "data": {
+              "type": "ServerNode",
+              "config": {
+                "name": "server-3",
+                "computeFactor": 1000.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0
+              }
+            }
+          },
+          {
+            "id": "23fe9362-5035-5d3b-b8c4-c8b41db6967f",
+            "type": "ServerNode",
+            "point": {
+              "x": 450,
+              "y": 0
+            },
+            "data": {
+              "type": "ServerNode",
+              "config": {
+                "name": "server-4",
+                "computeFactor": 1000.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0
+              }
+            }
+          },
+          {
+            "id": "a77c25c0-3ab3-5e38-81ec-2439c7edac32",
+            "type": "ClientNode",
+            "point": {
+              "x": 600,
+              "y": 0
+            },
+            "data": {
+              "type": "ClientNode",
+              "config": {
+                "name": "clients-1",
+                "computeFactor": 500.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0,
+                "count": 50,
+                "type": "workstation"
+              }
+            }
+          },
+          {
+            "id": "8f532b23-30b8-5540-bf49-c44b72e1d2ae",
+            "type": "ClientNode",
+            "point": {
+              "x": 750,
+              "y": 0
+            },
+            "data": {
+              "type": "ClientNode",
+              "config": {
+                "name": "clients-2",
+                "computeFactor": 500.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0,
+                "count": 50,
+                "type": "workstation"
+              }
+            }
+          },
+          {
+            "id": "d8d96046-a425-5cb1-b49a-2251a336098e",
+            "type": "ClientNode",
+            "point": {
+              "x": 900,
+              "y": 0
+            },
+            "data": {
+              "type": "ClientNode",
+              "config": {
+                "name": "clients-3",
+                "computeFactor": 500.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0,
+                "count": 50,
+                "type": "workstation"
+              }
+            }
+          },
+          {
+            "id": "f272b4a7-ad32-56b7-b560-5ef522dd5c1f",
+            "type": "ClientNode",
+            "point": {
+              "x": 1050,
+              "y": 0
+            },
+            "data": {
+              "type": "ClientNode",
+              "config": {
+                "name": "clients-4",
+                "computeFactor": 500.0,
+                "performanceSigma": 0.0,
+                "uploadMbps": 100.0,
+                "downloadMbps": 100.0,
+                "count": 50,
+                "type": "workstation"
+              }
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "0",
+            "source": "b04c6bb6-73b2-5866-a809-427b328fcfc0",
+            "target": "0a4a3aab-39a3-534e-aca9-ef890ad9f895",
+            "config": {
+              "pingMs": 100,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "1",
+            "source": "b04c6bb6-73b2-5866-a809-427b328fcfc0",
+            "target": "d45000bc-479e-55db-9938-f2e9906ae709",
+            "config": {
+              "pingMs": 100,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "2",
+            "source": "b04c6bb6-73b2-5866-a809-427b328fcfc0",
+            "target": "23fe9362-5035-5d3b-b8c4-c8b41db6967f",
+            "config": {
+              "pingMs": 100,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "3",
+            "source": "0a4a3aab-39a3-534e-aca9-ef890ad9f895",
+            "target": "d45000bc-479e-55db-9938-f2e9906ae709",
+            "config": {
+              "pingMs": 100,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "4",
+            "source": "0a4a3aab-39a3-534e-aca9-ef890ad9f895",
+            "target": "23fe9362-5035-5d3b-b8c4-c8b41db6967f",
+            "config": {
+              "pingMs": 100,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "5",
+            "source": "d45000bc-479e-55db-9938-f2e9906ae709",
+            "target": "23fe9362-5035-5d3b-b8c4-c8b41db6967f",
+            "config": {
+              "pingMs": 100,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "6",
+            "source": "a77c25c0-3ab3-5e38-81ec-2439c7edac32",
+            "target": "b04c6bb6-73b2-5866-a809-427b328fcfc0",
+            "config": {
+              "pingMs": 10,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "7",
+            "source": "8f532b23-30b8-5540-bf49-c44b72e1d2ae",
+            "target": "0a4a3aab-39a3-534e-aca9-ef890ad9f895",
+            "config": {
+              "pingMs": 10,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "8",
+            "source": "d8d96046-a425-5cb1-b49a-2251a336098e",
+            "target": "d45000bc-479e-55db-9938-f2e9906ae709",
+            "config": {
+              "pingMs": 10,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          },
+          {
+            "id": "9",
+            "source": "f272b4a7-ad32-56b7-b560-5ef522dd5c1f",
+            "target": "23fe9362-5035-5d3b-b8c4-c8b41db6967f",
+            "config": {
+              "pingMs": 10,
+              "jitterMs": 0,
+              "packetloss": 0.0,
+              "packetlossStddev": 0.0
+            }
+          }
+        ]
+      },
+      "request": {
+        "training_config": {
+          "epochs": 1,
+          "lr": 0.01,
+          "batch_size": 32,
+          "model_complexity": 1.0
+        },
+        "simulation_settings": {
+          "dataset": "uoft-cs/cifar10",
+          "seed": 42,
+          "seed_set": [
+            42
+          ],
+          "repetitions": 1,
+          "gpu_budget": 0.0,
+          "run_time_limit": 60.0,
+          "eval_interval": 10.0,
+          "idle_token_delay": 1.0,
+          "evaluate_model": true,
+          "output_filename": "campaigns/measurement-200-a64c9b91cc8c/balanced-spyker-seed42/model.pth"
+        },
+        "spyker_config": {
+          "decay_beta": 0.05,
+          "min_learning_rate": 1e-06,
+          "h_inter": 5,
+          "h_intra": 4,
+          "sigmoid_phi": 1.5,
+          "server_learning_rate": 0.6,
+          "tcp_rto_delay": 0.2
+        }
+      },
+      "require_peer_exchange": true
+    }
+  ]
+}

@@ -57,3 +57,11 @@ def test_enabled_adds_aggregation_time_to_dispatch(make_server):
     assert event["delay"] == pytest.approx(expected)
     assert expected > 0
     assert ("aggregation",) in server.streams_used
+
+
+def test_response_delay_does_not_claim_delayed_model_visibility(make_server):
+    server = make_server(aggregation_delay=True)
+    (event,) = send_update(server)
+    assert server.current_virtual_time == 0
+    assert server.get_global_model()[0][0] == pytest.approx(11.2)
+    assert event["delay"] > 0

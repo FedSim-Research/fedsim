@@ -72,9 +72,9 @@ export const RUN_OPTIONS: Readonly<Record<Architecture, readonly RunOption[]>> =
       help: 'HierFAVG kappa_2: edge aggregations per coordinator round (backend default 1).',
     },
     {
-      kind: 'flag', requestKey: 'aggregation_delay', label: 'Aggregation delay', section: 'algorithm',
+      kind: 'flag', requestKey: 'aggregation_delay', label: 'Aggregation response delay', section: 'algorithm',
       target: 'simulation_settings', defaultValue: false,
-      help: 'Model virtual server-side aggregation compute time.',
+      help: 'Delay coordinator broadcasts only. Model state updates immediately; edge work and server queues are not modeled.',
     },
   ],
   spyker: [
@@ -100,9 +100,9 @@ export const RUN_OPTIONS: Readonly<Record<Architecture, readonly RunOption[]>> =
       help: 'Deliver server-to-server messages in send order per link.',
     },
     {
-      kind: 'flag', requestKey: 'aggregation_delay', label: 'Aggregation delay', section: 'algorithm',
+      kind: 'flag', requestKey: 'aggregation_delay', label: 'Aggregation response delay', section: 'algorithm',
       target: 'spyker_config', defaultValue: false,
-      help: 'Model virtual server-side aggregation compute time.',
+      help: 'Delay the next fit for the replying client. Model state updates immediately; no busy-server queue is modeled.',
     },
     {
       kind: 'number', requestKey: 'sync_timeout', label: 'Sync timeout (s)', section: 'algorithm',

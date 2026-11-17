@@ -36,9 +36,8 @@ def validate_start_payload(
 
 def _validate_partitioning(simulation_settings: dict, prefix: str) -> None:
     partitioning = simulation_settings.get("partitioning")
-    if partitioning is None:
-        return
-    parse_choice(partitioning, PARTITIONING_MODES, f"{prefix}_invalid_partitioning")
+    if partitioning is not None:
+        parse_choice(partitioning, PARTITIONING_MODES, f"{prefix}_invalid_partitioning")
     labels = simulation_settings.get("labels_per_client")
     if partitioning == PARTITIONING_LABEL_SKEW:
         if labels is None:
@@ -143,7 +142,7 @@ def _validate_spyker_payload(
         _parse_float_gt_zero(server_learning_rate, "spyker_invalid_server_learning_rate")
     if tcp_rto_delay is not None:
         _parse_float_ge_zero(tcp_rto_delay, "spyker_invalid_tcp_rto_delay")
-    for key in ("sample_weighting", "age_announcements", "fifo_links"):
+    for key in ("sample_weighting", "age_announcements", "fifo_links", "aggregation_delay"):
         if spyker_config.get(key) is not None:
             parse_bool(spyker_config[key], f"spyker_invalid_{key}")
     if spyker_config.get("sync_timeout") is not None:

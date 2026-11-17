@@ -245,6 +245,28 @@ def test_campaign_round_trip_uses_real_graph_and_export_routes(
     assert (
         campaign._calibration_review(review, config())["pilot_campaign_id"] == plan["campaign_id"]
     )
+    # The earlier v1 format also omitted all optional Spyker policy defaults.
+    old["config"]["spyker_config"] = campaign._comparable_spyker_parameters(
+        old["config"]["spyker_config"]
+    )
+    for case in old["cases"]:
+        if case["request"]["spyker_config"] is not None:
+            case["request"]["spyker_config"] = campaign._comparable_spyker_parameters(
+                case["request"]["spyker_config"]
+            )
+    campaign._write_json(output / "plan.json", old)
+    checksums["plan.json"] = hashlib.sha256((output / "plan.json").read_bytes()).hexdigest()
+    campaign._write_json(output / "checksums.json", checksums)
+    assert (
+        campaign._calibration_review(review, config())["pilot_campaign_id"] == plan["campaign_id"]
+    )
+    old["config"]["client_runtime_sigma"] = 0.0
+    campaign._write_json(output / "plan.json", old)
+    checksums["plan.json"] = hashlib.sha256((output / "plan.json").read_bytes()).hexdigest()
+    campaign._write_json(output / "checksums.json", checksums)
+    assert (
+        campaign._calibration_review(review, config())["pilot_campaign_id"] == plan["campaign_id"]
+    )
     with pytest.raises(ValueError, match="decision_mismatch"):
         campaign._calibration_review(review, config(run_time_limit=120))
     network = json.loads((CONFIG.parent / "network-sensitivity.json").read_text())["network"]
@@ -660,3 +682,52 @@ def test_plan_saved_before_runtime_sigma_still_validates():
     plan["config"] = old_format_config(config())
     assert "decay_mode" in plan["config"]["spyker_config"]
     assert campaign._validated_plan(plan) == plan
+
+
+def test_pre_extension_archived_plan_is_accepted_without_rewriting(tmp_path):
+    fixture = Path(__file__).parent / "fixtures/campaign-plan-v1.json"
+    content = fixture.read_bytes()
+    path = tmp_path / "plan.json"
+    path.write_bytes(content)
+    assert campaign.read_plan(path) == json.loads(content)
+    assert path.read_bytes() == content
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("decay_mode", "relative"),
+        ("age_merge", "weighted"),
+        ("aggregation_delay", True),
+        ("sample_weighting", 0),
+    ],
+)
+def test_legacy_normalization_rejects_changed_request_policy(field, value):
+    plan = json.loads((Path(__file__).parent / "fixtures/campaign-plan-v1.json").read_bytes())
+    plan["cases"][1]["request"]["spyker_config"][field] = value
+    with pytest.raises(ValueError, match="plan_does_not_match"):
+        campaign._validated_plan(plan)
+
+
+def test_old_and_explicit_default_policies_compare_equally():
+    plan = json.loads((Path(__file__).parent / "fixtures/campaign-plan-v1.json").read_bytes())
+    explicit = campaign.build_plan(
+        campaign.CampaignConfig.model_validate(plan["config"]), plan["campaign_id"]
+    )
+    assert campaign._comparable_plan(plan) == campaign._comparable_plan(explicit)
+    assert campaign._comparable_spyker_parameters(
+        plan["config"]["spyker_config"]
+    ) == campaign._comparable_spyker_parameters(explicit["config"]["spyker_config"])
+
+
+def test_aggregation_response_delay_is_available_to_campaigns():
+    cfg = config(
+        spyker_config={**json.loads(CONFIG.read_text())["spyker_config"], "aggregation_delay": True}
+    )
+    plan = campaign.build_plan(cfg, "response-delay")
+    assert (
+        next(case for case in plan["cases"] if case["architecture"] == "spyker")["request"][
+            "spyker_config"
+        ]["aggregation_delay"]
+        is True
+    )

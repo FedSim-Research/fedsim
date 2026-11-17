@@ -393,3 +393,30 @@ def test_builders_preserve_fractional_millisecond_link_parameters(architecture):
     assert metrics
     assert all(net.latency_avg == 0.75 and net.latency_stddev == 0.125 for net in metrics)
     assert not ray.is_initialized()
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_response_delay_survives_api_validation_and_builder(enabled):
+    from fedsim.api.routes.simulation import SpykerAlgorithmConfig as APIConfig
+
+    graph = topology("spyker")
+    training = {"epochs": 1, "lr": 0.01}
+    controls = APIConfig.model_validate({"aggregation_delay": enabled}).model_dump(
+        exclude_none=True
+    )
+    validate_start_payload("spyker", graph, training, None, controls)
+    simulation = build_spyker_simulation(graph, training_config=training, spyker_config=controls)
+    assert simulation.config.spyker.aggregation_delay is enabled
+    assert not ray.is_initialized()
+
+
+@pytest.mark.parametrize("value", [1, "true"])
+def test_response_delay_requires_a_boolean_in_builder_and_preflight(value):
+    graph = topology("spyker")
+    training = {"epochs": 1, "lr": 0.01}
+    with pytest.raises(ValueError, match="invalid_aggregation_delay"):
+        validate_start_payload("spyker", graph, training, None, {"aggregation_delay": value})
+    with pytest.raises(ValueError, match="invalid_aggregation_delay"):
+        build_spyker_simulation(
+            graph, training_config=training, spyker_config={"aggregation_delay": value}
+        )

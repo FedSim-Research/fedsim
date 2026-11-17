@@ -172,10 +172,10 @@
                   </div>
                   <div class="sim-settings-section sim-settings-section--separated">
                     <div class="sim-settings-subtitle">Algorithm</div>
-                    <button type="button" class="nav-btn" (click)="applyPaperFaithfulFixes()">Paper-faithful fixes</button>
+                    <button type="button" class="nav-btn" (click)="applyExperimentalPreset()">Experimental comparison preset</button>
                     <div class="grid">
                       <label class="field">
-                        <span class="field-label">Decay beta <span class="help-dot" title="Decay factor for reducing contribution of frequently-updating clients.">?</span></span>
+                        <span class="field-label">Decay beta <span class="help-dot" title="Penalty applied to the next local SGD learning rate of frequently updating clients.">?</span></span>
                         <p-inputNumber [(ngModel)]="spykerSettings.decayBeta" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
                       </label>
                       <label class="field">
@@ -195,7 +195,7 @@
                         </select>
                       </label>
                       <label class="field">
-                        <span class="field-label">Min learning rate <span class="help-dot" title="Lower bound for client contribution scaling during decay.">?</span></span>
+                        <span class="field-label">Min learning rate <span class="help-dot" title="Minimum local SGD learning rate.">?</span></span>
                         <p-inputNumber [(ngModel)]="spykerSettings.minLearningRate" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="8" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
                       </label>
                       <label class="field">

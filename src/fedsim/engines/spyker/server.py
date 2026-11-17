@@ -54,7 +54,7 @@ class SpykerServer(BaseAsyncServer):
         self.age_at_last_sync: int = 0
 
         self.has_token: bool = False
-        self.server_ages: Dict[str, int] = {}
+        self.server_ages: Dict[str, float] = {}
 
         self.client_learning_rates: Dict[str, float] = {}
         self._dispatched_lrs: Dict[str, float] = {}  # rate of each client's in-flight fit
@@ -196,9 +196,9 @@ class SpykerServer(BaseAsyncServer):
         eta_server = self.spyker_config.server_learning_rate
         effective_alpha = eta_server * staleness_weight
         # A larger-than-average data share must not push the blend past the client model.
-        effective_alpha = min(
-            1.0, effective_alpha * self._sample_weight(client_id, data.get("num_examples"))
-        )
+        effective_alpha *= self._sample_weight(client_id, data.get("num_examples"))
+        if self.spyker_config.sample_weighting:
+            effective_alpha = min(1.0, effective_alpha)
 
         if staleness_mode == "delta":
             # Apply only the client's change, so stale or near-zero-lr updates cannot pull back.
@@ -308,7 +308,7 @@ class SpykerServer(BaseAsyncServer):
             decayed_lr = base_lr * (1.0 - self.spyker_config.decay_beta * excess)
         return max(self.spyker_config.min_learning_rate, decayed_lr)
 
-    def _staleness_weight(self, age_drift: int) -> float:
+    def _staleness_weight(self, age_drift: float) -> float:
         """Dampening factor for a client update trained on a model `age_drift` updates old."""
         mode = self.spyker_config.staleness_mode
         drift = max(0, age_drift)
@@ -317,7 +317,7 @@ class SpykerServer(BaseAsyncServer):
         if mode in ("reciprocal", "delta"):
             return 1.0 / (1.0 + drift)
         if mode == "relative":
-            # Measure drift in waves of this server's clients, so ordinary concurrency is not penalised.
+            # Measure drift in waves of this server's clients, while still damping positive drift.
             return 1.0 / (1.0 + drift / max(1, len(self.assigned_client_instances)))
         raise ValueError(f"Unknown staleness_mode: {mode!r}")
 
@@ -427,7 +427,7 @@ class SpykerServer(BaseAsyncServer):
         old_age = self.model_age
         weighted_age = (1.0 - effective_alpha) * self.model_age + (effective_alpha * sender_age)
         if self.spyker_config.age_merge == "weighted":
-            # Zuo et al. 2024, Alg. 2 l. 50: real-valued age that may also decrease.
+            # Zuo et al. 2024, Alg. 2 l. 46: real-valued age that may also decrease.
             self.model_age = weighted_age
         else:
             self.model_age = max(old_age, int(round(weighted_age)))
