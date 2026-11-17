@@ -36,4 +36,19 @@ describe('node architecture', () => {
 
     expect(fixture.componentInstance.environment()).toBe('hierfl');
   });
+
+  it('throws for a node without an architecture instead of assuming Spyker', () => {
+    TestBed.configureTestingModule({
+      providers: [
+        MessageService,
+        ɵComponentEventBusService,
+        { provide: ɵNodeAccessorService, useValue: { model: () => ({ selected: signal(false), preselected: signal(false) }) } },
+      ],
+    });
+    TestBed.overrideComponent(ClientNode, { set: { template: '', imports: [] } });
+    const fixture = TestBed.createComponent(ClientNode);
+    fixture.componentRef.setInput('node', { id: 'n', data: signal({ type: 'ClientNode', config: {}, selected: false }) });
+
+    expect(() => fixture.componentInstance.environment()).toThrow('Node n has no architecture.');
+  });
 });

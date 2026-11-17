@@ -115,7 +115,7 @@ export class StartPopup implements OnInit, OnDestroy {
   }
 
   public nextFromHierfl(): void {
-    if (!this.isHierflIncluded()) {
+    if (!this.isHierflIncluded() || this.seedSetError('hierfl')) {
       return;
     }
     this.activeStep = 3;

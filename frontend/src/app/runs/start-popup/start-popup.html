@@ -78,7 +78,7 @@
                     </label>
                     <label class="field">
                       <span class="field-label">Seed set <span class="help-dot" title="Fixed list of seeds used for reproducible benchmark repetitions, for example 42, 43, 44, 45, 46.">?</span></span>
-                      <input pInputText type="text" [(ngModel)]="hierflSettings.seedSetText" (ngModelChange)="updateSeedSet('hierfl', $event)" [attr.aria-invalid]="seedSetError('hierfl') ? true : null" aria-describedby="hierfl-seed-error" />
+                      <input pInputText type="text" [(ngModel)]="hierflSettings.seedSetText" (ngModelChange)="updateSeedSet('hierfl', $event)" [attr.aria-invalid]="seedSetError('hierfl') ? true : null" [attr.aria-describedby]="seedSetError('hierfl') ? 'hierfl-seed-error' : null" />
                       @if (seedSetError('hierfl'); as message) {
                         <span class="field-error" id="hierfl-seed-error">{{ message }}</span>
                       }
@@ -106,7 +106,7 @@
                   <button class="nav-btn nav-btn--primary" (click)="onRun()">Start</button>
                 </div>
                 } @else {
-                <button class="nav-btn nav-btn--primary" (click)="nextFromHierfl()">Next</button>
+                <button class="nav-btn nav-btn--primary" [disabled]="!!seedSetError('hierfl')" (click)="nextFromHierfl()">Next</button>
                 }
               </div>
               } @else {
@@ -156,7 +156,7 @@
                     </label>
                     <label class="field">
                       <span class="field-label">Seed set <span class="help-dot" title="Fixed list of seeds used for reproducible benchmark repetitions, for example 42, 43, 44, 45, 46.">?</span></span>
-                      <input pInputText type="text" [(ngModel)]="spykerSettings.seedSetText" (ngModelChange)="updateSeedSet('spyker', $event)" [attr.aria-invalid]="seedSetError('spyker') ? true : null" aria-describedby="spyker-seed-error" />
+                      <input pInputText type="text" [(ngModel)]="spykerSettings.seedSetText" (ngModelChange)="updateSeedSet('spyker', $event)" [attr.aria-invalid]="seedSetError('spyker') ? true : null" [attr.aria-describedby]="seedSetError('spyker') ? 'spyker-seed-error' : null" />
                       @if (seedSetError('spyker'); as message) {
                         <span class="field-error" id="spyker-seed-error">{{ message }}</span>
                       }

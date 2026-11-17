@@ -67,6 +67,16 @@ describe('StartPopup', () => {
     expect(emitted).not.toHaveBeenCalled();
   });
 
+  it('stays on the HierFL step while its seed set is invalid', () => {
+    component.selectMode('both');
+    component.nextStep();
+    component.updateSeedSet('hierfl', '42, x');
+
+    component.nextFromHierfl();
+
+    expect(component.activeStep).toBe(2);
+  });
+
   it('ignores the invalid seed set of an architecture that does not run', () => {
     component.selectMode('spyker');
     component.updateSeedSet('hierfl', 'x');
