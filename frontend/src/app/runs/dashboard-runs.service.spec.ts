@@ -107,6 +107,21 @@ describe('DashboardRunsService polling', () => {
       expect(vi.getTimerCount()).toBe(0);
     });
 
+    it('resumes polling after a plain refresh succeeds while a consumer is active', async () => {
+      listRuns.mockRejectedValueOnce(notFound());
+      const service = TestBed.inject(DashboardRunsService);
+      service.startPolling();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(service.pollingSupported()).toBe(false);
+
+      await service.refreshRuns();
+      expect(service.pollingSupported()).toBe(true);
+      const calls = listRuns.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(listRuns).toHaveBeenCalledTimes(calls + 1);
+      service.stopPolling();
+    });
+
     it('does not start an interval on retry without consumers', async () => {
       listRuns.mockRejectedValueOnce(notFound());
       const service = TestBed.inject(DashboardRunsService);

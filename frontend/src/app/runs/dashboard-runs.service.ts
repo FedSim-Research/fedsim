@@ -113,7 +113,7 @@ export class DashboardRunsService {
 
   private loadCoalesced(): Promise<void> {
     if (this.refreshInFlight) return this.refreshInFlight;
-    this.refreshInFlight = this.loadRuns().finally(() => { this.refreshInFlight = null; });
+    this.refreshInFlight = this.loadRuns().finally(() => { this.refreshInFlight = null; this.loading.set(false); });
     return this.refreshInFlight;
   }
 
@@ -124,6 +124,7 @@ export class DashboardRunsService {
     try {
       const list = await this.graphApi.listRuns();
       this.pollingSupported.set(true);
+      if (this.pollConsumers > 0 && !this.pollHandle) this.startInterval();
       this.runs.set(list);
       if (!this.selectedRunId() && list.length > 0) {
         this.selectedRunId.set(list[0].run_id);
@@ -140,8 +141,6 @@ export class DashboardRunsService {
       } else {
         this.error.set('Could not load runs from backend.');
       }
-    } finally {
-      this.loading.set(false);
     }
   }
 
@@ -155,9 +154,6 @@ export class DashboardRunsService {
   public async retryRunTracking(): Promise<void> {
     this.pollingSupported.set(true);
     await this.refreshRuns();
-    if (this.pollingSupported() && this.pollConsumers > 0 && !this.pollHandle) {
-      this.startInterval();
-    }
   }
 
   public selectRun(runId: string): void {
