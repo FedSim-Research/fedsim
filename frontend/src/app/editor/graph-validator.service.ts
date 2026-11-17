@@ -1,8 +1,10 @@
 import { Injectable } from '@angular/core';
 import { StaticEdge as Edge, StaticNode as Node } from 'ngx-vflow';
 import { Architecture } from '../domain/topology';
+import { DECAY_MODES, STALENESS_MODES } from '../domain/spyker-modes';
 import { canLink } from '../domain/link-rules';
 import { ArchitectureRunConfig } from '../runs/simulation-request';
+import { validateOptionValues } from '../runs/run-options';
 
 type FlowNodeData = { type?: string; config?: Record<string, unknown> };
 type FlowEdgeMetrics = {
@@ -11,6 +13,11 @@ type FlowEdgeMetrics = {
   packetloss?: number;
   packetlossStddev?: number;
 };
+
+/** Renders [a, b, c] as "a, b or c", the wording the mode messages use. */
+function orList(values: readonly string[]): string {
+  return `${values.slice(0, -1).join(', ')} or ${values[values.length - 1]}`;
+}
 
 @Injectable({
   providedIn: 'root',
@@ -90,11 +97,17 @@ export class GraphValidatorService {
     if (architecture === 'spyker' && config.spykerConfig) {
       const s = config.spykerConfig;
       if (!Number.isFinite(s.decayBeta) || s.decayBeta < 0) errors.push('spyker: decay beta must be >= 0');
+      if (s.decayMode !== undefined && !DECAY_MODES.includes(s.decayMode)) errors.push(`spyker: decayMode must be ${orList(DECAY_MODES)}`);
+      if (s.stalenessMode !== undefined && !STALENESS_MODES.includes(s.stalenessMode)) errors.push(`spyker: stalenessMode must be ${orList(STALENESS_MODES)}`);
       if (!Number.isFinite(s.minLearningRate) || s.minLearningRate <= 0) errors.push('spyker: min learning rate must be > 0');
-      if (!Number.isInteger(s.hInter) || s.hInter < 1) errors.push('spyker: hInter must be an integer >= 1');
+      if (s.hInter !== 'auto' && (!Number.isInteger(s.hInter) || s.hInter < 1)) errors.push('spyker: hInter must be an integer >= 1');
       if (!Number.isInteger(s.hIntra) || s.hIntra < 1) errors.push('spyker: hIntra must be an integer >= 1');
       if (!Number.isFinite(s.sigmoidPhi) || s.sigmoidPhi <= 0) errors.push('spyker: sigmoid phi must be > 0');
       if (!Number.isFinite(s.serverLearningRate) || s.serverLearningRate <= 0) errors.push('spyker: server learning rate must be > 0');
+    }
+    if (config.options) {
+      const values = { ...config.options.simulation_settings, ...config.options.spyker_config };
+      errors.push(...validateOptionValues(architecture, values));
     }
     return errors;
   }
@@ -162,6 +175,14 @@ export class GraphValidatorService {
         const neighbors = adjacency.get(server.id) ?? new Set<string>();
         if (!neighbors.has(superId)) {
           errors.push('hierfl: each Server must be connected to the Super Server');
+          break;
+        }
+      }
+      const clientIds = new Set(clientNodes.map((n) => n.id));
+      for (const server of serverNodes) {
+        const neighbors = adjacency.get(server.id) ?? new Set<string>();
+        if (![...neighbors].some((id) => clientIds.has(id))) {
+          errors.push('hierfl: each Server must have at least one Client');
           break;
         }
       }

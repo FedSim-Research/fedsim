@@ -4,6 +4,7 @@ import numpy as np
 import ray
 
 from fedsim.engines.base import BaseAsyncServer
+from fedsim.simulation.compute_model import estimate_aggregation_time
 from fedsim.simulation.context import SimulationContext, set_global_context
 from fedsim.simulation.network_model import estimate_transmission_time
 from fedsim.strategies.server_strategies import get_sync_server_strategy
@@ -20,10 +21,13 @@ class SuperServer(BaseAsyncServer):
         required_updates: int,
         training_config: Dict[str, Any],
         context: SimulationContext,
+        aggregation_delay: bool = False,
     ):
         set_global_context(context)
 
         super().__init__(server_id)
+
+        self.aggregation_delay = aggregation_delay
 
         self.initial_parameters = initial_parameters
         self.edge_server_refs = {}
@@ -89,16 +93,26 @@ class SuperServer(BaseAsyncServer):
                 else:
                     print(f"[SuperServer] Warning: Total samples was 0 in round {self.model_age}")
 
+                num_updates = len(updates_list)
                 self.updates_buffer.clear()
                 self.model_age += 1
 
-                self._broadcast_global_model()
+                self._broadcast_global_model(num_updates)
 
-    def _broadcast_global_model(self):
+    def _broadcast_global_model(self, num_updates: int = 0):
         """Helper to send the current global model to all Edge Servers."""
 
         super_spec = self.context.get_server_spec(self.server_id)
         weights_ref = ray.put(self.global_model_weights)
+
+        aggregation_time = 0.0
+        if self.aggregation_delay and num_updates > 0:
+            aggregation_time = estimate_aggregation_time(
+                super_spec,
+                num_updates,
+                sum(w.nbytes for w in self.global_model_weights),
+                rng=self.random_streams.stream("aggregation"),
+            )
 
         for edge_server_id, edge_server_ref in self.edge_server_refs.items():
             edge_spec = self.context.get_server_spec(edge_server_id)
@@ -114,7 +128,7 @@ class SuperServer(BaseAsyncServer):
             )
 
             self._schedule_event(
-                delay=latency,
+                delay=latency + aggregation_time,
                 target_actor=edge_server_ref,
                 event_type="SERVER_MESSAGE",
                 data={

@@ -56,7 +56,7 @@ class TrainingClient:
         self.set_parameters(parameters)
 
         epochs = int(config.get("epochs", 1))
-        lr = float(config.get("lr", 0.001))
+        lr = float(config.get("lr", 0.01))
         batch_size = int(config.get("batch_size", 32))
         if batch_size < 1:
             batch_size = 32

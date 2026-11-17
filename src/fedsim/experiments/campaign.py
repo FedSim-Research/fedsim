@@ -17,7 +17,7 @@ from typing import Annotated, Literal
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import requests
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 from fedsim.simulation.spyker_config import SpykerAlgorithmConfig
 
@@ -44,8 +44,15 @@ class SpykerParameters(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decay_beta: Annotated[float, Field(ge=0, allow_inf_nan=False)]
+    decay_mode: Literal["absolute", "relative"] = "absolute"
+    staleness_mode: Literal["reciprocal", "none", "delta", "relative"] = "reciprocal"
+    sample_weighting: StrictBool = False
+    age_merge: Literal["monotonic", "weighted"] = "monotonic"
+    age_announcements: StrictBool = False
+    fifo_links: StrictBool = False
+    sync_timeout: Annotated[float, Field(gt=0, allow_inf_nan=False)] | None = None
     min_learning_rate: PositiveFloat
-    h_inter: PositiveInt
+    h_inter: PositiveInt | Literal["auto"]
     h_intra: PositiveInt
     sigmoid_phi: PositiveFloat
     server_learning_rate: PositiveFloat
@@ -68,6 +75,7 @@ class CampaignConfig(BaseModel):
     batch_size: PositiveInt
     model_complexity: PositiveFloat
     client_compute_factor: PositiveFloat
+    client_runtime_sigma: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0
     spyker_config: SpykerParameters | None = None
     require_peer_exchange: Annotated[bool, Field(strict=True)] | None = None
 
@@ -202,6 +210,8 @@ def build_plan(config: CampaignConfig, campaign_id: str) -> dict:
                 for node in graph["nodes"]:
                     if node["type"] == "ClientNode":
                         node["data"]["config"]["computeFactor"] = config.client_compute_factor
+                        if config.client_runtime_sigma > 0:
+                            node["data"]["config"]["performanceSigma"] = config.client_runtime_sigma
                 cases.append(
                     {
                         "key": key,
@@ -242,14 +252,21 @@ def build_plan(config: CampaignConfig, campaign_id: str) -> dict:
     return {
         "schema_version": 1,
         "campaign_id": campaign_id,
-        # Keep saved v1 plans without the optional controls byte-compatible.
-        "config": config.model_dump(exclude_none=True),
+        "config": _plan_config(config),
         "cases": cases,
     }
 
 
 def read_plan(path: Path) -> dict:
     return _validated_plan(json.loads(path.read_bytes()))
+
+
+def _plan_config(config: CampaignConfig) -> dict:
+    # Omit the zero-valued new field so plans archived before it existed stay comparable.
+    dumped = config.model_dump(exclude_none=True)
+    if not config.client_runtime_sigma:
+        dumped.pop("client_runtime_sigma")
+    return dumped
 
 
 def _validated_plan(plan: dict) -> dict:
@@ -310,6 +327,8 @@ def _calibration_review(path: Path, config: CampaignConfig) -> dict:
         ):
             raise ValueError("campaign_calibration_missing_checkpoints")
     # Horizons may change after calibration; training and network conditions may not.
+    # Compare in the plan's own serialization, which omits unset optional controls.
+    planned = _plan_config(config)
     for field in (
         "network",
         "epochs",
@@ -317,10 +336,11 @@ def _calibration_review(path: Path, config: CampaignConfig) -> dict:
         "batch_size",
         "model_complexity",
         "client_compute_factor",
+        "client_runtime_sigma",
         "spyker_config",
         "require_peer_exchange",
     ):
-        if pilot["config"].get(field) != config.model_dump().get(field):
+        if pilot["config"].get(field) != planned.get(field):
             raise ValueError("campaign_calibration_conditions_mismatch")
     if next(iter(pilot["config"]["scenarios"].values())) not in config.scenarios.values():
         raise ValueError("campaign_calibration_topology_mismatch")

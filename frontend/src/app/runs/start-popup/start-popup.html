@@ -78,12 +78,19 @@
                     </label>
                     <label class="field">
                       <span class="field-label">Seed set <span class="help-dot" title="Fixed list of seeds used for reproducible benchmark repetitions, for example 42, 43, 44, 45, 46.">?</span></span>
-                      <input pInputText type="text" [(ngModel)]="hierflSettings.seedSetText" (ngModelChange)="updateSeedSet('hierfl', $event)" />
+                      <input pInputText type="text" [(ngModel)]="hierflSettings.seedSetText" (ngModelChange)="updateSeedSet('hierfl', $event)" [attr.aria-invalid]="seedSetError('hierfl') ? true : null" [attr.aria-describedby]="seedSetError('hierfl') ? 'hierfl-seed-error' : null" />
+                      @if (seedSetError('hierfl'); as message) {
+                        <span class="field-error" id="hierfl-seed-error">{{ message }}</span>
+                      }
                     </label>
                     <label class="field">
                       <span class="field-label">Output filename <span class="help-dot" title="Target file path/name used to store the final model checkpoint.">?</span></span>
                       <input pInputText type="text" [(ngModel)]="hierflSettings.outputFilename" (ngModelChange)="onSettingsChanged()" />
                     </label>
+                  </div>
+                  <div class="sim-settings-section sim-settings-section--separated">
+                    <div class="sim-settings-subtitle">Advanced options</div>
+                    <app-run-options-panel [options]="runOptions.hierfl" [values]="hierflSettings.options" (valuesChange)="onSettingsChanged()" />
                   </div>
                 </section>
               </div>
@@ -99,7 +106,7 @@
                   <button class="nav-btn nav-btn--primary" (click)="onRun()">Start</button>
                 </div>
                 } @else {
-                <button class="nav-btn nav-btn--primary" (click)="nextFromHierfl()">Next</button>
+                <button class="nav-btn nav-btn--primary" [disabled]="!!seedSetError('hierfl')" (click)="nextFromHierfl()">Next</button>
                 }
               </div>
               } @else {
@@ -149,7 +156,10 @@
                     </label>
                     <label class="field">
                       <span class="field-label">Seed set <span class="help-dot" title="Fixed list of seeds used for reproducible benchmark repetitions, for example 42, 43, 44, 45, 46.">?</span></span>
-                      <input pInputText type="text" [(ngModel)]="spykerSettings.seedSetText" (ngModelChange)="updateSeedSet('spyker', $event)" />
+                      <input pInputText type="text" [(ngModel)]="spykerSettings.seedSetText" (ngModelChange)="updateSeedSet('spyker', $event)" [attr.aria-invalid]="seedSetError('spyker') ? true : null" [attr.aria-describedby]="seedSetError('spyker') ? 'spyker-seed-error' : null" />
+                      @if (seedSetError('spyker'); as message) {
+                        <span class="field-error" id="spyker-seed-error">{{ message }}</span>
+                      }
                     </label>
                     <label class="field">
                       <span class="field-label">Idle token delay (s) <span class="help-dot" title="Delay before token forwarding when no immediate sync is triggered.">?</span></span>
@@ -162,10 +172,27 @@
                   </div>
                   <div class="sim-settings-section sim-settings-section--separated">
                     <div class="sim-settings-subtitle">Algorithm</div>
+                    <button type="button" class="nav-btn" (click)="applyPaperFaithfulFixes()">Paper-faithful fixes</button>
                     <div class="grid">
                       <label class="field">
                         <span class="field-label">Decay beta <span class="help-dot" title="Decay factor for reducing contribution of frequently-updating clients.">?</span></span>
                         <p-inputNumber [(ngModel)]="spykerSettings.decayBeta" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Decay mode <span class="help-dot" title="absolute: subtract beta per excess update from the base rate; relative: scale the base rate by (1 - beta per excess update).">?</span></span>
+                        <select [(ngModel)]="spykerSettings.decayMode" (ngModelChange)="onSettingsChanged()">
+                          <option value="absolute">absolute</option>
+                          <option value="relative">relative</option>
+                        </select>
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Staleness mode <span class="help-dot" title="reciprocal: eta/(1+drift), full-model blend; none: fixed eta; delta: reciprocal weight, but only the client's change is applied; relative: drift measured in waves of this server's clients.">?</span></span>
+                        <select [(ngModel)]="spykerSettings.stalenessMode" (ngModelChange)="onSettingsChanged()">
+                          <option value="reciprocal">reciprocal</option>
+                          <option value="none">none</option>
+                          <option value="delta">delta</option>
+                          <option value="relative">relative</option>
+                        </select>
                       </label>
                       <label class="field">
                         <span class="field-label">Min learning rate <span class="help-dot" title="Lower bound for client contribution scaling during decay.">?</span></span>
@@ -173,7 +200,11 @@
                       </label>
                       <label class="field">
                         <span class="field-label">h_inter <span class="help-dot" title="Inter-server drift threshold to trigger synchronization.">?</span></span>
-                        <p-inputNumber [(ngModel)]="spykerSettings.hInter" [min]="1" [step]="1" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
+                        <p-inputNumber [(ngModel)]="spykerSettings.hInter" [min]="1" [step]="1" [useGrouping]="false" [disabled]="spykerSettings.hInterAuto" (ngModelChange)="onSettingsChanged()" />
+                        <label class="field checkbox field-checkbox-inline">
+                          <input type="checkbox" [(ngModel)]="spykerSettings.hInterAuto" (ngModelChange)="onSettingsChanged()" />
+                          <span>Auto (n_C / 5n)</span>
+                        </label>
                       </label>
                       <label class="field">
                         <span class="field-label">h_intra <span class="help-dot" title="Intra-server drift threshold to trigger synchronization.">?</span></span>
@@ -188,6 +219,10 @@
                         <p-inputNumber [(ngModel)]="spykerSettings.serverLearningRate" mode="decimal" [minFractionDigits]="0" [maxFractionDigits]="6" [useGrouping]="false" (ngModelChange)="onSettingsChanged()" />
                       </label>
                     </div>
+                  </div>
+                  <div class="sim-settings-section sim-settings-section--separated">
+                    <div class="sim-settings-subtitle">Advanced options</div>
+                    <app-run-options-panel [options]="runOptions.spyker" [values]="spykerSettings.options" (valuesChange)="onSettingsChanged()" />
                   </div>
                 </section>
               </div>

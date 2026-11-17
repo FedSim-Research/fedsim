@@ -68,6 +68,9 @@ class SimulationController:
                     run_id=self.run_id,
                     graph_id=graph_id,
                     eval_interval=self.simulation_settings.get("eval_interval"),
+                    edge_rounds=self.simulation_settings.get("edge_rounds"),
+                    aggregation_delay=self.simulation_settings.get("aggregation_delay"),
+                    **self._data_settings(),
                 ),
                 evaluator=get_hierfl_evaluate_model,
             )
@@ -86,11 +89,19 @@ class SimulationController:
                     run_id=self.run_id,
                     graph_id=graph_id,
                     eval_interval=self.simulation_settings.get("eval_interval"),
+                    **self._data_settings(),
                 ),
                 evaluator=get_spyker_evaluate_model,
             )
 
         raise NotImplementedError(f"Architecture not supported: {self.architecture}")
+
+    def _data_settings(self) -> dict:
+        """Data-distribution controls shared by both engines."""
+        return {
+            key: self.simulation_settings.get(key)
+            for key in ("partitioning", "labels_per_client", "local_holdout")
+        }
 
     def _run_simulation(
         self,

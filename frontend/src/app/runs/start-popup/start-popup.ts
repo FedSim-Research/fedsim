@@ -1,12 +1,21 @@
-import { Component, EventEmitter, Input, OnInit, Output, SimpleChanges, inject } from '@angular/core';
+import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { StepperModule } from 'primeng/stepper';
 import { GraphApiService } from '../../api/graph-api.service';
-import { SimulationMode, SimulationRequest } from '../simulation-request';
+import { DecayMode, SimulationMode, SimulationRequest, StalenessMode } from '../simulation-request';
 import { Architecture } from '../../domain/topology';
+import {
+  RUN_OPTIONS,
+  RunOption,
+  RunOptionValues,
+  defaultOptionValues,
+  optionRequestFields,
+  validateOption,
+} from '../run-options';
+import { RunOptionsPanel } from '../run-options-panel/run-options-panel';
 
 type PersistedStartParams = {
   evaluateAfterRun?: boolean;
@@ -17,11 +26,11 @@ type PersistedStartParams = {
 @Component({
   selector: 'app-start-popup',
   standalone: true,
-  imports: [CommonModule, FormsModule, InputNumberModule, InputTextModule, StepperModule],
+  imports: [CommonModule, FormsModule, InputNumberModule, InputTextModule, StepperModule, RunOptionsPanel],
   templateUrl: './start-popup.html',
   styleUrl: './start-popup.css',
 })
-export class StartPopup implements OnInit {
+export class StartPopup implements OnInit, OnDestroy {
   @Input() hierflGraphId: number | null = null;
   @Input() spykerGraphId: number | null = null;
   @Output() close = new EventEmitter<void>();
@@ -48,6 +57,7 @@ export class StartPopup implements OnInit {
     repetitions: 5,
     outputFilename: 'final_model_hierarchical.pth',
     evaluateModel: false,
+    options: defaultOptionValues('hierfl'),
   };
 
   public spykerSettings = {
@@ -65,14 +75,23 @@ export class StartPopup implements OnInit {
     outputFilename: 'final_model_spyker.pth',
     evaluateModel: false,
     decayBeta: 0.1,
+    decayMode: 'absolute',
+    stalenessMode: 'reciprocal',
     minLearningRate: 0.000001,
     hInter: 5,
+    hInterAuto: false,
     hIntra: 50,
     sigmoidPhi: 1.0,
     serverLearningRate: 0.1,
+    options: defaultOptionValues('spyker'),
   };
 
+  public readonly runOptions = RUN_OPTIONS;
+
   private lastPersistedSignature: string | null = null;
+  private destroyed = false;
+  /** Set once the user edits settings, so a late backend response cannot overwrite them. */
+  private userEdited = false;
   private api = inject(GraphApiService);
   private backendSyncTimers: Partial<Record<Architecture, ReturnType<typeof setTimeout>>> = {};
 
@@ -96,7 +115,7 @@ export class StartPopup implements OnInit {
   }
 
   public nextFromHierfl(): void {
-    if (!this.isHierflIncluded()) {
+    if (!this.isHierflIncluded() || this.seedSetError('hierfl')) {
       return;
     }
     this.activeStep = 3;
@@ -125,8 +144,21 @@ export class StartPopup implements OnInit {
     return this.selectedMode === 'hierfl';
   }
 
+  public seedSetError(architecture: Architecture): string | null {
+    const text = architecture === 'hierfl' ? this.hierflSettings.seedSetText : this.spykerSettings.seedSetText;
+    return this.parseSeedSetInput(text)
+      ? null
+      : 'Seeds must be non-negative integers separated by commas or spaces, e.g. 42, 43, 44.';
+  }
+
   public onRun(): void {
     if (!this.selectedMode) {
+      return;
+    }
+    const blocked =
+      (this.isHierflIncluded() && this.seedSetError('hierfl')) ||
+      (this.isSpykerIncluded() && this.seedSetError('spyker'));
+    if (blocked) {
       return;
     }
 
@@ -152,6 +184,7 @@ export class StartPopup implements OnInit {
           outputFilename: this.hierflSettings.outputFilename,
           evaluateModel: this.evaluateAfterRunByArchitecture.hierfl,
         },
+        options: optionRequestFields('hierfl', this.hierflSettings.options),
       },
       spyker: {
         trainingConfig: {
@@ -173,15 +206,23 @@ export class StartPopup implements OnInit {
         },
         spykerConfig: {
           decayBeta: this.spykerSettings.decayBeta,
+          decayMode: this.spykerSettings.decayMode as DecayMode,
+          stalenessMode: this.spykerSettings.stalenessMode as StalenessMode,
           minLearningRate: this.spykerSettings.minLearningRate,
-          hInter: this.spykerSettings.hInter,
+          hInter: this.spykerSettings.hInterAuto ? 'auto' : this.spykerSettings.hInter,
           hIntra: this.spykerSettings.hIntra,
           sigmoidPhi: this.spykerSettings.sigmoidPhi,
           serverLearningRate: this.spykerSettings.serverLearningRate,
         },
+        options: optionRequestFields('spyker', this.spykerSettings.options),
       },
     });
     this.persistSettingsIfChanged();
+  }
+
+  public ngOnDestroy(): void {
+    // Pending sync timers stay armed so an edit made just before closing still reaches the backend.
+    this.destroyed = true;
   }
 
   public ngOnInit(): void {
@@ -191,11 +232,20 @@ export class StartPopup implements OnInit {
     this.persistSettingsIfChanged();
   }
 
+  public applyPaperFaithfulFixes(): void {
+    this.spykerSettings.decayMode = 'relative';
+    this.spykerSettings.stalenessMode = 'delta';
+    this.spykerSettings.hInterAuto = true;
+    this.onSettingsChanged();
+  }
+
   public onSettingsChanged(): void {
+    this.userEdited = true;
     this.persistSettingsIfChanged();
   }
 
   public onEvaluateAfterRunChanged(value: boolean): void {
+    this.userEdited = true;
     this.evaluateAfterRun = value;
 
     if (this.selectedMode === 'hierfl') {
@@ -400,6 +450,9 @@ export class StartPopup implements OnInit {
 
     try {
       const graph = await this.api.getGraph(graphId);
+      if (this.destroyed || this.userEdited) {
+        return;
+      }
       const backendParams = this.extractBackendStartParams(graph.metadata);
 
       if (!backendParams) {
@@ -446,6 +499,10 @@ export class StartPopup implements OnInit {
     const merged: Record<string, unknown> = { ...currentSettings };
     for (const [key, current] of Object.entries(currentSettings)) {
       const stored = persistedSettings[key];
+      if (key === 'options') {
+        merged[key] = this.mergeOptionValues(current as RunOptionValues, stored);
+        continue;
+      }
       const sameType = typeof stored === typeof current
         && (typeof stored !== 'number' || Number.isFinite(stored));
       if (sameType) {
@@ -453,6 +510,32 @@ export class StartPopup implements OnInit {
       }
     }
     return merged as T;
+  }
+
+  /** Keeps stored option values only for declared options with a valid value. */
+  private mergeOptionValues(current: RunOptionValues, stored: unknown): RunOptionValues {
+    if (!stored || typeof stored !== 'object') {
+      return current;
+    }
+    const merged: RunOptionValues = { ...current };
+    for (const option of this.allRunOptions()) {
+      const value = (stored as Record<string, unknown>)[option.requestKey];
+      if (option.requestKey in current && this.isValidOptionValue(option, value)) {
+        merged[option.requestKey] = value as RunOptionValues[string];
+      }
+    }
+    return merged;
+  }
+
+  private allRunOptions(): RunOption[] {
+    return Object.values(RUN_OPTIONS).flat();
+  }
+
+  private isValidOptionValue(option: RunOption, value: unknown): boolean {
+    if (value === null) {
+      return option.kind === 'number';
+    }
+    return validateOption(option, value as RunOptionValues[string]) === null;
   }
 
   private extractSeedSetText(

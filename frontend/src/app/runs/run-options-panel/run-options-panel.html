@@ -1,0 +1,31 @@
+<div class="grid">
+  @for (option of visibleOptions; track option.requestKey) {
+    <label class="field" [class.checkbox]="option.kind === 'flag'">
+      <span class="field-label">{{ option.label }} <span class="help-dot" [title]="option.help">?</span></span>
+      @switch (option.kind) {
+        @case ('choice') {
+          <select [ngModel]="values[option.requestKey]" (ngModelChange)="update(option.requestKey, $event)">
+            @for (choice of $any(option).choices; track choice) {
+              <option [value]="choice">{{ choice }}</option>
+            }
+          </select>
+        }
+        @case ('flag') {
+          <input type="checkbox" [ngModel]="values[option.requestKey]" (ngModelChange)="update(option.requestKey, $event)" />
+        }
+        @case ('number') {
+          <p-inputNumber
+            [ngModel]="values[option.requestKey]"
+            (ngModelChange)="update(option.requestKey, $event)"
+            mode="decimal"
+            [minFractionDigits]="0"
+            [maxFractionDigits]="$any(option).integer ? 0 : 6"
+            [useGrouping]="false"
+            [showClear]="true"
+            placeholder="backend default"
+          />
+        }
+      }
+    </label>
+  }
+</div>

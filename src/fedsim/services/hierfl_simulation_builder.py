@@ -127,6 +127,13 @@ def validate_hierfl_graph(graph: Graph) -> None:
         if len(connected_servers) != 1:
             raise ValueError("hierfl_client_requires_single_server_link")
 
+    # Checked after client links so a disconnected client reports its own error.
+    client_ids = {n.id for n in client_nodes}
+    for server in server_nodes:
+        neighbors = adjacency.get(server.id, set())
+        if not any(nid in client_ids for nid in neighbors):
+            raise ValueError("hierfl_server_requires_clients")
+
     required_common = [
         "computeFactor",
         "uploadMbps",
@@ -167,6 +174,11 @@ def build_hierfl_simulation(
     run_id: str | None = None,
     graph_id: int | None = None,
     eval_interval: float | None = None,
+    partitioning: str | None = None,
+    labels_per_client: int | None = None,
+    local_holdout: float | None = None,
+    edge_rounds: int | None = None,
+    aggregation_delay: bool | None = None,
 ):
     HierarchicalSimulation, Network, _ = _import_hierfl()
     validate_hierfl_graph(graph)
@@ -197,6 +209,18 @@ def build_hierfl_simulation(
         run_time_limit=limit,
         gpu_budget=gpu_budget,
         seed=seed,
+        partitioning=partitioning or "iid",
+        labels_per_client=labels_per_client,
+        # Unset optional controls keep the engine defaults.
+        **{
+            key: value
+            for key, value in {
+                "local_holdout": local_holdout,
+                "edge_rounds": edge_rounds,
+                "aggregation_delay": aggregation_delay,
+            }.items()
+            if value is not None
+        },
     )
     sim.set_metadata(
         run_id=run_id or "unknown_run",

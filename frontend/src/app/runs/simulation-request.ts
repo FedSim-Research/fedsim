@@ -1,5 +1,7 @@
 import { SimulationStartRequest } from '../api/graph-api.service';
 import { Architecture } from '../domain/topology';
+import type { DecayMode, StalenessMode } from '../domain/spyker-modes';
+import { OptionRequestFields } from './run-options';
 
 export type SimulationMode = Architecture | 'both';
 
@@ -23,10 +25,14 @@ export interface SimulationSettings {
   idleTokenDelay?: number;
 }
 
+export type { DecayMode, StalenessMode } from '../domain/spyker-modes';
+
 export interface SpykerConfig {
   decayBeta: number;
+  decayMode?: DecayMode;
+  stalenessMode?: StalenessMode;
   minLearningRate: number;
-  hInter: number;
+  hInter: number | 'auto';
   hIntra: number;
   sigmoidPhi: number;
   serverLearningRate: number;
@@ -38,6 +44,8 @@ export interface ArchitectureRunConfig {
   simulationSettings: SimulationSettings;
   /** Spyker only. */
   spykerConfig?: SpykerConfig;
+  /** Optional controls from run-options.ts, already split into their request blocks. */
+  options?: OptionRequestFields;
 }
 
 /** What the start dialog asks the app to run. */
@@ -71,9 +79,13 @@ export function toStartRequest(graphId: number, config: ArchitectureRunConfig): 
       repetitions: settings.repetitions,
       output_filename: settings.outputFilename || null,
       evaluate_model: settings.evaluateModel,
+      ...config.options?.simulation_settings,
     },
     spyker_config: spyker && {
+      ...config.options?.spyker_config,
       decay_beta: spyker.decayBeta,
+      decay_mode: spyker.decayMode,
+      staleness_mode: spyker.stalenessMode,
       min_learning_rate: spyker.minLearningRate,
       h_inter: spyker.hInter,
       h_intra: spyker.hIntra,

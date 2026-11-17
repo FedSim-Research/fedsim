@@ -6,6 +6,7 @@ import { APP_CONFIG } from '../../config/app-config';
 import { FrameworkJobsService } from '../framework-jobs.service';
 import { DashboardRunsService } from '../dashboard-runs.service';
 import { formatRunProgress } from '../run-progress';
+import { parseRunArchitecture } from '../../domain/topology';
 import { ThemeService } from '../../shared/theme.service';
 
 type ComparableMetrics = {
@@ -260,24 +261,19 @@ export class DashboardViewComponent {
     });
   }
 
-  public architectureLabel(architecture: 'hierarchical' | 'spyker' | 'both'): string {
+  public architectureLabel(architecture: 'hierarchical' | 'spyker' | 'both' | null): string {
     if (architecture === 'hierarchical') {
       return 'hierarchical';
     }
     if (architecture === 'spyker') {
       return 'Spyker';
     }
-    return 'Both';
+    return architecture === 'both' ? 'Both' : 'Unknown';
   }
 
-  public normalizeArchitecture(value: string | null | undefined): 'hierarchical' | 'spyker' | 'both' {
-    if (value === 'hierfl') {
-      return 'hierarchical';
-    }
-    if (value === 'hierarchical' || value === 'spyker' || value === 'both') {
-      return value;
-    }
-    return 'spyker';
+  public normalizeArchitecture(value: string | null | undefined): 'hierarchical' | 'spyker' | 'both' | null {
+    const parsed = parseRunArchitecture(value);
+    return parsed === 'hierfl' ? 'hierarchical' : parsed;
   }
 
   public formatPercent(value: number | null): string {

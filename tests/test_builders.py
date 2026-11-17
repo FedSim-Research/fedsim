@@ -10,6 +10,7 @@ from fedsim.clients import training
 from fedsim.clients.actor import VirtualClient
 from fedsim.engines.hierarchical import edge as hierarchical_edge
 from fedsim.engines.spyker import server as spyker_server
+from fedsim.engines.spyker.simulation import SpykerSimulation
 from fedsim.persistence.models import Edge, Graph, Node
 from fedsim.services.hierfl_simulation_builder import build_hierfl_simulation
 from fedsim.services.simulation_validation import validate_start_payload
@@ -81,6 +82,29 @@ def test_builders_reject_disconnected_clients(architecture):
     builder = build_hierfl_simulation if architecture == "hierfl" else build_spyker_simulation
     with pytest.raises(ValueError, match="client_requires_single_server_link"):
         builder(graph, training_config={"epochs": 1, "lr": 0.01})
+
+
+def test_hierfl_rejects_edge_server_without_clients():
+    graph = topology("hierfl")
+    graph.nodes.append(
+        Node(
+            id="idle",
+            type="ServerNode",
+            config_json=json.dumps({"computeFactor": 10, "uploadMbps": 5, "downloadMbps": 20}),
+            position_json='{"x": 0, "y": 0}',
+        )
+    )
+    graph.edges.append(
+        Edge(
+            source_node_id="coordinator",
+            target_node_id="idle",
+            config_json=json.dumps(
+                {"pingMs": 10, "jitterMs": 0, "packetloss": 0, "packetlossStddev": 0}
+            ),
+        )
+    )
+    with pytest.raises(ValueError, match="hierfl_server_requires_clients"):
+        build_hierfl_simulation(graph, training_config={"epochs": 1, "lr": 0.01})
 
 
 @pytest.mark.parametrize("complete", [False, True])
@@ -319,6 +343,37 @@ def test_invalid_spyker_controls_fail_preflight_and_builder(field, value):
             graph, training_config={"epochs": 1, "lr": 0.01}, spyker_config=config
         )
     assert not ray.is_initialized()
+
+
+def test_h_inter_auto_is_accepted_and_other_strings_are_rejected():
+    graph = topology("spyker")
+    training = {"epochs": 1, "lr": 0.01}
+    validate_start_payload("spyker", graph, training, None, {"h_inter": "auto"})
+    simulation = build_spyker_simulation(
+        graph, training_config=training, spyker_config={"h_inter": "auto"}
+    )
+    assert simulation.config.spyker.h_inter == "auto"
+    with pytest.raises(ValueError):
+        validate_start_payload("spyker", graph, training, None, {"h_inter": "fast"})
+    with pytest.raises(ValueError):
+        build_spyker_simulation(graph, training_config=training, spyker_config={"h_inter": "fast"})
+    assert not ray.is_initialized()
+
+
+@pytest.mark.parametrize("clients,servers,expected", [(200, 4, 10), (2, 1, 1), (7, 2, 1)])
+def test_h_inter_auto_resolves_to_integer(clients, servers, expected):
+    simulation = SpykerSimulation()
+    simulation.config.spyker.h_inter = "auto"
+    simulation.client_ids = list(range(clients))
+    simulation.server_ids = list(range(servers))
+    simulation._resolve_h_inter()
+    assert simulation.config.spyker.h_inter == expected
+
+
+def test_h_inter_default_is_unchanged_by_resolution():
+    simulation = SpykerSimulation()
+    simulation._resolve_h_inter()
+    assert simulation.config.spyker.h_inter == 5
 
 
 @pytest.mark.parametrize("architecture", ["hierfl", "spyker"])

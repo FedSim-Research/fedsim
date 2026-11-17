@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { GraphApiService, SimulationRunResponse } from '../api/graph-api.service';
-import { Architecture } from '../domain/topology';
+import { Architecture, parseRunArchitecture } from '../domain/topology';
 
 @Injectable({ providedIn: 'root' })
 export class DashboardRunsService {
@@ -56,7 +56,7 @@ export class DashboardRunsService {
     const search = this.searchText().trim().toLowerCase();
 
     return this.runs().filter((run) => {
-      if (architecture !== 'all' && String(run.architecture) !== architecture) {
+      if (architecture !== 'all' && parseRunArchitecture(run.architecture) !== architecture) {
         return false;
       }
       if (status !== 'all' && run.status !== status) {
@@ -84,36 +84,47 @@ export class DashboardRunsService {
       return;
     }
     void this.refreshRuns();
-    this.pollHandle = setInterval(() => {
-      if (!this.pollingSupported()) {
-        return;
-      }
-      void this.refreshRuns();
-    }, 4000);
+    this.startInterval();
   }
 
   public stopPolling(): void {
     this.pollConsumers = Math.max(0, this.pollConsumers - 1);
-    if (this.pollConsumers === 0 && this.pollHandle) {
+    if (this.pollConsumers === 0) {
+      this.stopInterval();
+    }
+  }
+
+  private startInterval(): void {
+    this.pollHandle = setInterval(() => void this.loadCoalesced(), 4000);
+  }
+
+  private stopInterval(): void {
+    if (this.pollHandle) {
       clearInterval(this.pollHandle);
       this.pollHandle = null;
     }
   }
 
+  /** Explicit load: shows `loading`, even when it joins a background request already in flight. */
   public refreshRuns(): Promise<void> {
+    this.loading.set(true);
+    return this.loadCoalesced();
+  }
+
+  private loadCoalesced(): Promise<void> {
     if (this.refreshInFlight) return this.refreshInFlight;
-    this.refreshInFlight = this.loadRuns().finally(() => { this.refreshInFlight = null; });
+    this.refreshInFlight = this.loadRuns().finally(() => { this.refreshInFlight = null; this.loading.set(false); });
     return this.refreshInFlight;
   }
 
   private async loadRuns(): Promise<void> {
-    this.loading.set(true);
     if (this.pollingSupported()) {
       this.error.set(null);
     }
     try {
       const list = await this.graphApi.listRuns();
       this.pollingSupported.set(true);
+      if (this.pollConsumers > 0 && !this.pollHandle) this.startInterval();
       this.runs.set(list);
       if (!this.selectedRunId() && list.length > 0) {
         this.selectedRunId.set(list[0].run_id);
@@ -125,12 +136,11 @@ export class DashboardRunsService {
     } catch (err) {
       if (err instanceof HttpErrorResponse && err.status === 404) {
         this.pollingSupported.set(false);
+        this.stopInterval();
         this.error.set('Run tracking endpoint (/runs) is not available in the current backend. Auto-refresh is paused.');
       } else {
         this.error.set('Could not load runs from backend.');
       }
-    } finally {
-      this.loading.set(false);
     }
   }
 

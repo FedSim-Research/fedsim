@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { MessageService } from 'primeng/api';
 import { GraphApiService, SimulationRunResponse, SimulationRunResult } from '../api/graph-api.service';
@@ -8,6 +9,9 @@ import { FrameworkJobsService } from './framework-jobs.service';
 import { ArchitectureRunConfig, SimulationRequest, toStartRequest } from './simulation-request';
 
 const RUN_STATUS_POLL_MS = 2000;
+/** Long runs are polled less often once they have been followed for a while. */
+const RUN_STATUS_SLOW_POLL_MS = 10000;
+const RUN_STATUS_FAST_PHASE_MS = 60000;
 /** Consecutive status request failures tolerated before a run is reported as lost. */
 const MAX_FAILED_STATUS_POLLS = 5;
 const MAX_LISTED_VALIDATION_ERRORS = 5;
@@ -49,13 +53,13 @@ export class SimulationRunner {
   }
 
   private async runCombined(request: SimulationRequest): Promise<void> {
+    if (!sameSeeds(request.hierfl.simulationSettings.seedSet, request.spyker.simulationSettings.seedSet)) {
+      this.error('Combined runs require identical seed sets for HierFL and Spyker.');
+      return;
+    }
     const hierflGraphId = await this.prepare('hierfl', request.hierfl);
     const spykerGraphId = await this.prepare('spyker', request.spyker);
     if (hierflGraphId === null || spykerGraphId === null) {
-      return;
-    }
-    if (!sameSeeds(request.hierfl.simulationSettings.seedSet, request.spyker.simulationSettings.seedSet)) {
-      this.error('Combined runs require identical seed sets for HierFL and Spyker.');
       return;
     }
 
@@ -71,12 +75,16 @@ export class SimulationRunner {
       return;
     }
     const run = await this.followRun(runId, 'combined', jobId);
-    const results = run?.results_by_architecture ?? {};
-    for (const architecture of ['hierfl', 'spyker'] as const) {
-      const result = results[architecture];
-      if (result) {
-        this.success(formatSimulationResult(architecture, result));
-      }
+    if (!run) {
+      return;
+    }
+    const results = run.results_by_architecture ?? {};
+    const reported = (['hierfl', 'spyker'] as const).filter((architecture) => results[architecture]);
+    for (const architecture of reported) {
+      this.success(formatSimulationResult(architecture, results[architecture]!));
+    }
+    if (reported.length === 0) {
+      this.success('combined: Completed');
     }
   }
 
@@ -124,19 +132,25 @@ export class SimulationRunner {
   /** Polls a run, mirroring its state into the job list. Resolves with the run once it completed. */
   private async followRun(runId: string, label: string, jobId: string): Promise<SimulationRunResponse | null> {
     let failedPolls = 0;
+    const startedAt = Date.now();
     for (;;) {
       let run: SimulationRunResponse;
       try {
         run = await this.api.getRunStatus(runId);
         failedPolls = 0;
-      } catch {
+      } catch (err) {
+        if (err instanceof HttpErrorResponse && err.status === 404) {
+          this.jobs.markFailed(jobId);
+          this.error(`The ${label} run ${runId} no longer exists.`);
+          return null;
+        }
         failedPolls += 1;
         if (failedPolls >= MAX_FAILED_STATUS_POLLS) {
           this.jobs.markFailed(jobId);
           this.error(`Lost track of the ${label} run ${runId}. Check the dashboard for its status.`);
           return null;
         }
-        await sleep(RUN_STATUS_POLL_MS);
+        await sleep(pollDelay(startedAt));
         continue;
       }
       switch (run.status) {
@@ -150,8 +164,14 @@ export class SimulationRunner {
           this.jobs.markFailed(jobId);
           this.error(`${label} simulation failed${run.error ? ` (${run.error})` : ''}`);
           return null;
+        case 'queued':
+          break;
+        default:
+          this.jobs.markFailed(jobId);
+          this.error(`${label} run ${runId} reported an unknown status (${run.status}).`);
+          return null;
       }
-      await sleep(RUN_STATUS_POLL_MS);
+      await sleep(pollDelay(startedAt));
     }
   }
 
@@ -205,6 +225,10 @@ export function formatSimulationResult(architecture: Architecture, result: Simul
 
 function sameSeeds(first: number[], second: number[]): boolean {
   return first.length === second.length && first.every((seed, index) => seed === second[index]);
+}
+
+function pollDelay(startedAt: number): number {
+  return Date.now() - startedAt < RUN_STATUS_FAST_PHASE_MS ? RUN_STATUS_POLL_MS : RUN_STATUS_SLOW_POLL_MS;
 }
 
 function sleep(ms: number): Promise<void> {

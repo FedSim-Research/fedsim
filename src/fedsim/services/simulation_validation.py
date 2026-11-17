@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+from fedsim.learning import PARTITIONING_LABEL_SKEW, PARTITIONING_MODES
 from fedsim.persistence.models import Graph
 from fedsim.services.hierfl_simulation_builder import validate_hierfl_graph
+from fedsim.services.input_values import (
+    SPYKER_MODE_CHOICES,
+    parse_bool,
+    parse_choice,
+    parse_training_config,
+)
 from fedsim.services.input_values import parse_nonnegative_float as _parse_float_ge_zero
 from fedsim.services.input_values import parse_nonnegative_int as _parse_int_ge_zero
 from fedsim.services.input_values import parse_positive_float as _parse_float_gt_zero
 from fedsim.services.input_values import parse_positive_int as _parse_int_min_one
-from fedsim.services.input_values import parse_training_config
 from fedsim.services.spyker_simulation_builder import validate_spyker_graph
 
 
@@ -26,6 +32,30 @@ def validate_start_payload(
         validate_spyker_graph(graph)
         return
     raise ValueError("unsupported_architecture")
+
+
+def _validate_partitioning(simulation_settings: dict, prefix: str) -> None:
+    partitioning = simulation_settings.get("partitioning")
+    if partitioning is None:
+        return
+    parse_choice(partitioning, PARTITIONING_MODES, f"{prefix}_invalid_partitioning")
+    labels = simulation_settings.get("labels_per_client")
+    if partitioning == PARTITIONING_LABEL_SKEW:
+        if labels is None:
+            raise ValueError(f"{prefix}_missing_labels_per_client")
+        _parse_int_min_one(labels, f"{prefix}_invalid_labels_per_client")
+    holdout = simulation_settings.get("local_holdout")
+    if holdout is not None:
+        value = _parse_float_ge_zero(holdout, f"{prefix}_invalid_local_holdout")
+        if value >= 1:
+            raise ValueError(f"{prefix}_invalid_local_holdout")
+
+
+def _validate_hierfl_extensions(simulation_settings: dict) -> None:
+    if simulation_settings.get("edge_rounds") is not None:
+        _parse_int_min_one(simulation_settings["edge_rounds"], "hierfl_invalid_edge_rounds")
+    if simulation_settings.get("aggregation_delay") is not None:
+        parse_bool(simulation_settings["aggregation_delay"], "hierfl_invalid_aggregation_delay")
 
 
 def _validate_hierfl_payload(
@@ -54,6 +84,8 @@ def _validate_hierfl_payload(
         if seed is not None:
             _parse_int_ge_zero(seed, "hierfl_invalid_seed")
         _validate_seed_controls(simulation_settings, "hierfl")
+        _validate_partitioning(simulation_settings, "hierfl")
+        _validate_hierfl_extensions(simulation_settings)
 
 
 def _validate_spyker_payload(
@@ -86,6 +118,7 @@ def _validate_spyker_payload(
         if seed is not None:
             _parse_int_ge_zero(seed, "spyker_invalid_seed")
         _validate_seed_controls(simulation_settings, "spyker")
+        _validate_partitioning(simulation_settings, "spyker")
 
     if not spyker_config:
         return
@@ -100,7 +133,7 @@ def _validate_spyker_payload(
         _parse_float_ge_zero(decay_beta, "spyker_invalid_decay_beta")
     if min_learning_rate is not None:
         _parse_float_gt_zero(min_learning_rate, "spyker_invalid_min_learning_rate")
-    if h_inter is not None:
+    if h_inter is not None and h_inter != "auto":
         _parse_int_min_one(h_inter, "spyker_invalid_h_inter")
     if h_intra is not None:
         _parse_int_min_one(h_intra, "spyker_invalid_h_intra")
@@ -110,6 +143,15 @@ def _validate_spyker_payload(
         _parse_float_gt_zero(server_learning_rate, "spyker_invalid_server_learning_rate")
     if tcp_rto_delay is not None:
         _parse_float_ge_zero(tcp_rto_delay, "spyker_invalid_tcp_rto_delay")
+    for key in ("sample_weighting", "age_announcements", "fifo_links"):
+        if spyker_config.get(key) is not None:
+            parse_bool(spyker_config[key], f"spyker_invalid_{key}")
+    if spyker_config.get("sync_timeout") is not None:
+        _parse_float_gt_zero(spyker_config["sync_timeout"], "spyker_invalid_sync_timeout")
+    for key, choices in SPYKER_MODE_CHOICES.items():
+        value = spyker_config.get(key)
+        if value is not None:
+            parse_choice(value, choices, f"spyker_invalid_{key}")
 
 
 def _validate_seed_controls(simulation_settings: dict, prefix: str) -> None:

@@ -1,4 +1,5 @@
 import logging
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, Field
@@ -35,12 +36,24 @@ class SimulationSettings(BaseModel):
     repetitions: int | None = None
     output_filename: str | None = None
     evaluate_model: bool = False
+    partitioning: Literal["iid", "label-skew"] | None = None
+    labels_per_client: int | None = None
+    local_holdout: float | None = None
+    edge_rounds: int | None = None
+    aggregation_delay: bool | None = None
 
 
 class SpykerAlgorithmConfig(BaseModel):
     decay_beta: float | None = None
+    decay_mode: Literal["absolute", "relative"] | None = None
+    staleness_mode: Literal["reciprocal", "none", "delta", "relative"] | None = None
+    sample_weighting: bool | None = None
+    age_merge: Literal["monotonic", "weighted"] | None = None
+    age_announcements: bool | None = None
+    fifo_links: bool | None = None
+    sync_timeout: float | None = None
     min_learning_rate: float | None = None
-    h_inter: int | None = None
+    h_inter: int | Literal["auto"] | None = None
     h_intra: int | None = None
     sigmoid_phi: float | None = None
     server_learning_rate: float | None = None

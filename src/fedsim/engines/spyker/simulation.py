@@ -6,7 +6,7 @@ import ray
 import torch
 
 from fedsim.engines.spyker.server import SpykerServer
-from fedsim.learning import Net, get_dataset_provider
+from fedsim.learning import DEFAULT_LOCAL_HOLDOUT, Net, get_dataset_provider
 from fedsim.runtime import ensure_ray_initialized
 from fedsim.simulation.context import SimulationContext, set_global_context
 from fedsim.simulation.cpu_execution import get_cpu_execution_pool
@@ -24,10 +24,16 @@ class SpykerSimulation:
         dataset_id: str = "uoft-cs/cifar10",
         gpu_budget: float | None = None,
         seed: int | None = None,
+        partitioning: str = "iid",
+        labels_per_client: int | None = None,
+        local_holdout: float = DEFAULT_LOCAL_HOLDOUT,
     ):
         self.dataset_id = dataset_id
         self.gpu_budget = gpu_budget
         self.seed = seed
+        self.partitioning = partitioning
+        self.labels_per_client = labels_per_client
+        self.local_holdout = local_holdout
         self.server_ids = []
         self.client_ids = []
 
@@ -179,6 +185,13 @@ class SpykerSimulation:
         }
         self.client_map[server_id].append((client_id, client_config))
 
+    def _resolve_h_inter(self):
+        if self.config.spyker.h_inter == "auto":
+            # n_C / (5n), rounded to the nearest integer (ties to even), at least 1.
+            self.config.spyker.h_inter = max(
+                1, round(len(self.client_ids) / (5 * len(self.server_ids)))
+            )
+
     def _spawn_actors(self):
         if not self.server_ids:
             raise ValueError("No servers defined.")
@@ -189,6 +202,8 @@ class SpykerSimulation:
                 "First spyker server must have at least one client to initialize global model."
             )
 
+        self._resolve_h_inter()
+
         dummy_model = Net(seed=self.seed)
         initial_weights_np = [val.cpu().numpy() for _, val in dummy_model.state_dict().items()]
 
@@ -196,7 +211,7 @@ class SpykerSimulation:
 
         for s_id in self.server_ids:
             actor = SpykerServer.options(**self._server_actor_options).remote(
-                server_id=s_id, config=self.config, context=self.context
+                server_id=s_id, config=self.config, context=self.context, run_id=self.run_id
             )
             self.spyker_actors_map[s_id] = actor
 
@@ -268,7 +283,12 @@ class SpykerSimulation:
             server_registry=self.server_registry,
             seed=self.seed,
             dataset_provider=get_dataset_provider(
-                self.dataset_id, len(self.client_registry), self.seed
+                self.dataset_id,
+                len(self.client_registry),
+                self.seed,
+                self.partitioning,
+                self.labels_per_client,
+                self.local_holdout,
             ),
         )
 

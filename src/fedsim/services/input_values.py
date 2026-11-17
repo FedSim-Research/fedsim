@@ -46,6 +46,29 @@ def parse_positive_int(value: object, error_code: str) -> int:
     return _integer(value, error_code, 1)
 
 
+SPYKER_MODE_CHOICES = {
+    "decay_mode": ("absolute", "relative"),
+    "staleness_mode": ("reciprocal", "none", "delta", "relative"),
+    "age_merge": ("monotonic", "weighted"),
+}
+
+
+def parse_choice(value: object, choices: tuple[str, ...], error_code: str) -> str:
+    if not isinstance(value, str) or value not in choices:
+        raise ValueError(error_code)
+    return value
+
+
+def parse_bool(value: object, error_code: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(error_code)
+    return value
+
+
+def parse_h_inter(value: object, error_code: str) -> int | str:
+    return value if value == "auto" else parse_positive_int(value, error_code)
+
+
 def parse_nonnegative_int(value: object, error_code: str) -> int:
     return _integer(value, error_code, 0)
 

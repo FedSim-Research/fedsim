@@ -74,11 +74,71 @@ describe('Spyker topology validation', () => {
     expect(errors.some((error) => error.toLowerCase().includes(field.toLowerCase()))).toBe(true);
   });
 
+  it.each([['auto', false], ['fast', true]])('validates hInter %s (rejected: %s)', (hInter, rejected) => {
+    const spykerConfig = {
+      decayBeta: 0.05, minLearningRate: 1e-6, hInter, hIntra: 350,
+      sigmoidPhi: 1.5, serverLearningRate: 0.6,
+    } as any;
+    const errors = validator.validateSimulationRequest('spyker',
+      [node('A', 'ServerNode'), node('client', 'ClientNode')], [edge('client', 'A')],
+      { ...config, spykerConfig });
+    expect(errors.some((error) => error.includes('hInter'))).toBe(rejected);
+  });
+
+  it.each([
+    ['decayMode', 'relative', false],
+    ['decayMode', 'bogus', true],
+    ['stalenessMode', 'delta', false],
+    ['stalenessMode', 'bogus', true],
+  ])('validates %s %s (rejected: %s)', (field, value, rejected) => {
+    const spykerConfig = {
+      decayBeta: 0.05, minLearningRate: 1e-6, hInter: 5, hIntra: 350,
+      sigmoidPhi: 1.5, serverLearningRate: 0.6, [field as string]: value,
+    } as any;
+    const errors = validator.validateSimulationRequest('spyker',
+      [node('A', 'ServerNode'), node('client', 'ClientNode')], [edge('client', 'A')],
+      { ...config, spykerConfig });
+    expect(errors.some((error) => error.includes(field as string))).toBe(rejected);
+  });
+
+  it('reports the exact message for an invalid decayMode', () => {
+    const spykerConfig = {
+      decayBeta: 0.05, minLearningRate: 1e-6, hInter: 5, hIntra: 350,
+      sigmoidPhi: 1.5, serverLearningRate: 0.6, decayMode: 'bogus',
+    } as any;
+    const errors = validator.validateSimulationRequest('spyker',
+      [node('A', 'ServerNode'), node('client', 'ClientNode')], [edge('client', 'A')],
+      { ...config, spykerConfig });
+    expect(errors).toContain('spyker: decayMode must be absolute or relative');
+  });
+
+  it('reports the exact message for an invalid stalenessMode', () => {
+    const spykerConfig = {
+      decayBeta: 0.05, minLearningRate: 1e-6, hInter: 5, hIntra: 350,
+      sigmoidPhi: 1.5, serverLearningRate: 0.6, stalenessMode: 'bogus',
+    } as any;
+    const errors = validator.validateSimulationRequest('spyker',
+      [node('A', 'ServerNode'), node('client', 'ClientNode')], [edge('client', 'A')],
+      { ...config, spykerConfig });
+    expect(errors).toContain('spyker: stalenessMode must be reciprocal, none, delta or relative');
+  });
+
   it('rejects fractional local epochs', () => {
     const errors = validator.validateSimulationRequest('spyker',
       [node('A', 'ServerNode'), node('client', 'ClientNode')], [edge('client', 'A')],
       { ...config, trainingConfig: { ...config.trainingConfig, epochs: 1.5 } });
     expect(errors.some((error) => error.includes('epochs'))).toBe(true);
+  });
+
+  it('rejects a hierarchical Server without Clients', () => {
+    const nodes = [
+      node('S', 'SuperServerNode'), node('A', 'ServerNode'), node('idle', 'ServerNode'),
+      node('client', 'ClientNode'),
+    ];
+    const edges = [edge('A', 'S'), edge('idle', 'S'), edge('client', 'A')];
+    expect(validator.validateSimulationRequest('hierfl', nodes, edges, config)).toContain(
+      'hierfl: each Server must have at least one Client',
+    );
   });
 
   it.each([['pingMs', null, 'ping'], ['packetloss', false, 'packetloss']])(

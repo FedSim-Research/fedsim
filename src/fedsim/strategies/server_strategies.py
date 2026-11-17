@@ -43,6 +43,16 @@ class AsyncServerStrategy(ABC):
     ) -> List[np.ndarray]:
         pass
 
+    @abstractmethod
+    def aggregate_delta(
+        self,
+        global_weights: List[np.ndarray],
+        update_weights: List[np.ndarray],
+        base_weights: List[np.ndarray],
+        alpha: float,
+    ) -> List[np.ndarray]:
+        """Apply alpha times the client's change relative to the model it trained on."""
+
 
 class SpykerDefaultAsyncStrategy(AsyncServerStrategy):
     """Standard Spyker Exponential Moving Average."""
@@ -53,6 +63,20 @@ class SpykerDefaultAsyncStrategy(AsyncServerStrategy):
         return [
             w_base + alpha * (w_upd - w_base)
             for w_base, w_upd in zip(global_weights, update_weights)
+        ]
+
+    def aggregate_delta(
+        self,
+        global_weights: List[np.ndarray],
+        update_weights: List[np.ndarray],
+        base_weights: List[np.ndarray],
+        alpha: float,
+    ) -> List[np.ndarray]:
+        return [
+            w_glob + alpha * (w_upd - w_sent)
+            for w_glob, w_upd, w_sent in zip(
+                global_weights, update_weights, base_weights, strict=True
+            )
         ]
 
 

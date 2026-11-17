@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Literal
 
 
 @dataclass
@@ -7,15 +8,30 @@ class SpykerAlgorithmConfig:
 
     # --- Algorithm 1: Client Learning Rate Decay ---
     decay_beta: float = 0.05
+    decay_mode: Literal["absolute", "relative"] = "absolute"
     min_learning_rate: float = 1e-6
 
     # --- Algorithm 2: Server Synchronization Triggers ---
-    h_inter: int = 5
+    # "auto" resolves to n_C / (5n) per Zuo et al. 2024 (Table 2).
+    h_inter: int | Literal["auto"] = 5
     h_intra: int = 350
+    # RcvAge (Zuo et al. 2024, Alg. 2): servers without the token announce threshold drift.
+    age_announcements: bool = False
+    # Deliver server-to-server messages in send order per link, as Spyker assumes.
+    fifo_links: bool = False
+    # Virtual seconds after which an incomplete exchange round releases the token; None waits.
+    sync_timeout: float | None = None
 
     # --- Server Aggregation ---
     sigmoid_phi: float = 1.5
+    # "monotonic": rounded integer age that never decreases; "weighted": real-valued as in Alg. 2.
+    age_merge: Literal["monotonic", "weighted"] = "monotonic"
     server_learning_rate: float = 0.6
+    staleness_mode: Literal["reciprocal", "none", "delta", "relative"] = "reciprocal"
+    # Scale each client blend by its training-set size relative to the server's mean.
+    sample_weighting: bool = False
+    # Models server-side aggregation compute time as virtual delay.
+    aggregation_delay: bool = False
 
     # Reserved compatibility field; neither engine simulates TCP retransmissions.
     tcp_rto_delay: float = 0.2

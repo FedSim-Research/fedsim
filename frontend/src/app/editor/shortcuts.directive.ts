@@ -250,7 +250,7 @@ export class Shortcuts{
       kind: entry.kind,
       architecture: service.architecture,
       point: { x: entry.point.x + PASTE_OFFSET, y: entry.point.y + PASTE_OFFSET },
-      config: { ...entry.config, environment: service.architecture },
+      config: { ...entry.config },
     }));
     const rejection = service.addEntities(nodes, []);
     if (rejection) {

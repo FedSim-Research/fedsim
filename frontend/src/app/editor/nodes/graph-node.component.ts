@@ -12,7 +12,7 @@ export type NodeSettings = Record<string, string | number>;
 
 interface NodeData {
   config?: Record<string, unknown>;
-  environment?: Architecture;
+  environment: Architecture;
   selected?: boolean;
 }
 
@@ -33,7 +33,12 @@ export abstract class GraphNodeComponent<S extends NodeSettings> extends CustomN
   public readonly isEditing = computed(() => this.editUi.activeId() === this.node().id);
   public readonly showDelete = computed(() => this.deleteUi.activeId() === this.node().id || this.isEditing());
   public readonly isSelected = computed(() => Boolean(this.data()?.selected));
-  public readonly environment = computed<Architecture>(() => this.data()?.environment ?? 'spyker');
+  public readonly environment = computed<Architecture>(() => {
+    // data() is typed optional by the renderer; a node without an architecture is a bug, not a Spyker node.
+    const environment = this.data()?.environment;
+    if (!environment) throw new Error(`Node ${this.node().id} has no architecture.`);
+    return environment;
+  });
 
   /** The node's settings, completed with defaults. */
   public readonly settings = computed(() => this.withDefaults(this.data()?.config ?? {}));

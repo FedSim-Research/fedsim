@@ -1,4 +1,5 @@
 import math
+import os
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
@@ -7,18 +8,26 @@ import ray
 
 from fedsim.clients.handle import ClientHandle
 from fedsim.engines.base import BaseAsyncServer
+from fedsim.simulation.compute_model import estimate_aggregation_time
 from fedsim.simulation.context import SimulationContext, set_global_context
 from fedsim.simulation.network_model import estimate_transmission_time
 from fedsim.simulation.spyker_config import FullConfiguration
 from fedsim.specs.network_metrics import Network
 from fedsim.strategies.server_strategies import get_async_server_strategy
+from fedsim.telemetry.logging import setup_telemetry_logger
 
 TOKEN_PAYLOAD_BYTES = 1000
 
 
 @ray.remote(num_cpus=0, num_gpus=0)
 class SpykerServer(BaseAsyncServer):
-    def __init__(self, server_id: str, config: FullConfiguration, context: SimulationContext):
+    def __init__(
+        self,
+        server_id: str,
+        config: FullConfiguration,
+        context: SimulationContext,
+        run_id: str | None = None,
+    ):
         set_global_context(context)
         self.context = context
         try:
@@ -48,6 +57,11 @@ class SpykerServer(BaseAsyncServer):
         self.server_ages: Dict[str, int] = {}
 
         self.client_learning_rates: Dict[str, float] = {}
+        self._dispatched_lrs: Dict[str, float] = {}  # rate of each client's in-flight fit
+
+        self._run_id = run_id
+        trace_on = os.environ.get("FEDSIM_UPDATE_TRACE", "off").strip().lower() == "on"
+        self._trace_logger = setup_telemetry_logger(run_id) if trace_on and run_id else None
 
         # Tracking client activity for Decay function
         self.client_update_counts: Dict[str, int] = {}
@@ -61,6 +75,16 @@ class SpykerServer(BaseAsyncServer):
         self.MAX_BROADCAST_CACHE = 1000
 
         self._cached_global_weights_ref = None
+
+        # Weights last sent to each client (only tracked for staleness_mode == "delta")
+        self._sent_weights: Dict[str, List[np.ndarray]] = {}
+        # Training-set sizes of reporting clients (only tracked when sample_weighting is on)
+        self._client_num_examples: Dict[str, int] = {}
+        # RcvAge: announce once per sync epoch; reset whenever a new exchange round starts
+        self._age_announced = False
+        self._sync_timeouts = 0
+        # Latest scheduled arrival per peer (only used when fifo_links is on)
+        self._last_arrival: Dict[str, float] = {}
 
         # The current broadcast ID
         self.current_bid: str = ""
@@ -128,6 +152,7 @@ class SpykerServer(BaseAsyncServer):
             "sync_rounds_initiated": self._sync_sequence,
             "sync_rounds_completed": self._sync_rounds_completed,
             "peer_models_aggregated": self._peer_models_aggregated,
+            "sync_timeouts": self._sync_timeouts,
         }
 
     # ==============================================================
@@ -162,20 +187,33 @@ class SpykerServer(BaseAsyncServer):
         # Model age the client trained on
         metrics = data.get("metrics", {})
         ref_model_age = metrics.get("ref_model_age", self.model_age)
+        age_before = self.model_age
 
-        # Staleness Dampener
-        age_drift = self.model_age - ref_model_age
-        staleness_weight = 1.0 / (1.0 + max(0, age_drift))
+        staleness_mode = self.spyker_config.staleness_mode
+        staleness_weight = self._staleness_weight(self.model_age - ref_model_age)
 
         # Aggregate Client weights into global model
         eta_server = self.spyker_config.server_learning_rate
         effective_alpha = eta_server * staleness_weight
-
-        self.global_model_weights = self.aggregation_strategy.aggregate(
-            global_weights=self.global_model_weights,
-            update_weights=client_weights,
-            alpha=effective_alpha,
+        # A larger-than-average data share must not push the blend past the client model.
+        effective_alpha = min(
+            1.0, effective_alpha * self._sample_weight(client_id, data.get("num_examples"))
         )
+
+        if staleness_mode == "delta":
+            # Apply only the client's change, so stale or near-zero-lr updates cannot pull back.
+            self.global_model_weights = self.aggregation_strategy.aggregate_delta(
+                global_weights=self.global_model_weights,
+                update_weights=client_weights,
+                base_weights=self._sent_weights.pop(client_id),
+                alpha=effective_alpha,
+            )
+        else:
+            self.global_model_weights = self.aggregation_strategy.aggregate(
+                global_weights=self.global_model_weights,
+                update_weights=client_weights,
+                alpha=effective_alpha,
+            )
 
         # Invalidate global weights cache because of recent change
         self._cached_global_weights_ref = None
@@ -193,12 +231,50 @@ class SpykerServer(BaseAsyncServer):
         new_client_lr = self._calculate_decay(count, avg_updates, base_client_lr)
         self.client_learning_rates[client_id] = new_client_lr
 
+        if self._trace_logger:
+            self._trace_update(
+                client_id, age_before, ref_model_age, effective_alpha, new_client_lr, count
+            )
+
         # Check Sync (Algorithm 2 SPYKER)
         if self.has_token:
             self.server_ages[self.server_id] = self.model_age
             self._check_synchronization()
+        else:
+            self._announce_age_if_drifting()
 
-        self._schedule_client_task(client_id)
+        if self.spyker_config.aggregation_delay:
+            delay = estimate_aggregation_time(
+                self.context.get_server_spec(self.server_id),
+                1,
+                self._get_model_size_bytes(),
+                rng=self.random_streams.stream("aggregation"),
+            )
+            self._schedule_client_task(client_id, delay=delay)
+        else:
+            self._schedule_client_task(client_id)
+
+    def _trace_update(self, client_id, server_age, ref_age, alpha, lr_next, update_count):
+        lr_used = self._dispatched_lrs.get(client_id, self.full_config.training.learning_rate)
+        self._trace_logger.info(
+            "Client Update",
+            extra={
+                "extra_data": {
+                    "log_type": "client_update",
+                    "run_id": self._run_id,
+                    "server_id": self.server_id,
+                    "client_id": client_id,
+                    "virtual_time": self.current_virtual_time,
+                    "server_age": server_age,
+                    "ref_age": ref_age,
+                    "staleness": max(0, server_age - ref_age),
+                    "alpha": alpha,
+                    "lr_used": lr_used,
+                    "lr_next": lr_next,
+                    "update_count": update_count,
+                }
+            },
+        )
 
     def on_server_message(self, data: Any, direct_refs: Any = None):
         msg_type = data["type"]
@@ -208,17 +284,50 @@ class SpykerServer(BaseAsyncServer):
             self._handle_model_broadcast(sender_id, data, direct_refs)
         elif msg_type == "TOKEN":
             self._handle_token_arrival(sender_id, data)
+        elif msg_type == "AGE":
+            self._handle_age_announcement(sender_id, data)
+        elif msg_type == "SYNC_TIMEOUT":
+            self._handle_sync_timeout(data["bid"])
 
     # =============================================================
 
     def _calculate_decay(self, client_updates, avg_updates, base_lr):
         """Spyker Algorithm 1: Learning Rate Decay."""
+        mode = self.spyker_config.decay_mode
+        if mode not in ("absolute", "relative"):
+            raise ValueError(f"Unknown decay_mode: {mode!r}")
+
         if client_updates < avg_updates:
             return base_lr
 
         # linear decay for active clients
-        decayed_lr = base_lr - (self.spyker_config.decay_beta * (client_updates - avg_updates))
+        excess = client_updates - avg_updates
+        if mode == "absolute":
+            decayed_lr = base_lr - (self.spyker_config.decay_beta * excess)
+        else:
+            decayed_lr = base_lr * (1.0 - self.spyker_config.decay_beta * excess)
         return max(self.spyker_config.min_learning_rate, decayed_lr)
+
+    def _staleness_weight(self, age_drift: int) -> float:
+        """Dampening factor for a client update trained on a model `age_drift` updates old."""
+        mode = self.spyker_config.staleness_mode
+        drift = max(0, age_drift)
+        if mode == "none":
+            return 1.0
+        if mode in ("reciprocal", "delta"):
+            return 1.0 / (1.0 + drift)
+        if mode == "relative":
+            # Measure drift in waves of this server's clients, so ordinary concurrency is not penalised.
+            return 1.0 / (1.0 + drift / max(1, len(self.assigned_client_instances)))
+        raise ValueError(f"Unknown staleness_mode: {mode!r}")
+
+    def _sample_weight(self, client_id: str, num_examples: int | None) -> float:
+        """Relative data share of a client among this server's reporting clients (1.0 if disabled)."""
+        if not self.spyker_config.sample_weighting or not num_examples:
+            return 1.0
+        self._client_num_examples[client_id] = num_examples
+        mean = sum(self._client_num_examples.values()) / len(self._client_num_examples)
+        return num_examples / mean
 
     def _get_model_size_bytes(self) -> int:
         """Count tensor payload bytes, excluding transport and message metadata."""
@@ -258,8 +367,10 @@ class SpykerServer(BaseAsyncServer):
         print(f"[{self.server_id}] Initiating SYNC {bid}. Reason: {reason}")
 
         self._perform_broadcast(bid)
+        self._schedule_sync_timeout(bid)
 
     def _remember_sync(self, bid):
+        self._age_announced = False
         participants = {self.server_id}
         self._sync_participants[bid] = participants
         if len(self._sync_participants) > self.MAX_BROADCAST_CACHE:
@@ -315,9 +426,11 @@ class SpykerServer(BaseAsyncServer):
         # Update local age
         old_age = self.model_age
         weighted_age = (1.0 - effective_alpha) * self.model_age + (effective_alpha * sender_age)
-        self.model_age = int(round(weighted_age))
-
-        self.model_age = max(old_age, self.model_age)
+        if self.spyker_config.age_merge == "weighted":
+            # Zuo et al. 2024, Alg. 2 l. 50: real-valued age that may also decrease.
+            self.model_age = weighted_age
+        else:
+            self.model_age = max(old_age, int(round(weighted_age)))
         self.server_ages[self.server_id] = self.model_age
 
         self._peer_models_aggregated += 1
@@ -346,6 +459,49 @@ class SpykerServer(BaseAsyncServer):
         self.server_ages[self.server_id] = self.model_age
 
         self._check_synchronization()
+
+    def _handle_age_announcement(self, sender_id, payload):
+        """Spyker Algorithm 2 RcvAge: learn a peer's age so the token holder can react."""
+        if sender_id not in self.peer_connections:
+            return
+        self.server_ages[sender_id] = max(self.server_ages.get(sender_id, 0), payload["age"])
+        if self.has_token:
+            self.server_ages[self.server_id] = self.model_age
+            self._check_synchronization()
+
+    def _announce_age_if_drifting(self):
+        """Without the token, broadcast our age once per sync epoch when a threshold is exceeded."""
+        if not self.spyker_config.age_announcements or self.has_token or self._age_announced:
+            return
+        self.server_ages[self.server_id] = self.model_age
+        inter_drift = max(self.server_ages.values()) - min(self.server_ages.values())
+        intra_drift = self.model_age - self.age_at_last_sync
+        if inter_drift < self.spyker_config.h_inter and intra_drift < self.spyker_config.h_intra:
+            return
+        self._age_announced = True
+        for peer_id in self.peer_connections:
+            self._send_server_message(peer_id, "AGE", {"age": self.model_age})
+
+    def _schedule_sync_timeout(self, bid):
+        timeout = self.spyker_config.sync_timeout
+        if timeout is None:
+            return
+        self._schedule_event(
+            delay=timeout,
+            target_actor=self.context.server_actor_handles[self.server_id],
+            event_type="SERVER_MESSAGE",
+            data={"type": "SYNC_TIMEOUT", "sender_id": self.server_id, "bid": bid},
+        )
+
+    def _handle_sync_timeout(self, bid):
+        """Release a token whose exchange round did not complete in time."""
+        if not (self.has_token and self.ongoing_sync and bid == self.current_bid):
+            return
+        print(f"[{self.server_id}] Sync {bid} timed out. Releasing Token.")
+        self._sync_timeouts += 1
+        self.current_bid = ""
+        self.ongoing_sync = False
+        self._pass_token(immediate_sync_after_release=True)
 
     def _pass_token(self, immediate_sync_after_release: bool = False):
         if not self.next_token_peer or self.next_token_peer == self.server_id:
@@ -379,10 +535,11 @@ class SpykerServer(BaseAsyncServer):
 
     # =====================================================================
 
-    def _schedule_client_task(self, client_id):
+    def _schedule_client_task(self, client_id, delay: float = 0.0):
         train_config = self.full_config.training
 
         client_lr = self.client_learning_rates.get(client_id, train_config.learning_rate)
+        self._dispatched_lrs[client_id] = client_lr
 
         config = {
             "server_id": self.server_id,
@@ -399,8 +556,11 @@ class SpykerServer(BaseAsyncServer):
         if self._cached_global_weights_ref is None:
             self._cached_global_weights_ref = ray.put(self.global_model_weights)
 
+        if self.spyker_config.staleness_mode == "delta":
+            self._sent_weights[client_id] = self.global_model_weights
+
         self._schedule_event(
-            delay=0.0,
+            delay=delay,
             target_actor=client_actor,
             event_type="START_FIT",
             data={
@@ -441,6 +601,13 @@ class SpykerServer(BaseAsyncServer):
         )
 
         final_delay = delay + added_delay
+        if self.spyker_config.fifo_links:
+            # Spyker assumes FIFO links: never deliver before an earlier message to this peer.
+            arrival = max(
+                self.current_virtual_time + final_delay, self._last_arrival.get(target_id, 0.0)
+            )
+            self._last_arrival[target_id] = arrival
+            final_delay = arrival - self.current_virtual_time
 
         payload["sender_id"] = self.server_id
         payload["type"] = msg_type
