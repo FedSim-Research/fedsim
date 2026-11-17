@@ -144,8 +144,21 @@ export class StartPopup implements OnInit, OnDestroy {
     return this.selectedMode === 'hierfl';
   }
 
+  public seedSetError(architecture: Architecture): string | null {
+    const text = architecture === 'hierfl' ? this.hierflSettings.seedSetText : this.spykerSettings.seedSetText;
+    return this.parseSeedSetInput(text)
+      ? null
+      : 'Seeds must be non-negative integers separated by commas or spaces, e.g. 42, 43, 44.';
+  }
+
   public onRun(): void {
     if (!this.selectedMode) {
+      return;
+    }
+    const blocked =
+      (this.isHierflIncluded() && this.seedSetError('hierfl')) ||
+      (this.isSpykerIncluded() && this.seedSetError('spyker'));
+    if (blocked) {
       return;
     }
 

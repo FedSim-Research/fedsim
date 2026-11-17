@@ -78,7 +78,10 @@
                     </label>
                     <label class="field">
                       <span class="field-label">Seed set <span class="help-dot" title="Fixed list of seeds used for reproducible benchmark repetitions, for example 42, 43, 44, 45, 46.">?</span></span>
-                      <input pInputText type="text" [(ngModel)]="hierflSettings.seedSetText" (ngModelChange)="updateSeedSet('hierfl', $event)" />
+                      <input pInputText type="text" [(ngModel)]="hierflSettings.seedSetText" (ngModelChange)="updateSeedSet('hierfl', $event)" [attr.aria-invalid]="seedSetError('hierfl') ? true : null" aria-describedby="hierfl-seed-error" />
+                      @if (seedSetError('hierfl'); as message) {
+                        <span class="field-error" id="hierfl-seed-error">{{ message }}</span>
+                      }
                     </label>
                     <label class="field">
                       <span class="field-label">Output filename <span class="help-dot" title="Target file path/name used to store the final model checkpoint.">?</span></span>
@@ -153,7 +156,10 @@
                     </label>
                     <label class="field">
                       <span class="field-label">Seed set <span class="help-dot" title="Fixed list of seeds used for reproducible benchmark repetitions, for example 42, 43, 44, 45, 46.">?</span></span>
-                      <input pInputText type="text" [(ngModel)]="spykerSettings.seedSetText" (ngModelChange)="updateSeedSet('spyker', $event)" />
+                      <input pInputText type="text" [(ngModel)]="spykerSettings.seedSetText" (ngModelChange)="updateSeedSet('spyker', $event)" [attr.aria-invalid]="seedSetError('spyker') ? true : null" aria-describedby="spyker-seed-error" />
+                      @if (seedSetError('spyker'); as message) {
+                        <span class="field-error" id="spyker-seed-error">{{ message }}</span>
+                      }
                     </label>
                     <label class="field">
                       <span class="field-label">Idle token delay (s) <span class="help-dot" title="Delay before token forwarding when no immediate sync is triggered.">?</span></span>

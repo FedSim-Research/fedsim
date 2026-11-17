@@ -43,6 +43,41 @@ describe('StartPopup', () => {
     expect(payload?.hierfl.simulationSettings.repetitions).toBe(2);
   });
 
+  const seedMessage = 'Seeds must be non-negative integers separated by commas or spaces, e.g. 42, 43, 44.';
+
+  it('explains invalid seed sets and accepts valid ones', () => {
+    for (const valid of ['42, 43', '7', '1 2;3']) {
+      component.updateSeedSet('hierfl', valid);
+      expect(component.seedSetError('hierfl')).toBeNull();
+    }
+    for (const invalid of ['42, x', '1.5', '-3', '', ' , ']) {
+      component.updateSeedSet('spyker', invalid);
+      expect(component.seedSetError('spyker')).toBe(seedMessage);
+    }
+  });
+
+  it('does not emit run when a running architecture has an invalid seed set', () => {
+    component.selectMode('both');
+    component.updateSeedSet('spyker', '42, x');
+    const emitted = vi.fn();
+    component.run.subscribe(emitted);
+
+    component.onRun();
+
+    expect(emitted).not.toHaveBeenCalled();
+  });
+
+  it('ignores the invalid seed set of an architecture that does not run', () => {
+    component.selectMode('spyker');
+    component.updateSeedSet('hierfl', 'x');
+    const emitted = vi.fn();
+    component.run.subscribe(emitted);
+
+    component.onRun();
+
+    expect(emitted).toHaveBeenCalledTimes(1);
+  });
+
   it('restores persisted settings without appending defaults', () => {
     (component as any).applyPersistedParams('hierfl', {
       settings: {
