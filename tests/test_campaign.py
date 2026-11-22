@@ -722,7 +722,11 @@ def test_old_and_explicit_default_policies_compare_equally():
 
 def test_aggregation_response_delay_is_available_to_campaigns():
     cfg = config(
-        spyker_config={**json.loads(CONFIG.read_text())["spyker_config"], "aggregation_delay": True}
+        spyker_config={
+            **json.loads(CONFIG.read_text())["spyker_config"],
+            "aggregation_delay": True,
+            "aggregation_bytes_per_second": 100_000_000,
+        }
     )
     plan = campaign.build_plan(cfg, "response-delay")
     assert (

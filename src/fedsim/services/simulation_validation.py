@@ -23,6 +23,15 @@ def validate_start_payload(
     simulation_settings: dict | None,
     spyker_config: dict | None,
 ) -> None:
+    if (
+        architecture in {"hierfl", "spyker"}
+        and (simulation_settings or {}).get("event_order") is not None
+    ):
+        parse_choice(
+            simulation_settings["event_order"],
+            ("completion", "parent"),
+            f"{architecture}_invalid_event_order",
+        )
     if architecture == "hierfl":
         _validate_hierfl_payload(training_config, simulation_settings)
         validate_hierfl_graph(graph)
@@ -55,6 +64,15 @@ def _validate_hierfl_extensions(simulation_settings: dict) -> None:
         _parse_int_min_one(simulation_settings["edge_rounds"], "hierfl_invalid_edge_rounds")
     if simulation_settings.get("aggregation_delay") is not None:
         parse_bool(simulation_settings["aggregation_delay"], "hierfl_invalid_aggregation_delay")
+    _validate_aggregation_throughput(simulation_settings, "hierfl")
+
+
+def _validate_aggregation_throughput(settings: dict, prefix: str) -> None:
+    rate = settings.get("aggregation_bytes_per_second")
+    if rate is not None:
+        _parse_float_gt_zero(rate, f"{prefix}_invalid_aggregation_throughput")
+    elif settings.get("aggregation_delay"):
+        raise ValueError(f"{prefix}_aggregation_throughput_required")
 
 
 def _validate_hierfl_payload(
@@ -145,6 +163,7 @@ def _validate_spyker_payload(
     for key in ("sample_weighting", "age_announcements", "fifo_links", "aggregation_delay"):
         if spyker_config.get(key) is not None:
             parse_bool(spyker_config[key], f"spyker_invalid_{key}")
+    _validate_aggregation_throughput(spyker_config, "spyker")
     if spyker_config.get("sync_timeout") is not None:
         _parse_float_gt_zero(spyker_config["sync_timeout"], "spyker_invalid_sync_timeout")
     for key, choices in SPYKER_MODE_CHOICES.items():

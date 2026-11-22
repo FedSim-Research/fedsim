@@ -27,5 +27,8 @@
         }
       }
     </label>
+    @if (option.warning && option.kind === 'flag' && values[option.requestKey] === true) {
+      <p class="section-hint" role="note">{{ option.warning }}</p>
+    }
   }
 </div>

@@ -13,6 +13,44 @@ from fedsim.simulation.orchestrator import SimulationOrchestrator
 from fedsim.telemetry.evaluator import PeriodicEvaluator
 
 
+@pytest.fixture(autouse=True)
+def default_worker_limit(monkeypatch):
+    monkeypatch.delenv("FEDSIM_CPU_WORKERS", raising=False)
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "1.5", "", "true"])
+def test_invalid_cpu_worker_limit_is_rejected_before_ray_calls(monkeypatch, value):
+    from fedsim.simulation import cpu_execution
+
+    monkeypatch.setenv("FEDSIM_CPU_WORKERS", value)
+    lookup = Mock()
+    monkeypatch.setattr(ray, "get_actor", lookup)
+    with pytest.raises(ValueError, match="invalid_cpu_worker_limit"):
+        cpu_execution.get_cpu_execution_pool()
+    lookup.assert_not_called()
+
+
+def test_cpu_worker_limit_caps_available_slots_without_resizing_an_existing_pool(monkeypatch):
+    from fedsim.simulation import cpu_execution
+
+    monkeypatch.setenv("FEDSIM_CPU_WORKERS", "4")
+    pool = SimpleNamespace(ready=SimpleNamespace(remote=lambda: "ready"))
+    monkeypatch.setattr(ray, "get_actor", Mock(side_effect=ValueError("missing")))
+    monkeypatch.setattr(ray, "available_resources", lambda: {"CPU": 16})
+    monkeypatch.setattr(ray, "get", Mock(return_value=4))
+    factory = Mock(return_value=SimpleNamespace(remote=Mock(return_value=pool)))
+    monkeypatch.setattr(cpu_execution.CpuExecutionPool, "options", factory)
+    assert cpu_execution.get_cpu_execution_pool() is pool
+    factory.return_value.remote.assert_called_once_with(4)
+    monkeypatch.setattr(ray, "get_actor", Mock(return_value=pool))
+    monkeypatch.setattr(ray, "get", Mock(return_value=16))
+    kill = Mock()
+    monkeypatch.setattr(ray, "kill", kill)
+    with pytest.raises(ValueError, match="existing_cpu_pool_exceeds"):
+        cpu_execution.get_cpu_execution_pool()
+    kill.assert_not_called()
+
+
 # These resource assertions use metadata from the Ray version pinned in uv.lock.
 @pytest.mark.parametrize(
     "actor",

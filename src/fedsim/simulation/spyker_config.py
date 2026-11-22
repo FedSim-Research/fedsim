@@ -32,6 +32,7 @@ class SpykerAlgorithmConfig:
     sample_weighting: bool = False
     # Response-delay approximation: state updates immediately, without a server queue.
     aggregation_delay: bool = False
+    aggregation_bytes_per_second: float | None = None
 
     # Reserved compatibility field; neither engine simulates TCP retransmissions.
     tcp_rto_delay: float = 0.2
@@ -60,6 +61,8 @@ class SimulationConfig:
 
     # The 'Heartbeat' delay during token idle state (Virtual Seconds)
     idle_token_delay: float = 1.0
+    # Experimental frontier ordering; existing runs keep completion-order behavior.
+    event_order: Literal["completion", "parent"] = "completion"
 
 
 @dataclass

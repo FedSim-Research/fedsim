@@ -70,6 +70,9 @@ class SimulationController:
                     eval_interval=self.simulation_settings.get("eval_interval"),
                     edge_rounds=self.simulation_settings.get("edge_rounds"),
                     aggregation_delay=self.simulation_settings.get("aggregation_delay"),
+                    aggregation_bytes_per_second=self.simulation_settings.get(
+                        "aggregation_bytes_per_second"
+                    ),
                     **self._data_settings(),
                 ),
                 evaluator=get_hierfl_evaluate_model,
@@ -100,7 +103,7 @@ class SimulationController:
         """Data-distribution controls shared by both engines."""
         return {
             key: self.simulation_settings.get(key)
-            for key in ("partitioning", "labels_per_client", "local_holdout")
+            for key in ("partitioning", "labels_per_client", "local_holdout", "event_order")
         }
 
     def _run_simulation(

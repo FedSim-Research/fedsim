@@ -6,6 +6,8 @@ from typing import Any
 
 from fedsim.persistence.models import Edge, Graph, Node
 from fedsim.services.input_values import (
+    parse_bool,
+    parse_choice,
     parse_nonnegative_float,
     parse_positive_float,
     parse_positive_int,
@@ -179,6 +181,8 @@ def build_hierfl_simulation(
     local_holdout: float | None = None,
     edge_rounds: int | None = None,
     aggregation_delay: bool | None = None,
+    event_order: str | None = None,
+    aggregation_bytes_per_second: float | None = None,
 ):
     HierarchicalSimulation, Network, _ = _import_hierfl()
     validate_hierfl_graph(graph)
@@ -204,6 +208,18 @@ def build_hierfl_simulation(
         raise ValueError("hierfl_invalid_run_time_limit")
     if eval_interval is not None and float(eval_interval) < 0:
         raise ValueError("hierfl_invalid_eval_interval")
+    if event_order is not None:
+        event_order = parse_choice(
+            event_order, ("completion", "parent"), "hierfl_invalid_event_order"
+        )
+    if aggregation_delay is not None:
+        aggregation_delay = parse_bool(aggregation_delay, "hierfl_invalid_aggregation_delay")
+    if aggregation_bytes_per_second is not None:
+        aggregation_bytes_per_second = parse_positive_float(
+            aggregation_bytes_per_second, "hierfl_invalid_aggregation_throughput"
+        )
+    if aggregation_delay and aggregation_bytes_per_second is None:
+        raise ValueError("hierfl_aggregation_throughput_required")
     sim = HierarchicalSimulation(
         dataset_id=dataset_id or "uoft-cs/cifar10",
         run_time_limit=limit,
@@ -218,6 +234,8 @@ def build_hierfl_simulation(
                 "local_holdout": local_holdout,
                 "edge_rounds": edge_rounds,
                 "aggregation_delay": aggregation_delay,
+                "event_order": event_order,
+                "aggregation_bytes_per_second": aggregation_bytes_per_second,
             }.items()
             if value is not None
         },

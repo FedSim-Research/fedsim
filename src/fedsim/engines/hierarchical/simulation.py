@@ -8,6 +8,7 @@ from fedsim.engines.hierarchical.coordinator import SuperServer
 from fedsim.engines.hierarchical.edge import EdgeServer
 from fedsim.learning import DEFAULT_LOCAL_HOLDOUT, Net, get_dataset_provider
 from fedsim.runtime import ensure_ray_initialized
+from fedsim.simulation.compute_model import require_aggregation_throughput
 from fedsim.simulation.context import SimulationContext, set_global_context
 from fedsim.simulation.cpu_execution import get_cpu_execution_pool
 from fedsim.simulation.orchestrator import SimulationOrchestrator
@@ -33,6 +34,8 @@ class HierarchicalSimulation:
         local_holdout: float = DEFAULT_LOCAL_HOLDOUT,
         edge_rounds: int = 1,
         aggregation_delay: bool = False,
+        event_order: str = "completion",
+        aggregation_bytes_per_second: float | None = None,
     ):
         if isinstance(edge_rounds, bool) or not isinstance(edge_rounds, int) or edge_rounds < 1:
             raise ValueError("hierfl_invalid_edge_rounds")
@@ -45,6 +48,10 @@ class HierarchicalSimulation:
         self.local_holdout = local_holdout
         self.edge_rounds = edge_rounds
         self.aggregation_delay = aggregation_delay
+        self.aggregation_bytes_per_second = aggregation_bytes_per_second
+        if event_order not in {"completion", "parent"}:
+            raise ValueError("event_order must be completion or parent")
+        self.event_order = event_order
         self.super_id = None
         self.edge_ids = []
         self.client_ids = []
@@ -200,6 +207,7 @@ class HierarchicalSimulation:
             training_config=self.super_config,
             context=self.context,
             aggregation_delay=self.aggregation_delay,
+            aggregation_bytes_per_second=self.aggregation_bytes_per_second,
         )
 
         print("Spawning Edge Servers...")
@@ -238,6 +246,8 @@ class HierarchicalSimulation:
 
     def build(self):
         """Constructs the simulation environment, orchestrator, and actors."""
+        if self.aggregation_delay:
+            require_aggregation_throughput(self.aggregation_bytes_per_second)
         if not self.super_id:
             raise ValueError("Super server must be defined before building.")
         if not self.edge_ids:
@@ -246,7 +256,9 @@ class HierarchicalSimulation:
 
         self._cpu_pool = get_cpu_execution_pool()
         self._server_actor_options = self._resolve_server_actor_options()
-        self.orchestrator = SimulationOrchestrator.remote(cpu_pool=self._cpu_pool)
+        self.orchestrator = SimulationOrchestrator.remote(
+            cpu_pool=self._cpu_pool, event_order=self.event_order
+        )
         self.context = SimulationContext(
             orchestrator_actor=self.orchestrator,
             client_registry=self.client_registry,

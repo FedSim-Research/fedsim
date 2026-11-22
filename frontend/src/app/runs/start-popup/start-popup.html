@@ -173,6 +173,9 @@
                   <div class="sim-settings-section sim-settings-section--separated">
                     <div class="sim-settings-subtitle">Algorithm</div>
                     <button type="button" class="nav-btn" (click)="applyExperimentalPreset()">Experimental comparison preset</button>
+                    @if (absoluteDecayRatio !== null && absoluteDecayRatio >= 1) {
+                      <p class="section-hint" role="note">The absolute decay penalty is at least as large as the base learning rate. Small update-count differences can push clients to the minimum rate. Validate a smaller beta or relative decay before interpreting learning quality.</p>
+                    }
                     <div class="grid">
                       <label class="field">
                         <span class="field-label">Decay beta <span class="help-dot" title="Penalty applied to the next local SGD learning rate of frequently updating clients.">?</span></span>

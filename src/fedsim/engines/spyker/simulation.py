@@ -8,6 +8,7 @@ import torch
 from fedsim.engines.spyker.server import SpykerServer
 from fedsim.learning import DEFAULT_LOCAL_HOLDOUT, Net, get_dataset_provider
 from fedsim.runtime import ensure_ray_initialized
+from fedsim.simulation.compute_model import require_aggregation_throughput
 from fedsim.simulation.context import SimulationContext, set_global_context
 from fedsim.simulation.cpu_execution import get_cpu_execution_pool
 from fedsim.simulation.orchestrator import SimulationOrchestrator
@@ -266,6 +267,8 @@ class SpykerSimulation:
                 ray.get(actor.set_token_holder.remote(True))
 
     def build(self):
+        if self.config.spyker.aggregation_delay:
+            require_aggregation_throughput(self.config.spyker.aggregation_bytes_per_second)
         server_ids = set(self.server_ids)
         for server_id in server_ids:
             peers = set(self.server_registry[server_id].network_metrics)
@@ -275,7 +278,9 @@ class SpykerSimulation:
 
         self._cpu_pool = get_cpu_execution_pool()
         self._server_actor_options = self._resolve_server_actor_options()
-        self.orchestrator = SimulationOrchestrator.remote(cpu_pool=self._cpu_pool)
+        self.orchestrator = SimulationOrchestrator.remote(
+            cpu_pool=self._cpu_pool, event_order=self.config.simulation.event_order
+        )
 
         self.context = SimulationContext(
             orchestrator_actor=self.orchestrator,

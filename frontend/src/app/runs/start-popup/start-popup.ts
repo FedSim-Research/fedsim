@@ -88,6 +88,12 @@ export class StartPopup implements OnInit, OnDestroy {
 
   public readonly runOptions = RUN_OPTIONS;
 
+  public get absoluteDecayRatio(): number | null {
+    const { lr, decayBeta, decayMode } = this.spykerSettings;
+    return decayMode === 'absolute' && Number.isFinite(lr) && lr > 0 && Number.isFinite(decayBeta)
+      ? decayBeta / lr : null;
+  }
+
   private lastPersistedSignature: string | null = null;
   private destroyed = false;
   /** Set once the user edits settings, so a late backend response cannot overwrite them. */

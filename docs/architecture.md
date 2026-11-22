@@ -165,6 +165,16 @@ with previous runs is not guaranteed.
 
 ## Training settings and virtual time
 
+For 32x32 inputs, the CNN's three spatial pooling stages already produce a
+4x4 feature map. The maintained model skips adaptive pooling in that case:
+the operation is an identity for values and gradients. Other feature sizes
+still use adaptive pooling. This also avoids an unnecessary CUDA backward
+operation that rejects strict deterministic execution in the tested CUDA-12.6
+environment. It is not a guarantee of CPU/GPU numerical equality or of
+deterministic GPU training for other input sizes. The application continues
+to route client training through CPU workers; GPU server budgets do not change
+that contract.
+
 Both engines initialize their shared model from the run seed with a private
 CPU PyTorch generator. Model construction uses meta tensors before allocating
 and initializing weights, so it does not consume or reseed the process-global
@@ -219,12 +229,28 @@ retransmission state are not simulated. The API retains `tcp_rto_delay` for
 compatibility with existing records, but neither engine reads it. The start
 dialog therefore does not expose it as a tunable simulation control.
 
-The aggregation-time helper uses the same zero-mean noise convention. Its
-delay is currently not scheduled by either engine. These corrections change
+The aggregation-time helper uses the same zero-mean noise convention. Both
+engines leave it disabled by default; the optional response-delay policy is
+described below. These corrections change
 effective settings and virtual timings; historical results must retain their
 original code and configuration rather than being relabeled as new results.
 
 ## Model evaluation
+
+Telemetry writers use a cross-process file lock so Ray actors sharing a run log
+cannot interleave JSON records on Docker/host mounts. This protects record
+integrity; file append order is not a globally atomic simulation snapshot.
+Normal application writers fall back to marked JSON records on stderr if the
+lock times out or a write fails. Such logs may be incomplete in the file.
+Research runners set `FEDSIM_TELEMETRY_STRICT=on` before starting Ray: a failed
+write aborts the case, and trace checks reject incomplete evidence. The setting
+is read when each writer is created. Persistent `.lock` files are lock handles,
+not evidence that a lock is held; do not unlink them while writers are active.
+
+Local `train_loss` is a mean over examples processed across all local epochs,
+including partial batches. This changes the reported training metric from the
+earlier sum of epoch-level batch means; SGD updates and global test metrics are
+unchanged. Archived records retain their producing revision's metric semantics.
 
 HierFL evaluates the coordinator model. Spyker evaluates every registered
 server on the same loaded test dataset and reports each server's accuracy and
@@ -309,9 +335,10 @@ The existing model-weighting formula, integer monotonic model ages, and token
 circulation policy are retained. Peer aggregation remains asynchronous and
 can depend on arrival order. These protocol corrections do not establish full
 equivalence with the original Spyker implementation or validate paper results.
-The scheduler assigns tie-breaking sequence IDs when callbacks complete.
-Fixed seeds therefore do not by themselves guarantee identical event order
-across runs.
+The default scheduler assigns tie-breaking sequence IDs when callbacks complete.
+The optional `parent` ordering waits for the dispatched frontier and inserts
+children by parent sequence instead. This mode is available in the API and run
+dialog; its replay checks and limits are described in the reproducibility guide.
 
 Independent reference tests cover hand-computed client/peer blends, floor counts
 and token cadence, including the case where an identical peer model changes the
@@ -325,3 +352,12 @@ Spyker fit or a HierFL coordinator broadcast after the model has already changed
 It does not delay state visibility, serialize a server work queue, or add edge
 aggregation delay. The default remains disabled. See the experiment documentation
 for interpretation limits; this is not a physical server-compute model.
+
+Its nominal duration is
+`num_updates * model_bytes / aggregation_bytes_per_second` seconds. A positive
+input-byte throughput is required when enabling the option. This rate is
+separate from the training compute factor and requires workload calibration.
+It applies uniformly to the relevant servers in a run. No calibration or
+server serialization is inferred from this setting. Earlier enabled experimental
+configurations must supply this new field; archived comparisons leave the
+response delay disabled.

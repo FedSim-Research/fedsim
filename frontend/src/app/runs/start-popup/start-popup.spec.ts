@@ -22,6 +22,18 @@ describe('StartPopup', () => {
     expect(component).toBeTruthy();
   });
 
+  it('detects aggressive absolute feedback without changing the chosen parameters', () => {
+    component.spykerSettings.lr = 0.01;
+    component.spykerSettings.decayBeta = 0.05;
+    expect(component.absoluteDecayRatio).toBe(5);
+    expect(component.spykerSettings.decayBeta).toBe(0.05);
+    component.spykerSettings.decayMode = 'relative';
+    expect(component.absoluteDecayRatio).toBeNull();
+    component.spykerSettings.decayMode = 'absolute';
+    component.spykerSettings.lr = 0;
+    expect(component.absoluteDecayRatio).toBeNull();
+  });
+
   it('counts duplicate seeds as separate repetitions', () => {
     component.updateSeedSet('hierfl', '42,42');
 

@@ -47,8 +47,16 @@ class TrainingClient:
         return [val.cpu().numpy() for _, val in state_dict.items()]
 
     def set_parameters(self, parameters: List[np.ndarray]):
-        params_dict = zip(self.net.state_dict().keys(), parameters)
-        state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+        current = self.net.state_dict()
+        if len(parameters) != len(current):
+            raise ValueError("client_parameter_count_mismatch")
+        state_dict = OrderedDict()
+        for (name, target), value in zip(current.items(), parameters, strict=True):
+            tensor = torch.tensor(value)
+            if tensor.shape != target.shape:
+                raise ValueError(f"client_parameter_shape_mismatch: {name}")
+            state_dict[name] = tensor
+        # Validate every shape before copying any values into the shared model.
         self.net.load_state_dict(state_dict, strict=True)
 
     def fit(self, parameters: List[np.ndarray], config: dict) -> dict:

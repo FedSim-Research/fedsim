@@ -401,9 +401,9 @@ def test_response_delay_survives_api_validation_and_builder(enabled):
 
     graph = topology("spyker")
     training = {"epochs": 1, "lr": 0.01}
-    controls = APIConfig.model_validate({"aggregation_delay": enabled}).model_dump(
-        exclude_none=True
-    )
+    controls = APIConfig.model_validate(
+        {"aggregation_delay": enabled, "aggregation_bytes_per_second": 100_000_000}
+    ).model_dump(exclude_none=True)
     validate_start_payload("spyker", graph, training, None, controls)
     simulation = build_spyker_simulation(graph, training_config=training, spyker_config=controls)
     assert simulation.config.spyker.aggregation_delay is enabled

@@ -41,6 +41,10 @@ class SimulationSettings(BaseModel):
     local_holdout: float | None = None
     edge_rounds: int | None = None
     aggregation_delay: bool | None = None
+    event_order: Literal["completion", "parent"] | None = None
+    aggregation_bytes_per_second: float | None = Field(
+        default=None, gt=0, allow_inf_nan=False, strict=True
+    )
 
 
 class SpykerAlgorithmConfig(BaseModel):
@@ -49,6 +53,9 @@ class SpykerAlgorithmConfig(BaseModel):
     staleness_mode: Literal["reciprocal", "none", "delta", "relative"] | None = None
     sample_weighting: bool | None = None
     aggregation_delay: bool | None = None
+    aggregation_bytes_per_second: float | None = Field(
+        default=None, gt=0, allow_inf_nan=False, strict=True
+    )
     age_merge: Literal["monotonic", "weighted"] | None = None
     age_announcements: bool | None = None
     fifo_links: bool | None = None

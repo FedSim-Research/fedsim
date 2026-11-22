@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import math
+import os
 import threading
 
 import ray
@@ -13,6 +14,19 @@ CPU_POOL_NAME = "fedsim-cpu-execution-v1"
 _pool_lock = threading.Lock()
 _STARTUP_TIMEOUT = 30
 _logger = logging.getLogger(__name__)
+
+
+def cpu_worker_limit():
+    value = os.environ.get("FEDSIM_CPU_WORKERS")
+    if value is None:
+        return None
+    try:
+        limit = int(value)
+    except ValueError:
+        raise ValueError("fedsim_invalid_cpu_worker_limit") from None
+    if limit < 1:
+        raise ValueError("fedsim_invalid_cpu_worker_limit")
+    return limit
 
 
 @ray.remote(num_cpus=1, num_gpus=0)
@@ -114,18 +128,21 @@ class CpuExecutionPool:
 
 def get_cpu_execution_pool():
     """Get one pool per Ray namespace, shared by concurrent engine controllers."""
+    limit = cpu_worker_limit()
     with _pool_lock:
         try:
             pool = ray.get_actor(CPU_POOL_NAME)
         except ValueError:
             capacity = math.floor(ray.available_resources().get("CPU", 0))
+            if limit is not None:
+                capacity = min(capacity, limit)
             if capacity < 1:
                 raise ValueError(
                     "fedsim_requires_available_cpu: at least one free logical CPU is required"
                 ) from None
             pool = CpuExecutionPool.options(name=CPU_POOL_NAME, get_if_exists=True).remote(capacity)
         try:
-            ray.get(pool.ready.remote(), timeout=_STARTUP_TIMEOUT)
+            capacity = ray.get(pool.ready.remote(), timeout=_STARTUP_TIMEOUT)
         except ray.exceptions.GetTimeoutError as exc:
             # A readiness timeout is fatal for the shared pool, not just this caller.
             # Other controllers holding or awaiting the same pool will fail as well.
@@ -141,4 +158,6 @@ def get_cpu_execution_pool():
                 "fedsim_cpu_workers_unavailable: CPU workers could not start within "
                 f"{_STARTUP_TIMEOUT} seconds; check the cluster's free CPU capacity"
             ) from exc
+        if limit is not None and capacity > limit:
+            raise ValueError("fedsim_existing_cpu_pool_exceeds_worker_limit")
         return pool

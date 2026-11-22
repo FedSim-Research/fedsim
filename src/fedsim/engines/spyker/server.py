@@ -8,7 +8,10 @@ import ray
 
 from fedsim.clients.handle import ClientHandle
 from fedsim.engines.base import BaseAsyncServer
-from fedsim.simulation.compute_model import estimate_aggregation_time
+from fedsim.simulation.compute_model import (
+    estimate_aggregation_time,
+    require_aggregation_throughput,
+)
 from fedsim.simulation.context import SimulationContext, set_global_context
 from fedsim.simulation.network_model import estimate_transmission_time
 from fedsim.simulation.spyker_config import FullConfiguration
@@ -40,6 +43,8 @@ class SpykerServer(BaseAsyncServer):
         self.server_id = server_id
         self.full_config = config
         self.spyker_config = config.spyker
+        if self.spyker_config.aggregation_delay:
+            require_aggregation_throughput(self.spyker_config.aggregation_bytes_per_second)
 
         # --- Machine Learning State ---
         self.global_model_weights: List[np.ndarray] = []
@@ -249,6 +254,7 @@ class SpykerServer(BaseAsyncServer):
                 1,
                 self._get_model_size_bytes(),
                 rng=self.random_streams.stream("aggregation"),
+                throughput_bytes_per_second=self.spyker_config.aggregation_bytes_per_second,
             )
             self._schedule_client_task(client_id, delay=delay)
         else:

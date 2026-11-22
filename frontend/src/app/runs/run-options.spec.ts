@@ -37,6 +37,24 @@ describe('run options', () => {
     expect(validateOptionValues('spyker', defaultOptionValues('spyker'))).toEqual([]);
   });
 
+  it.each(['hierfl', 'spyker'] as const)('requires a separate response throughput for %s', (architecture) => {
+    const values = { ...defaultOptionValues(architecture), aggregation_delay: true };
+    expect(validateOptionValues(architecture, values).some((e) => e.includes('requires aggregation throughput'))).toBe(true);
+    expect(validateOptionValues(architecture, { ...values, aggregation_bytes_per_second: 100_000_000 })).toEqual([]);
+    expect(validateOptionValues(architecture, { ...values, aggregation_bytes_per_second: 0 }).length).toBeGreaterThan(0);
+  });
+
+  it.each(['hierfl', 'spyker'] as const)('routes ordering and response throughput for %s', (architecture) => {
+    const fields = optionRequestFields(architecture, {
+      ...defaultOptionValues(architecture), event_order: 'parent',
+      aggregation_delay: true, aggregation_bytes_per_second: 100_000_000,
+    });
+    expect(fields.simulation_settings['event_order']).toBe('parent');
+    const settings = architecture === 'hierfl' ? fields.simulation_settings : fields.spyker_config;
+    expect(settings['aggregation_delay']).toBe(true);
+    expect(settings['aggregation_bytes_per_second']).toBe(100_000_000);
+  });
+
   it('merges options into the start request', () => {
     const request = toStartRequest(1, {
       trainingConfig: { epochs: 1, lr: 0.01, modelComplexity: 1 },

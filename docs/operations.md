@@ -69,6 +69,19 @@ capacity and CPU reservations for its lifetime. Shutting down its owning Ray
 job releases the pool. Standalone Python callers should call `ray.shutdown()`
 when finished.
 
+Set `FEDSIM_CPU_WORKERS` to a positive integer in the backend process environment
+to cap the shared pool, for example `FEDSIM_CPU_WORKERS=4`. The default uses all
+whole CPUs available when the pool is created. For Compose, pass the variable
+under the backend service's `environment`; adding it only to the root `.env`
+does not pass it into a container. This limit controls concurrent callbacks,
+not the number of logical clients or their memory usage.
+
+The setting cannot shrink an existing pool. A caller requesting a lower limit
+than that pool's capacity fails with
+`fedsim_existing_cpu_pool_exceeds_worker_limit`, without terminating other
+runs. Let active runs finish and restart their Ray job before changing the
+limit. Invalid values fail with `fedsim_invalid_cpu_worker_limit`.
+
 Managed runs release Ray after their last active caller finishes. Both mode
 keeps each seed pair alive until both engines exit, then releases it before
 starting the next pair. Engine failures also release their registrations.

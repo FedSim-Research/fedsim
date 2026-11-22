@@ -4,7 +4,10 @@ import numpy as np
 import ray
 
 from fedsim.engines.base import BaseAsyncServer
-from fedsim.simulation.compute_model import estimate_aggregation_time
+from fedsim.simulation.compute_model import (
+    estimate_aggregation_time,
+    require_aggregation_throughput,
+)
 from fedsim.simulation.context import SimulationContext, set_global_context
 from fedsim.simulation.network_model import estimate_transmission_time
 from fedsim.strategies.server_strategies import get_sync_server_strategy
@@ -22,12 +25,16 @@ class SuperServer(BaseAsyncServer):
         training_config: Dict[str, Any],
         context: SimulationContext,
         aggregation_delay: bool = False,
+        aggregation_bytes_per_second: float | None = None,
     ):
         set_global_context(context)
 
         super().__init__(server_id)
 
         self.aggregation_delay = aggregation_delay
+        self.aggregation_bytes_per_second = aggregation_bytes_per_second
+        if aggregation_delay:
+            require_aggregation_throughput(aggregation_bytes_per_second)
 
         self.initial_parameters = initial_parameters
         self.edge_server_refs = {}
@@ -112,6 +119,7 @@ class SuperServer(BaseAsyncServer):
                 num_updates,
                 sum(w.nbytes for w in self.global_model_weights),
                 rng=self.random_streams.stream("aggregation"),
+                throughput_bytes_per_second=self.aggregation_bytes_per_second,
             )
 
         for edge_server_id, edge_server_ref in self.edge_server_refs.items():

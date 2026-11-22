@@ -1,5 +1,34 @@
 # Reproducibility
 
+## Controlled event-order experiment
+
+The engines, start API and run dialog support an experimental
+`event_order="parent"` mode. The API stores it in `simulation_settings` for
+either architecture, including frozen run definitions. Programmatic Spyker
+accepts it in `simulation_params`; HierFL accepts it in its constructor.
+The default remains `completion`, preserving the policy of existing archives.
+The new mode finishes each dispatched frontier, then inserts its children in
+parent-event sequence order, retaining each callback's child order and timestamps.
+Zero-delay children form a subsequent frontier. Merely sorting futures that
+happen to be ready would not remove completion-timing dependence.
+
+`get_execution_summary()` reports dispatched work and a canonical envelope-order
+digest. It excludes model payloads and physical scheduling. Repeated tensor-state
+hashes provide a separate saved-state check; neither digest certifies an entire
+runtime. Hardware, libraries, actor state, input registration order and RNGs still
+matter. This mode changes scheduling semantics and must be named explicitly in
+new experiments; it does not reinterpret the archived completion-order runs.
+
+Parent sequence is one explicit tie convention, not a fairness or realism
+guarantee. Under arrival-sensitive feedback it may repeatedly favor the same
+client positions. Distinguish replay consistency from sensitivity to the chosen
+ordering rule; a seeded tie-order intervention is a separate experiment.
+
+Client shuffle seeds retain the existing `run_seed + partition_index` rule.
+Adjacent run seeds therefore have overlapping client shuffle streams. This is
+not independent seed derivation across runs; partitions and actor timing streams
+are recorded separately. Do not silently reseed an ongoing or archived study.
+
 ## Historical source
 
 Commit `7d9d5bd07d80edc613286f3effec7256cac1fd6b` preserves the imported project

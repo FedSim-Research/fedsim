@@ -12,6 +12,8 @@ interface RunOptionBase {
   requestKey: string;
   label: string;
   help: string;
+  /** Visible when an experimental flag is enabled, without opening a tooltip. */
+  warning?: string;
   section: RunOptionSection;
   /** Request block the value belongs to. */
   target: 'simulation_settings' | 'spyker_config';
@@ -46,6 +48,11 @@ export type RunOptionValues = Record<string, RunOptionValue>;
 
 const DATA_OPTIONS: readonly RunOption[] = [
   {
+    kind: 'choice', requestKey: 'event_order', label: 'Event ordering', section: 'simulation',
+    target: 'simulation_settings', choices: ['completion', 'parent'], defaultValue: 'completion',
+    help: 'completion: children follow physical callback completion. parent: finish each dispatch frontier, then insert children by parent sequence. This experimental tie convention changes scheduling assumptions; fixed seeds alone do not guarantee replay across platforms.',
+  },
+  {
     kind: 'choice', requestKey: 'partitioning', label: 'Data partitioning', section: 'simulation',
     target: 'simulation_settings', choices: ['iid', 'label-skew'], defaultValue: 'iid',
     help: 'iid: shuffled equal shares; label-skew: each client holds only a few labels (non-IID).',
@@ -75,6 +82,12 @@ export const RUN_OPTIONS: Readonly<Record<Architecture, readonly RunOption[]>> =
       kind: 'flag', requestKey: 'aggregation_delay', label: 'Aggregation response delay', section: 'algorithm',
       target: 'simulation_settings', defaultValue: false,
       help: 'Delay coordinator broadcasts only. Model state updates immediately; edge work and server queues are not modeled.',
+      warning: 'Supply aggregation throughput in bytes/s. Delay = input model bytes / throughput, plus runtime noise. Model state is immediately visible; server queues are not modeled.',
+    },
+    {
+      kind: 'number', requestKey: 'aggregation_bytes_per_second', label: 'Aggregation throughput (bytes/s)', section: 'algorithm',
+      target: 'simulation_settings', min: 0, exclusiveMin: true, defaultValue: null,
+      help: 'Required for aggregation response delay. Supply separately measured input-byte throughput; training compute factors are not used. Applied uniformly to coordinator aggregation.',
     },
   ],
   spyker: [
@@ -103,6 +116,12 @@ export const RUN_OPTIONS: Readonly<Record<Architecture, readonly RunOption[]>> =
       kind: 'flag', requestKey: 'aggregation_delay', label: 'Aggregation response delay', section: 'algorithm',
       target: 'spyker_config', defaultValue: false,
       help: 'Delay the next fit for the replying client. Model state updates immediately; no busy-server queue is modeled.',
+      warning: 'Supply aggregation throughput in bytes/s. Delay = input model bytes / throughput, plus runtime noise. Model state is immediately visible; server queues are not modeled.',
+    },
+    {
+      kind: 'number', requestKey: 'aggregation_bytes_per_second', label: 'Aggregation throughput (bytes/s)', section: 'algorithm',
+      target: 'spyker_config', min: 0, exclusiveMin: true, defaultValue: null,
+      help: 'Required for aggregation response delay. Supply separately measured input-byte throughput; training compute factors are not used. Applied uniformly to server aggregation.',
     },
     {
       kind: 'number', requestKey: 'sync_timeout', label: 'Sync timeout (s)', section: 'algorithm',
@@ -143,6 +162,9 @@ export function validateOptionValues(architecture: Architecture, values: RunOpti
     .map((error) => `${architecture}: ${error}`);
   if (values['partitioning'] === 'label-skew' && values['labels_per_client'] == null) {
     errors.push(`${architecture}: label-skew partitioning requires labels per client`);
+  }
+  if (values['aggregation_delay'] === true && values['aggregation_bytes_per_second'] == null) {
+    errors.push(`${architecture}: aggregation response delay requires aggregation throughput (bytes/s)`);
   }
   return errors;
 }

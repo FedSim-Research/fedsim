@@ -170,6 +170,7 @@ def _require_spyker_config(spyker_config: dict[str, Any] | None) -> dict[str, An
         "tcp_rto_delay": parse_nonnegative_float,
         "sample_weighting": parse_bool,
         "aggregation_delay": parse_bool,
+        "aggregation_bytes_per_second": parse_positive_float,
         "age_announcements": parse_bool,
         "fifo_links": parse_bool,
         "sync_timeout": parse_positive_float,
@@ -178,11 +179,14 @@ def _require_spyker_config(spyker_config: dict[str, Any] | None) -> dict[str, An
     }
     for key, choices in SPYKER_MODE_CHOICES.items():
         parsers[key] = lambda value, code, choices=choices: parse_choice(value, choices, code)
-    return {
+    parsed = {
         key: parsers[key](value, f"spyker_invalid_{key}")
         for key, value in spyker_config.items()
         if value is not None and key in parsers
     }
+    if parsed.get("aggregation_delay") and parsed.get("aggregation_bytes_per_second") is None:
+        raise ValueError("spyker_aggregation_throughput_required")
+    return parsed
 
 
 def build_spyker_simulation(
@@ -201,6 +205,7 @@ def build_spyker_simulation(
     partitioning: str | None = None,
     labels_per_client: int | None = None,
     local_holdout: float | None = None,
+    event_order: str | None = None,
 ):
     SpykerSimulation, _, _ = _import_spyker()
     validate_spyker_graph(graph)
@@ -223,6 +228,10 @@ def build_spyker_simulation(
         "run_time_limit": limit,
         "eval_time_delay": 500.0 if eval_interval is None else float(eval_interval),
     }
+    if event_order is not None:
+        simulation_config["event_order"] = parse_choice(
+            event_order, ("completion", "parent"), "spyker_invalid_event_order"
+        )
     if idle_token_delay is not None:
         idle = float(idle_token_delay)
         if idle < 0:

@@ -49,6 +49,9 @@ class SpykerParameters(BaseModel):
     staleness_mode: Literal["reciprocal", "none", "delta", "relative"] = "reciprocal"
     sample_weighting: StrictBool = False
     aggregation_delay: StrictBool = False
+    aggregation_bytes_per_second: (
+        Annotated[float, Field(gt=0, strict=True, allow_inf_nan=False)] | None
+    ) = None
     age_merge: Literal["monotonic", "weighted"] = "monotonic"
     age_announcements: StrictBool = False
     fifo_links: StrictBool = False
@@ -59,6 +62,12 @@ class SpykerParameters(BaseModel):
     sigmoid_phi: PositiveFloat
     server_learning_rate: PositiveFloat
     tcp_rto_delay: Annotated[float, Field(ge=0, allow_inf_nan=False)]
+
+    @model_validator(mode="after")
+    def validate_response_throughput(self):
+        if self.aggregation_delay and self.aggregation_bytes_per_second is None:
+            raise ValueError("campaign_aggregation_throughput_required")
+        return self
 
 
 class CampaignConfig(BaseModel):
@@ -80,6 +89,7 @@ class CampaignConfig(BaseModel):
     client_runtime_sigma: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0
     spyker_config: SpykerParameters | None = None
     require_peer_exchange: Annotated[bool, Field(strict=True)] | None = None
+    event_order: Literal["completion", "parent"] | None = None
 
     @model_validator(mode="after")
     def validate_comparison(self):
@@ -251,6 +261,8 @@ def build_plan(config: CampaignConfig, campaign_id: str) -> dict:
                 )
                 if config.require_peer_exchange is not None:
                     cases[-1]["require_peer_exchange"] = config.require_peer_exchange
+                if config.event_order is not None:
+                    cases[-1]["request"]["simulation_settings"]["event_order"] = config.event_order
     return {
         "schema_version": 1,
         "campaign_id": campaign_id,
@@ -281,6 +293,7 @@ _EXTENSION_DEFAULTS = {
     "fifo_links": False,
     "sync_timeout": None,
     "aggregation_delay": False,
+    "aggregation_bytes_per_second": None,
 }
 
 

@@ -90,8 +90,10 @@ class Net(nn.Module):
         x = self.pool(F.relu(self.conv2(x)))
         x = self.pool(F.relu(self.conv3(x)))
 
-        # Force feature map to 4x4 for dataset agnosticism
-        x = self.adaptive_pool(x)
+        # Avoid an identity operation for 32x32 inputs. Its CUDA backward has
+        # no deterministic implementation on some supported PyTorch versions.
+        if x.shape[-2:] != (4, 4):
+            x = self.adaptive_pool(x)
 
         x = x.view(-1, 128 * 4 * 4)
 
@@ -293,7 +295,7 @@ def load_data(
 
 
 def train(net, trainloader, epochs, lr, device, strategy_name="standard"):
-    """Train the model on the training set."""
+    """Train and return mean loss per example processed across all epochs."""
     net.to(device)
     criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
@@ -302,6 +304,7 @@ def train(net, trainloader, epochs, lr, device, strategy_name="standard"):
 
     net.train()
     running_loss = 0.0
+    processed_examples = 0
     for _ in range(epochs):
         for batch in trainloader:
             images = batch["img"].to(device)
@@ -315,10 +318,12 @@ def train(net, trainloader, epochs, lr, device, strategy_name="standard"):
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item()
+            running_loss += loss.item() * len(labels)
+            processed_examples += len(labels)
 
-    avg_trainloss = running_loss / len(trainloader)
-    return avg_trainloss
+    if not processed_examples:
+        raise ValueError("training_requires_examples")
+    return running_loss / processed_examples
 
 
 def test(net, testloader, device):

@@ -296,6 +296,25 @@ The `fixed` preset changes three controls at once. Use the individual
 separate contributions. Larger accuracy is an observation, not proof of fidelity
 to the original Spyker algorithm. Compare all outcomes at fixed data and budgets.
 
+An unchanged result does not establish that a control is generally inactive.
+In particular, synchronization checks the inter-server age threshold first.
+If observed drift exceeds both the fixed and automatic thresholds, they can
+produce the same decisions and models. Raising `h_intra` alone does not make
+that comparison informative. A threshold experiment must establish, from traces,
+that the changed inter threshold changes decisions.
+Runtime noise can break completion waves, but it is neither a necessary nor a
+sufficient condition for threshold sensitivity. A separate zero-noise control
+could also choose thresholds across an observed drift step while preventing the
+intra rule from masking it. Do not add such a control to an already frozen plan.
+The existing `default-noise` and `fixed-noise` profiles differ in several policy
+settings, not only the inter threshold. Their contrast cannot isolate a causal
+effect of automatic threshold selection under noise.
+
+For future experiments, specify `eval_interval` explicitly. The run dialog uses
+500 virtual seconds for both architectures; omitted programmatic metadata uses
+500 for HierFL and the configured interval (initially 0) for Spyker. These
+convenience defaults are not part of a matched experimental design.
+
 ### Aggregation response-delay approximation
 
 The optional `aggregation_delay` API field retains its name for compatibility.
@@ -307,3 +326,18 @@ delay expires; evaluations and peer messages can see the current state during
 that wait. This option must not be used as evidence of calibrated server CPU
 utilization, contention, or delayed model availability. It is disabled by default.
 A serialized aggregation-completion model would require a separate extension.
+
+Enabling the option requires a finite positive `aggregation_bytes_per_second`:
+in `simulation_settings` for HierFL and `spyker_config` for Spyker. The nominal
+response delay is `updates * model_bytes / aggregation_bytes_per_second` virtual
+seconds, with zero-mean runtime noise added separately. Training compute factors
+are not used. The rate applies uniformly to coordinator aggregation in HierFL
+or server aggregation in Spyker. Measure it for the intended workload; there is
+no calibrated default. For example, 2,481,448 input bytes at 100,000,000 bytes/s
+give 0.02481448 seconds before noise. This is an arithmetic example, not a
+hardware measurement.
+
+Earlier experimental enabled configurations reused the training compute factor
+as bytes/s, leading to unrealistic delays. They must now supply the separate
+rate explicitly. Disabled configurations and archived learning runs are
+unaffected. This change does not implement a server queue.
