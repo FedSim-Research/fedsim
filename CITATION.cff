@@ -1,6 +1,7 @@
 cff-version: 1.2.0
 message: "If you use FedSim in your research, please cite this software and record the commit you used."
 type: software
+version: 1.0.0
 title: "FedSim: Topology-Aware Simulation of Geo-Distributed Federated Learning"
 authors:
   - family-names: Altunkapan
@@ -15,6 +16,21 @@ authors:
     given-names: Silas
 repository-code: "https://github.com/FedSim-Research/fedsim"
 license: Apache-2.0
+preferred-citation:
+  type: article
+  title: "FedSim: Topology-Aware Simulation of Geo-Distributed Federated Learning"
+  authors:
+    - family-names: Altunkapan
+      given-names: Deniz
+    - family-names: Peresunchak
+      given-names: Maximilian
+    - family-names: Tsigos
+      given-names: Viorel
+    - family-names: Reng
+      given-names: Nico
+    - family-names: Aidam
+      given-names: Silas
+  year: 2026
 keywords:
   - federated learning
   - simulation
