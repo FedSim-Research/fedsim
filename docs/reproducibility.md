@@ -24,6 +24,12 @@ guarantee. Under arrival-sensitive feedback it may repeatedly favor the same
 client positions. Distinguish replay consistency from sensitivity to the chosen
 ordering rule; a seeded tie-order intervention is a separate experiment.
 
+The research studies accompanying the paper ran from frozen source snapshots,
+not from a later release tree. Their producing sources, plans and per-file
+hashes are archived with the study data (see the README's citation section).
+Results obtained with one revision must not be attributed to another; passing
+later tests does not establish numerical equivalence between revisions.
+
 Client shuffle seeds retain the existing `run_seed + partition_index` rule.
 Adjacent run seeds therefore have overlapping client shuffle streams. This is
 not independent seed derivation across runs; partitions and actor timing streams
@@ -33,8 +39,8 @@ are recorded separately. Do not silently reseed an ongoing or archived study.
 
 Commit `7d9d5bd07d80edc613286f3effec7256cac1fd6b` preserves the imported project
 before the repository reorganization. It is a historical source reference;
-the exact commit and installed environment used for each manuscript experiment
-have not been established.
+the exact commit and installed environment used for experiments with the
+imported code have not been established.
 
 The original dependency declarations can be inspected without changing the
 working tree:
@@ -57,7 +63,7 @@ are in [Development](development.md).
 
 The automated tests and CPU integration checks exercise application behavior,
 dataset partitioning, model training on synthetic images, and runtime
-integration. They do not reproduce the manuscript's convergence or performance
+integration. They do not reproduce published convergence or performance
 measurements. Historical measurements must remain associated with the original
 software and hardware conditions; comparisons after a runtime update require
 new measurements.

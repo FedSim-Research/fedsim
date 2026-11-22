@@ -334,7 +334,7 @@ completions rather than initiated exchanges.
 The existing model-weighting formula, integer monotonic model ages, and token
 circulation policy are retained. Peer aggregation remains asynchronous and
 can depend on arrival order. These protocol corrections do not establish full
-equivalence with the original Spyker implementation or validate paper results.
+equivalence with the original Spyker implementation or validate its published results.
 The default scheduler assigns tie-breaking sequence IDs when callbacks complete.
 The optional `parent` ordering waits for the dispatched frontier and inserts
 children by parent sequence instead. This mode is available in the API and run

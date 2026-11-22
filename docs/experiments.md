@@ -238,23 +238,15 @@ available for inspection.
 Only a campaign with `execution.json` status `completed` has passed all collection
 checks. Preserve the original archive before deriving tables or figures. Evaluation
 snapshots remain per-actor, not globally simultaneous; asynchronous event order
-can still vary. Historical paper measurements remain a separate evidence set.
+can still vary. Measurements published with the paper remain a separate evidence set.
 
-## Experimental Spyker policy comparisons
+## Spyker update policies and tracing
 
-`experiments/spyker-fixes/` holds seven campaigns: `default`, `relative-decay`,
-`delta-staleness`, `auto-threshold`, `fixed`, `default-noise` and `fixed-noise`. Each has two
-placements and three seeds; the hierarchical counterpart runs in every campaign.
-
-The legacy filename "fixed" selects an experimental combination, not a faithful
-reproduction or a demonstrated correction: relative decay, delta staleness and
-`h_inter: "auto"`, which
-is `n_C / (5 n)`: 10 for 200 clients on 4 servers. The noise campaigns add a
-per-fit runtime standard deviation of 0.02 virtual seconds (5 % of the 0.4 s
-training time) to break synchronous completion waves.
-
-With β = 0.05, `relative-decay` lowers a rate by at most 5 % in synchronous
-waves, so it is expected to land near the archived β = 0 results.
+Spyker's learning-rate decay (`decay_mode`: `absolute` or `relative`), staleness
+weighting (`staleness_mode`: `reciprocal`, `none`, `delta` or `relative`) and
+synchronization thresholds (`h_inter`, `h_intra`; `h_inter: "auto"` resolves to
+`n_C / (5 n)`) are explicit configuration fields. A per-fit runtime standard
+deviation can break synchronous completion waves.
 
 `FEDSIM_UPDATE_TRACE=on` writes one telemetry line per client update: learning
 rate used and assigned, staleness, blend coefficient and ages. Each Spyker
@@ -271,18 +263,6 @@ measurement campaigns, after the calibration pilot, check that tracing is
 active: `grep -c '"client_update"' <telemetry dir>/sim_<run_id>.jsonl` must
 print a number greater than 0 for one Spyker run.
 
-Smoke test (10+ minutes):
-
-```bash
-FEDSIM_EVENT_LOG=off .venv/bin/python experiments/spyker-fixes/smoke.py default 60
-FEDSIM_EVENT_LOG=off .venv/bin/python experiments/spyker-fixes/smoke.py fixed 60
-```
-
-The smoke runs use the fixed run ids `smoke-default` and `smoke-fixed`, so
-repeated runs append to the same trace file; delete it before analysing a
-smoke trace.
-
-
 ### Compatibility and interpretation
 
 Saved v1 plans may omit the later optional controls. The reader compares absent
@@ -291,10 +271,14 @@ non-default policies, graphs or requests remain invalid. Calibration approval
 uses the same equivalence for optional defaults. Runtime sources and old result
 archives remain separate from new policy experiments.
 
-The `fixed` preset changes three controls at once. Use the individual
-`relative-decay`, `delta-staleness` and `auto-threshold` profiles to study their
-separate contributions. Larger accuracy is an observation, not proof of fidelity
-to the original Spyker algorithm. Compare all outcomes at fixed data and budgets.
+The start dialog offers an explicitly labeled experimental comparison preset
+and warns when absolute beta is at least the base learning rate. The preset
+changes several controls at once and is not a validated universal default.
+Vary one control at a time to study separate contributions. Larger accuracy is
+an observation, not proof of fidelity to the original Spyker algorithm. Keep the
+reference settings for reproduction; for a new learning experiment, compare
+decay choices on held-out training data before interpreting a low score as a
+protocol limitation, and compare all outcomes at fixed data and budgets.
 
 An unchanged result does not establish that a control is generally inactive.
 In particular, synchronization checks the inter-server age threshold first.
@@ -306,9 +290,8 @@ Runtime noise can break completion waves, but it is neither a necessary nor a
 sufficient condition for threshold sensitivity. A separate zero-noise control
 could also choose thresholds across an observed drift step while preventing the
 intra rule from masking it. Do not add such a control to an already frozen plan.
-The existing `default-noise` and `fixed-noise` profiles differ in several policy
-settings, not only the inter threshold. Their contrast cannot isolate a causal
-effect of automatic threshold selection under noise.
+Comparing profiles that differ in several policy settings, not only the inter
+threshold, cannot isolate a causal effect of automatic threshold selection.
 
 For future experiments, specify `eval_interval` explicitly. The run dialog uses
 500 virtual seconds for both architectures; omitted programmatic metadata uses

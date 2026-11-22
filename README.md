@@ -43,13 +43,13 @@ dataset paths, non-IID workloads and physical timing calibration remain unvalida
 
 ## Citation
 
-The accompanying [analysis scripts](experiments/analysis/README.md) regenerate
-manuscript results from verified experiment archives. The artifact deposit under
-reserved Zenodo DOI
-**10.5281/zenodo.24245352** is being prepared and is not yet published.
-
 Use [CITATION.cff](CITATION.cff) to cite the software. Record the source commit
 and dependency lockfile with your experiment results.
+
+The accompanying paper, its experiment archives and the analysis scripts that
+regenerate its tables and figures are published separately under the reserved
+Zenodo DOI **10.5281/zenodo.24245352** (not yet published). They are not part of
+this repository.
 
 ## License
 
