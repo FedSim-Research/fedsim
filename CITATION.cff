@@ -19,6 +19,7 @@ license: Apache-2.0
 preferred-citation:
   type: article
   title: "FedSim: Topology-Aware Simulation of Geo-Distributed Federated Learning"
+  doi: "10.5281/zenodo.24502689"
   authors:
     - family-names: Altunkapan
       given-names: Deniz

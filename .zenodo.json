@@ -1,0 +1,29 @@
+{
+  "title": "FedSim: Topology-Aware Simulation of Geo-Distributed Federated Learning",
+  "description": "FedSim is a topology-aware simulator for hierarchical and Spyker-inspired asynchronous multi-server federated learning. It combines interactive topology design, real PyTorch training, virtual computation and communication delays, immutable run definitions, update traces, and per-server checkpoints. This software archive preserves a release of the maintained simulator; the accompanying preprint and experimental artifacts are published separately.",
+  "upload_type": "software",
+  "license": "Apache-2.0",
+  "creators": [
+    {"name": "Altunkapan, Deniz", "affiliation": "University of Stuttgart"},
+    {"name": "Peresunchak, Maximilian", "affiliation": "University of Stuttgart"},
+    {"name": "Tsigos, Viorel", "affiliation": "University of Stuttgart"},
+    {"name": "Reng, Nico", "affiliation": "University of Stuttgart"},
+    {"name": "Aidam, Silas", "affiliation": "University of Stuttgart"}
+  ],
+  "keywords": [
+    "federated learning",
+    "multi-server federated learning",
+    "simulation",
+    "network topology",
+    "asynchronous federated learning",
+    "reproducibility"
+  ],
+  "access_right": "open",
+  "related_identifiers": [
+    {
+      "identifier": "10.5281/zenodo.24502689",
+      "relation": "isDocumentedBy",
+      "scheme": "doi"
+    }
+  ]
+}

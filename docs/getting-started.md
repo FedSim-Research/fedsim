@@ -54,8 +54,13 @@ file in the repository root with `DEPLOY_HTTP_PORT=8090`.
 4. Switch to the **Dashboard** to follow the run's status and learning curves.
    Use **Export CSV** to download the results once the run has finished.
 
-The first run downloads CIFAR-10, which can take a few minutes. A short time
-limit (for example 60 seconds) keeps the first run quick.
+The first run downloads CIFAR-10, which can take a few minutes. The time limit
+is virtual time, not a wall-clock runtime limit. Choose a horizon long enough
+for clients to finish training: with the predefined 100-client Spyker graphs,
+the default compute factor of 1 and one local epoch, training alone takes about
+400 virtual seconds per client. A 60-second horizon therefore ends before the
+first update can arrive. For a shorter virtual training cycle, increase the
+client compute factors before submitting; this does not speed up the actual SGD.
 
 ## Everyday commands
 
