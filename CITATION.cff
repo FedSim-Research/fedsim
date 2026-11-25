@@ -6,14 +6,18 @@ title: "FedSim: Topology-Aware Simulation of Geo-Distributed Federated Learning"
 authors:
   - family-names: Altunkapan
     given-names: Deniz
+    orcid: "https://orcid.org/0009-0007-0646-2889"
   - family-names: Peresunchak
     given-names: Maximilian
+    orcid: "https://orcid.org/0009-0009-3329-9911"
   - family-names: Tsigos
     given-names: Viorel
+    orcid: "https://orcid.org/0009-0003-7352-5852"
   - family-names: Reng
     given-names: Nico
   - family-names: Aidam
     given-names: Silas
+    orcid: "https://orcid.org/0009-0005-4648-4498"
 repository-code: "https://github.com/FedSim-Research/fedsim"
 license: Apache-2.0
 preferred-citation:
@@ -23,14 +27,18 @@ preferred-citation:
   authors:
     - family-names: Altunkapan
       given-names: Deniz
+      orcid: "https://orcid.org/0009-0007-0646-2889"
     - family-names: Peresunchak
       given-names: Maximilian
+      orcid: "https://orcid.org/0009-0009-3329-9911"
     - family-names: Tsigos
       given-names: Viorel
+      orcid: "https://orcid.org/0009-0003-7352-5852"
     - family-names: Reng
       given-names: Nico
     - family-names: Aidam
       given-names: Silas
+      orcid: "https://orcid.org/0009-0005-4648-4498"
   year: 2026
 keywords:
   - federated learning

@@ -4,11 +4,11 @@
   "upload_type": "software",
   "license": "Apache-2.0",
   "creators": [
-    {"name": "Altunkapan, Deniz", "affiliation": "University of Stuttgart"},
-    {"name": "Peresunchak, Maximilian", "affiliation": "University of Stuttgart"},
-    {"name": "Tsigos, Viorel", "affiliation": "University of Stuttgart"},
+    {"name": "Altunkapan, Deniz", "orcid": "0009-0007-0646-2889", "affiliation": "University of Stuttgart"},
+    {"name": "Peresunchak, Maximilian", "orcid": "0009-0009-3329-9911", "affiliation": "University of Stuttgart"},
+    {"name": "Tsigos, Viorel", "orcid": "0009-0003-7352-5852", "affiliation": "University of Stuttgart"},
     {"name": "Reng, Nico", "affiliation": "University of Stuttgart"},
-    {"name": "Aidam, Silas", "affiliation": "University of Stuttgart"}
+    {"name": "Aidam, Silas", "orcid": "0009-0005-4648-4498", "affiliation": "University of Stuttgart"}
   ],
   "keywords": [
     "federated learning",
